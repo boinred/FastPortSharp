@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortServer", "FastPortServer\FastPortServer.csproj", "{17DB360E-BC84-4D36-915C-0F07E48BE579}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibCommons", "LibCommons\LibCommons.csproj", "{D009F64A-A190-4BF4-9FD0-39BB6CF4690D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibNetworks", "LibNetworks\LibNetworks.csproj", "{A91233AE-158B-4337-AAC2-96886AA7EA31}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortClient", "FastPortClient\FastPortClient.csproj", "{23EB6B03-959E-442B-A131-FD3A5225CC30}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{17DB360E-BC84-4D36-915C-0F07E48BE579}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{17DB360E-BC84-4D36-915C-0F07E48BE579}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{17DB360E-BC84-4D36-915C-0F07E48BE579}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{17DB360E-BC84-4D36-915C-0F07E48BE579}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D009F64A-A190-4BF4-9FD0-39BB6CF4690D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D009F64A-A190-4BF4-9FD0-39BB6CF4690D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D009F64A-A190-4BF4-9FD0-39BB6CF4690D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D009F64A-A190-4BF4-9FD0-39BB6CF4690D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A91233AE-158B-4337-AAC2-96886AA7EA31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A91233AE-158B-4337-AAC2-96886AA7EA31}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A91233AE-158B-4337-AAC2-96886AA7EA31}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A91233AE-158B-4337-AAC2-96886AA7EA31}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
