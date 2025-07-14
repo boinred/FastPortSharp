@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 
 namespace LibNetworks;
 
@@ -22,7 +22,7 @@ public static class AddressConverter
         }
         catch (System.Exception ex)
         {
-
+            
         }
 
 

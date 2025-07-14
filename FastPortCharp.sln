@@ -11,13 +11,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibNetworks", "LibNetworks\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortClient", "FastPortClient\FastPortClient.csproj", "{23EB6B03-959E-442B-A131-FD3A5225CC30}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "솔루션 항목", "솔루션 항목", "{2A3A057F-5D22-31FD-628C-DF5EF75AEF1E}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{17DB360E-BC84-4D36-915C-0F07E48BE579}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -36,5 +38,8 @@ Global
 		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23EB6B03-959E-442B-A131-FD3A5225CC30}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal
