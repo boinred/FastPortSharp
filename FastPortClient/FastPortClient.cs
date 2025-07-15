@@ -10,7 +10,7 @@ namespace FastPortClient;
 
 internal class FastPortClient : LibNetworks.BaseConnector
 {
-    public FastPortClient(ILogger<BaseMessageListener> logger) : base()
+    public FastPortClient(ILogger<FastPortClient> logger) : base(logger)
     {
     }
 }

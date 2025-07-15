@@ -2,11 +2,10 @@
 using System.Net.Sockets;
 using LibNetworks.Sessions;
 using Microsoft.Extensions.Logging;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LibNetworks;
 
-public abstract class BaseListener
+public abstract class BaseListener : BaseSocket
 {
 
     // TODO : 파일 설정에서 불러온다.
@@ -14,12 +13,6 @@ public abstract class BaseListener
     private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
 
     protected ILogger m_Logger;
-
-    private System.Net.Sockets.Socket m_ListenerSocket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
-
-    private SocketEventsPool m_SocketEventsPool = new SocketEventsPool(1000);
-
-    private System.Net.Sockets.SocketAsyncEventArgs m_AcceptSocketEvents = new System.Net.Sockets.SocketAsyncEventArgs();
 
     private IClientSessionFactory m_ClientSessionFactory;
 
@@ -33,7 +26,7 @@ public abstract class BaseListener
         C_MaxConnections = maxConnectionsCount;
     }
 
-    public bool Start(string ip, int port)
+    public bool StartAccept(string ip, int port)
     {
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
@@ -43,12 +36,12 @@ public abstract class BaseListener
 
         try
         {
-            m_ListenerSocket.Bind(endPoint!);
+            m_Socket.Bind(endPoint!);
 
-            m_ListenerSocket.Listen(100);
+            m_Socket.Listen(100);
 
-            m_AcceptSocketEvents.Completed += OnSocketEventsAcceptCompleted;
-            return Accept(m_AcceptSocketEvents);
+            m_SocketEvent.Completed += OnSocketEventsAcceptCompleted;
+            return Accept(m_SocketEvent);
         }
         catch (System.Exception ex)
         {
@@ -65,7 +58,7 @@ public abstract class BaseListener
 
         try
         {
-            if (!m_ListenerSocket.AcceptAsync(acceptArgs))
+            if (!m_Socket.AcceptAsync(acceptArgs))
             {
                 // If AcceptAsync returns false, we handle the accept operation immediately
                 OnSocketEventsAcceptCompleted(this, acceptArgs);
@@ -89,7 +82,6 @@ public abstract class BaseListener
             m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {args.SocketError}");
             return; 
         }
-
         Socket? clientSocket = args.AcceptSocket;
         if (null == clientSocket)
         {
@@ -99,10 +91,14 @@ public abstract class BaseListener
 
         m_Logger.LogInformation($"BaseListener, OnSocketEventsAcceptCompleted, End Point : {clientSocket.RemoteEndPoint}");
 
+        // TODO: 다른 쓰레드에서 처리되어야 한다.
+
         //new BaseSessionClient(clientSocket);
         BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
 
         // Add Session Managers
-        
+
+
+        Accept(m_SocketEvent);
     }
 }

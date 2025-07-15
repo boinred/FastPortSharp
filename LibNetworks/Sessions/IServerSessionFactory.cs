@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace LibNetworks.Sessions;
 
-public interface IServerSessionFactory
+public interface IClientSessionFactory
 {
-    BaseSessionServer Create(Socket connectedSocket);
+    BaseSessionClient Create(Socket clientSocket);
 }
