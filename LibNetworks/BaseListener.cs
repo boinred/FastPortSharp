@@ -2,16 +2,18 @@
 using System.Net.Sockets;
 using LibNetworks.Sessions;
 using Microsoft.Extensions.Logging;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LibNetworks;
 
-public abstract class BaseListener(ILogger<BaseListener> logger, int maxConnectionsCount)
+public abstract class BaseListener
 {
+
     // TODO : 파일 설정에서 불러온다.
-    private readonly int C_MaxConnections = maxConnectionsCount;
+    private readonly int C_MaxConnections;
     private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
 
-    protected ILogger m_Logger = logger;
+    protected ILogger m_Logger;
 
     private System.Net.Sockets.Socket m_ListenerSocket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
 
@@ -19,11 +21,23 @@ public abstract class BaseListener(ILogger<BaseListener> logger, int maxConnecti
 
     private System.Net.Sockets.SocketAsyncEventArgs m_AcceptSocketEvents = new System.Net.Sockets.SocketAsyncEventArgs();
 
+    private IClientSessionFactory m_ClientSessionFactory;
+
+    // TODO: Session Manager 
+
+    public BaseListener(ILogger<BaseListener> logger, IClientSessionFactory clientSessionFactory , int maxConnectionsCount)
+    {
+        m_Logger = logger;
+        m_ClientSessionFactory = clientSessionFactory;
+
+        C_MaxConnections = maxConnectionsCount;
+    }
+
     public bool Start(string ip, int port)
     {
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
-            logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
+            m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
             return false;
         }
 
@@ -55,7 +69,6 @@ public abstract class BaseListener(ILogger<BaseListener> logger, int maxConnecti
             {
                 // If AcceptAsync returns false, we handle the accept operation immediately
                 OnSocketEventsAcceptCompleted(this, acceptArgs);
-
             }
 
             return true;
@@ -73,25 +86,23 @@ public abstract class BaseListener(ILogger<BaseListener> logger, int maxConnecti
         //
         if (args.SocketError != SocketError.Success)
         {
-            ErrorHandler(args.SocketError);
-
+            m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {args.SocketError}");
             return; 
         }
 
         Socket? clientSocket = args.AcceptSocket;
         if (null == clientSocket)
         {
-            ErrorHandler(args.SocketError);
+            m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, Socket is not valid.");
             return;
         }
 
         m_Logger.LogInformation($"BaseListener, OnSocketEventsAcceptCompleted, End Point : {clientSocket.RemoteEndPoint}");
 
         //new BaseSessionClient(clientSocket);
+        BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
 
-        void ErrorHandler(SocketError error)
-        {
-            m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {error}");
-        }
+        // Add Session Managers
+        
     }
 }

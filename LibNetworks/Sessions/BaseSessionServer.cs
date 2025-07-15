@@ -8,5 +8,6 @@ public abstract class BaseSessionServer : BaseSession
         : base(logger, socket)
     {
     }
-    protected abstract void OnAccepted(BaseSessionClient clientSession);
+
+    protected abstract void OnConnected();
 }

@@ -1,6 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using FastPortClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -9,7 +8,7 @@ IHostBuilder builder = Host.CreateDefaultBuilder(args);
 
 builder.ConfigureServices(s =>
 {
-    s.AddHostedService<FastPortClientBackgroundService>();
+    s.AddHostedService<FastPortClient.FastPortClientBackgroundService>();
 });
 
 

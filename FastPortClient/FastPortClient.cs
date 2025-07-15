@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace FastPortClient;
 
-internal class FastPortClient : LibNetworks.BaseMessageListener
+internal class FastPortClient : LibNetworks.BaseConnector
 {
-    public FastPortClient(ILogger<BaseMessageListener> logger) : base(logger)
+    public FastPortClient(ILogger<BaseMessageListener> logger) : base()
     {
     }
 }

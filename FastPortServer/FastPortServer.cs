@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LibNetworks.Sessions;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FastPortServer;
 
-internal class FastPortServer(ILogger<FastPortServer> logger) : LibNetworks.BaseMessageListener(logger)
+internal class FastPortServer(ILogger<FastPortServer> logger, IClientSessionFactory clientSessionFactory) : LibNetworks.BaseMessageListener(logger, clientSessionFactory)
 {
 
 }

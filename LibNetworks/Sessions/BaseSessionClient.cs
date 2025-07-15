@@ -9,6 +9,7 @@ public abstract class BaseSessionClient : BaseSession
 
     }
 
-    protected abstract void OnConnected();
+    protected abstract void OnAccepted();
+    
 
 }
