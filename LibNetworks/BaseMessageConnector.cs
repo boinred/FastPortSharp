@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LibNetworks.Sessions;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +10,7 @@ namespace LibNetworks;
 
 public class BaseMessageConnector : BaseConnector
 {
-    public BaseMessageConnector(ILogger<BaseMessageConnector> logger) : base(logger)
+    public BaseMessageConnector(ILogger<BaseMessageConnector> logger, IServerSessionFactory serverSessionFactory) : base(logger, serverSessionFactory)
     {
     }
 }

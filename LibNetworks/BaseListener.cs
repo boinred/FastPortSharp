@@ -97,6 +97,7 @@ public abstract class BaseListener : BaseSocket
         BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
 
         // Add Session Managers
+        Task.Factory.StartNew(() => clientSession.OnAccepted());
 
 
         Accept(m_SocketEvent);

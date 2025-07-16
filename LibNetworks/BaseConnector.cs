@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LibNetworks.Sessions;
+using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 
 namespace LibNetworks;
@@ -8,12 +9,15 @@ public class BaseConnector : BaseSocket
 {
     private ILogger m_Logger;
 
-    public BaseConnector(ILogger<BaseConnector> logger)
+    private IServerSessionFactory m_ServerSessionFactory; 
+
+    public BaseConnector(ILogger<BaseConnector> logger, IServerSessionFactory serverSessionFactory)
     {
         m_Logger = logger;
+        m_ServerSessionFactory = serverSessionFactory; 
     }
 
-    public bool StartConnect(string ip, int port)
+    public bool StartConnect(string ip, int port, int connectionCount)
     {
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
@@ -27,7 +31,7 @@ public class BaseConnector : BaseSocket
             OnSocketEventsConnectedCompleted(this, m_SocketEvent);
         }
 
-        return false;
+        return true;
     }
 
     private void OnSocketEventsConnectedCompleted(object? sender, SocketAsyncEventArgs args)
@@ -40,5 +44,13 @@ public class BaseConnector : BaseSocket
         }
 
 
+        m_Logger.LogInformation($"BaseConnector, OnSocketEventsConnectedCompleted, Connected to {args.RemoteEndPoint}");
+
+        // TODO: 다른 쓰레드에서 처리되어야 한다.
+        var session = m_ServerSessionFactory.Create(m_Socket);
+
+        // Add Session Managers 
+
+        Task.Run(() => session.OnConnected());
     }
 }

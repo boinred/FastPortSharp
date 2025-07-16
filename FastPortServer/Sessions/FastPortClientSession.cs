@@ -15,7 +15,7 @@ public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
         m_Logger.LogInformation("Data received from client.");
     }
 
-    protected override void OnAccepted()
+    public override void OnAccepted()
     {
         m_Logger.LogInformation("FastPortClientSession, OnAccepted. ");
     }

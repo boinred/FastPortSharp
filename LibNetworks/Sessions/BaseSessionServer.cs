@@ -9,5 +9,5 @@ public abstract class BaseSessionServer : BaseSession
     {
     }
 
-    protected abstract void OnConnected();
+    public abstract void OnConnected();
 }
