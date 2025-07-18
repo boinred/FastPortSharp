@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 
 namespace FastPortServer;
 
-internal class FastPortServer(ILogger<FastPortServer> logger, IClientSessionFactory clientSessionFactory) : LibNetworks.BaseMessageListener(logger, clientSessionFactory)
+public class FastPortServer(ILogger<FastPortServer> logger, IClientSessionFactory clientSessionFactory) 
+    : LibNetworks.BaseMessageListener(logger, clientSessionFactory)
 {
 
 }

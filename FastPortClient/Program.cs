@@ -10,6 +10,7 @@ builder.ConfigureServices(s =>
 {
     s.AddHostedService<FastPortClient.FastPortClientBackgroundService>();
     s.AddSingleton<LibNetworks.Sessions.IServerSessionFactory, FastPortClient.Sessions.FastPortServerSessionFactory>();
+    s.AddTransient<FastPortClient.FastPortConnector>(); 
 });
 
 

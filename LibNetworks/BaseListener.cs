@@ -7,14 +7,19 @@ namespace LibNetworks;
 
 public abstract class BaseListener : BaseSocket
 {
+    
 
     // TODO : 파일 설정에서 불러온다.
     private readonly int C_MaxConnections;
     private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
+    private IClientSessionFactory m_ClientSessionFactory;
 
     protected ILogger m_Logger;
 
-    private IClientSessionFactory m_ClientSessionFactory;
+    protected bool m_bIsRunning = false;
+
+    // Listener가 정지되었을 경우 처리하는 CancellationToken 
+    private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
     // TODO: Session Manager 
 
@@ -33,12 +38,14 @@ public abstract class BaseListener : BaseSocket
             m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
             return false;
         }
+        m_bIsRunning = true; 
 
         try
         {
             m_Socket.Bind(endPoint!);
 
             m_Socket.Listen(100);
+
 
             m_SocketEvent.Completed += OnSocketEventsAcceptCompleted;
             return Accept(m_SocketEvent);
@@ -49,6 +56,19 @@ public abstract class BaseListener : BaseSocket
         }
 
         return true;
+    }
+
+    public void RequestShutdown()
+    {
+        var result = Interlocked.CompareExchange(ref m_bIsRunning, false, true);
+        if(true != result)
+        {
+            return; 
+        }
+
+        // TODO : Shutdown Session Managers
+
+        RequestDisconnect();
     }
 
     private bool Accept(System.Net.Sockets.SocketAsyncEventArgs acceptArgs)
@@ -97,8 +117,7 @@ public abstract class BaseListener : BaseSocket
         BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
 
         // Add Session Managers
-        Task.Factory.StartNew(() => clientSession.OnAccepted());
-
+        Task.Run(() => clientSession.OnAccepted());
 
         Accept(m_SocketEvent);
     }

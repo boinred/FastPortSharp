@@ -2,15 +2,25 @@
 
 namespace LibNetworks.Sessions;
 
-public abstract class BaseSessionClient : BaseSession
+/// <summary>
+/// Base class for client sessions.
+/// </summary>
+public class BaseSessionClient : BaseSession
 {
     public BaseSessionClient(ILogger<BaseSessionClient> logger, System.Net.Sockets.Socket socket)
         : base(logger, socket)
     {
-
+        
     }
 
-    public abstract void OnAccepted();
+    public virtual void OnAccepted()
+    {
+        m_Logger.LogInformation($"BaseSessionClient, OnAccepted. Remote End Point : {GetSessionAddress()}");
+
+        OnReceived();
+
+        RequestReceived();
+    }
 
 
 }
