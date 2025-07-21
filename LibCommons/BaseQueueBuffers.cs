@@ -1,0 +1,121 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace LibCommons;
+
+public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
+{
+    private Queue<byte> m_QueueBuffers = new(capacity);
+
+    /// <summary>
+    /// A ReaderWriterLockSlim to ensure thread safety with concurrent read support.
+    /// </summary>
+    private readonly ReaderWriterLockSlim m_Lock = new();
+
+    private bool m_bDisposed = false;
+
+    public int CanReadSize
+    {
+        get
+        {
+            m_Lock.EnterReadLock();
+
+            try
+            {
+                return m_QueueBuffers.Count;
+            }
+            finally
+            {
+                m_Lock.ExitReadLock();
+            }
+        }
+
+    }
+
+    public int CanWriteSize => m_QueueBuffers.Capacity - CanReadSize;
+
+    public int Write(byte[] buffers, int offset, int count)
+    {
+        var data = new ReadOnlySpan<byte>(buffers, offset, count);
+
+        m_Lock.EnterWriteLock();
+        try
+        {
+            foreach (byte b in data)
+            {
+                m_QueueBuffers.Enqueue(b);
+            }
+            return count;
+        }
+        finally
+        {
+            m_Lock.ExitWriteLock();
+        }
+    }
+
+    public int Peek(ref byte[] buffers)
+    {
+        m_Lock.EnterReadLock();
+
+        try
+        {
+            buffers = m_QueueBuffers.ToArray();
+            return buffers.Length;
+        }
+        finally
+        {
+            m_Lock.ExitReadLock();
+        }
+    }
+
+
+    public int Drain(int size)
+    {
+        m_Lock.EnterReadLock();
+        try
+        {
+            int bytesInDrain = Math.Min(size, m_QueueBuffers.Count);
+            if (0 >= bytesInDrain)
+            {
+                return 0;
+            }
+
+            for (int i = 0; i < bytesInDrain; i++)
+            {
+                m_QueueBuffers.Dequeue();
+            }
+
+            return bytesInDrain;
+        }
+        finally
+        {
+            m_Lock.ExitReadLock();
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+
+    }
+
+    protected virtual void Dispose(bool bDisposing)
+    {
+        if (m_bDisposed)
+        {
+            return;
+        }
+
+        if (bDisposing)
+        {
+            m_Lock.Dispose();
+        }
+
+        m_bDisposed = true;
+
+    }
+}

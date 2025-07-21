@@ -10,7 +10,7 @@ public class BasePacket
 {
     // [PACKET_SIZE][DATA...]
     // 
-    public static int HeaderSize => 4; // Packet Header Size (4 bytes for int)
+    public static int HeaderSize => 2; // Packet Header Size (2 bytes for int)
     
     private int m_DataSize = 0; 
     private byte[] m_Data;

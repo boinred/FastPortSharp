@@ -24,8 +24,9 @@ public abstract class BaseSession
 
     private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
-    private LibCommons.BaseCircularBuffer m_CircularBuffer = new LibCommons.BaseCircularBuffer(1024 * 8); // 8KB Circular Buffer
+    private LibCommons.BaseCircularBuffers m_CircularBuffers = new LibCommons.BaseCircularBuffers(1024 * 8); // 8KB Circular Buffer
 
+    private Task m_TaskReceived;
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket)
@@ -42,7 +43,7 @@ public abstract class BaseSession
         m_SockenEventsSent.Completed += OnSocketEventsSentCompleted;
         m_SockenEventsSent.UserToken = this;
 
-        StartWorkers();
+        m_TaskReceived = Task.Run(() => DoWorkReceived(m_CircularBuffers, m_CancellationTokenSource.Token));
     }
 
     public string GetSessionAddress() => m_Socket.RemoteEndPoint?.ToString() ?? " Unknown";
@@ -55,10 +56,6 @@ public abstract class BaseSession
 
     protected virtual void OnDisconnected() { }
 
-    private void StartWorkers()
-    {
-
-    }
 
     private void OnSocketEventsReceivedCompleted(object? sender, SocketAsyncEventArgs e)
     {
@@ -96,13 +93,11 @@ public abstract class BaseSession
         }
 
         // Process the received data
-        var wroteSize = m_CircularBuffer.Write(buffer, e.Offset, e.Count);
+        var wroteSize = m_CircularBuffers.Write(buffer, e.Offset, e.Count);
 
         m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Received {wroteSize} bytes from {GetSessionAddress()}");
 
         // 
-
-
 
         RequestReceived();
     }
@@ -160,14 +155,15 @@ public abstract class BaseSession
         RequestSendBuffers(bytes);
     }
 
-    public static void DoWorkReceived(LibCommons.BaseCircularBuffer circularBuffer, CancellationToken cancellationToken)
+    public static void DoWorkReceived(LibCommons.BaseCircularBuffers circularBuffers, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (circularBuffer.CanReadSize < LibCommons.BasePacket.HeaderSize)
+            if (circularBuffers.CanReadSize < LibCommons.BasePacket.HeaderSize)
             {
                 continue;
             }
+            // circularBuffer.Peek()
 
             // CircularBuffer에서 패킷 사이즈만큼 가지고 와서 BlockingCollection에 넣어줘야 한다.
         }
