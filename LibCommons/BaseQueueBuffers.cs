@@ -96,6 +96,62 @@ public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
         }
     }
 
+    public bool TryGetBasePackets(out List<BasePacket> basePackets)
+    {
+        m_Lock.EnterReadLock();
+        int readBuffersSize = 0;
+
+        try
+        {
+            basePackets = new();
+
+            while (readBuffersSize <= m_QueueBuffers.Count)
+            {
+                if (readBuffersSize + 1 >= m_QueueBuffers.Count)
+                {
+                    break;
+                }
+
+                // Read the packet size from the queue
+                byte[] packetIdBuffers = new byte[BasePacket.HeaderSize];
+                m_QueueBuffers.CopyTo(packetIdBuffers, BasePacket.HeaderSize);
+
+                int basePacketSize = packetIdBuffers[0] << 0 | packetIdBuffers[1] << 8;
+                readBuffersSize += BasePacket.HeaderSize;
+
+                if (basePacketSize + readBuffersSize >= m_QueueBuffers.Count)
+                {
+                    break;
+                }
+
+                // Consume 
+                for (int i = 0; i < BasePacket.HeaderSize; i++)
+                {
+                    m_QueueBuffers.Dequeue();
+                }
+
+                // Assuming the first two bytes represent the packet size
+                byte[] packetDataBuffers = new byte[basePacketSize];
+                for (int i = 0; i < basePacketSize; i++)
+                {
+                    if (m_QueueBuffers.Count == 0)
+                    {
+                        break;
+                    }
+                    packetDataBuffers[i] = m_QueueBuffers.Dequeue();
+                }
+            }
+
+        }
+        finally
+        {
+            m_Lock.ExitReadLock();
+        }
+
+        return basePackets.Count > 0;
+    }
+
+
     public void Dispose()
     {
         Dispose(true);
@@ -118,4 +174,6 @@ public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
         m_bDisposed = true;
 
     }
+
+
 }

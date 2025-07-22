@@ -19,4 +19,6 @@ public interface IBuffers
 
     // 버퍼에서 데이터를 제거.
     int Drain(int size);
+
+    bool TryGetBasePackets(out List<BasePacket> basePackets);
 }

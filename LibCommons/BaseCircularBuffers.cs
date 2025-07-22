@@ -14,9 +14,9 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
     // 쓰기 시작 위치
     private int m_Tail = 0;
-    
+
     // 버퍼의 총 크기
-    private int m_Capacity; 
+    private int m_Capacity;
     private readonly ReaderWriterLockSlim m_Lock = new ReaderWriterLockSlim();
 
     // 버퍼에 현재 데이터 사이즈
@@ -41,37 +41,46 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     public int Write(byte[] buffers, int offset, int count)
     {
         int writeSize = count;
-        if (buffers == null || writeSize == 0)
+
+        m_Lock.EnterWriteLock();
+        try
         {
-            return 0; // No data to write
-        }
+            if (buffers == null || writeSize == 0)
+            {
+                return 0; // No data to write
+            }
 
-        if (writeSize > CanWriteSize)
+            if (writeSize > CanWriteSize)
+            {
+                // 용량을 증가 시켜 준다.
+                var increaseSize = writeSize - CanWriteSize; // 증가시켜야 하는 크기
+                Array.Resize(ref m_Buffers, m_Capacity + increaseSize);
+                m_Capacity += increaseSize;
+            }
+
+            // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+            if (m_Tail + writeSize > m_Capacity)
+            {
+                int forwardSize = m_Capacity - m_Tail; // 버퍼의 끝까지 쓸 수 있는 크기
+
+                Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, forwardSize); // 첫 번째 부분 복사
+
+                int remainSize = writeSize - forwardSize; // 남은 크기
+                Buffer.BlockCopy(buffers, offset + forwardSize, m_Buffers, 0, remainSize);
+            }
+            else // 데이터가 버퍼의 끝을 넘지 않는 경우
+            {
+                Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, writeSize);
+            }
+
+            m_Tail = (m_Tail + writeSize) % m_Capacity; // 쓰기 위치 업데이트
+            CanReadSize += writeSize;
+
+        }
+        finally
         {
-            // 용량을 증가 시켜 준다.
-            var increaseSize = writeSize - CanWriteSize; // 증가시켜야 하는 크기
-            Array.Resize(ref m_Buffers, m_Capacity + increaseSize);
-            m_Capacity += increaseSize;
+            m_Lock.ExitWriteLock();
         }
-
-        // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-        if (m_Tail + writeSize > m_Capacity)
-        {
-            int forwardSize = m_Capacity - m_Tail; // 버퍼의 끝까지 쓸 수 있는 크기
-
-            Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, forwardSize); // 첫 번째 부분 복사
-
-            int remainSize = writeSize - forwardSize; // 남은 크기
-            Buffer.BlockCopy(buffers, offset + forwardSize, m_Buffers, 0, remainSize);
-        }
-        else // 데이터가 버퍼의 끝을 넘지 않는 경우
-        {
-            Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, writeSize);
-        }
-
-        m_Tail = (m_Tail + writeSize) % m_Capacity; // 쓰기 위치 업데이트
-        CanReadSize += writeSize;
-
 
         return writeSize;
     }
@@ -79,29 +88,39 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     // 버퍼에서 데이터를 읽어오는 메서드, 데이터는 버퍼에서 제거하지 않는다.
     public int Peek(ref byte[] buffers)
     {
-        if (CanReadSize <= 0)
-        {
-            return 0; // 읽을 데이터가 없는 경우
-        }
-
         int buffersSize = buffers.Length;
-        if (buffersSize > CanReadSize)
-        {
-            // 읽을 수 있는 데이터가 부족한 경우
-            buffersSize = CanReadSize;
-        }
 
-        if (m_Head + buffersSize > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+        m_Lock.EnterReadLock();
+        try
         {
-            int forwardSize = m_Capacity - m_Head; // 버퍼의 끝까지 읽을 수 있는 크기
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize); // 첫 번째 부분 복사
+            if (CanReadSize <= 0)
+            {
+                return 0; // 읽을 데이터가 없는 경우
+            }
 
-            int remainSize = buffersSize - forwardSize; // 남은 크기
-            Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
+
+            if (buffersSize > CanReadSize)
+            {
+                // 읽을 수 있는 데이터가 부족한 경우
+                buffersSize = CanReadSize;
+            }
+
+            if (m_Head + buffersSize > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+            {
+                int forwardSize = m_Capacity - m_Head; // 버퍼의 끝까지 읽을 수 있는 크기
+                Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize); // 첫 번째 부분 복사
+
+                int remainSize = buffersSize - forwardSize; // 남은 크기
+                Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
+            }
+            else // 데이터가 버퍼의 끝을 넘지 않는 경우
+            {
+                Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, buffersSize);
+            }
         }
-        else // 데이터가 버퍼의 끝을 넘지 않는 경우
+        finally
         {
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, buffersSize);
+            m_Lock.ExitReadLock();
         }
 
         return buffersSize;
@@ -109,18 +128,26 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
     public int Drain(int size)
     {
-        if (size > CanReadSize)
+        m_Lock.EnterWriteLock();
+        try
         {
-            size = CanReadSize;
-        }
+            if (size > CanReadSize)
+            {
+                size = CanReadSize;
+            }
 
-        if (size <= 0)
+            if (size <= 0)
+            {
+                return 0;
+            }
+
+            m_Head = (m_Head + size) % m_Capacity; // 읽기 위치 업데이트
+            CanReadSize -= size; // 읽은 데이터 크기만큼 감소
+        }
+        finally
         {
-            return 0;
+            m_Lock.ExitWriteLock();
         }
-
-        m_Head = (m_Head + size) % m_Capacity; // 읽기 위치 업데이트
-        CanReadSize -= size; // 읽은 데이터 크기만큼 감소
 
         return size;
     }
@@ -140,22 +167,9 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         basePackets = new List<BasePacket>().ToArray();
         return true;
     }
-
-    public bool TryGetBasePackets(out BasePacket[]? basePackets)
+    public bool TryGetBasePackets(out List<BasePacket> basePackets)
     {
-        if (m_Buffers.Length < CanReadSize)
-        {
-            basePackets = null; // 읽을 수 있는 패킷이 없음
-            return false; // 패킷이 없음
-        }
-        basePackets = null; 
-
-        m_Lock.EnterWriteLock();
-
-        m_Lock.ExitWriteLock();
-        
-        return true;
-
+        throw new NotImplementedException();
     }
 
     public int GetPacketSizeInBuffers()
@@ -230,4 +244,6 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         m_bDisposed = true;
 
     }
+
+
 }
