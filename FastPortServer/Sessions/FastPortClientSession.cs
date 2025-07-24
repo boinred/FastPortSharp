@@ -6,7 +6,8 @@ namespace FastPortServer.Sessions;
 
 public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
 {
-    public FastPortClientSession(ILogger<LibNetworks.Sessions.BaseSessionClient> logger, Socket socket, LibCommons.IBuffers receivedBuffers) : base(logger, socket, receivedBuffers)
+    public FastPortClientSession(ILogger<LibNetworks.Sessions.BaseSessionClient> logger, Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendBuffers)
+        : base(logger, socket, receivedBuffers, sendBuffers)
     {
     }
 

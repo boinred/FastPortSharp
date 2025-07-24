@@ -23,19 +23,24 @@ public abstract class BaseSession
     private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
     private readonly LibCommons.IBuffers m_ReceivedBuffers;
+    private readonly LibCommons.IBuffers m_SendBuffers;
 
-    private Task m_TaskReceivedBuffers;
-    private Task m_TaskReceivedPackets;
+    private readonly Task m_TaskReceivedBuffers;
+    private readonly Task m_TaskReceivedPackets;
+
+    private readonly Task m_TaskSendBuffers;
 
     private readonly BufferBlock<LibCommons.BasePacket> m_ReceivedPackets;
     private readonly ActionBlock<LibCommons.BasePacket> m_ReceivedWorks;
 
 
-    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers buffers)
+    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
     {
         m_Logger = logger;
         m_Socket = socket;
-        m_ReceivedBuffers = buffers;
+
+        m_ReceivedBuffers = receivedBuffers;
+        m_SendBuffers = sendbuffers;
 
         m_SocketEventsReceived.SetBuffer(m_ReceivedSocketBuffers, 0, m_ReceivedSocketBuffers.Length);
         m_SocketEventsReceived.Completed += OnSocketEventsReceivedCompleted;
@@ -49,6 +54,8 @@ public abstract class BaseSession
 
         m_TaskReceivedPackets = Task.Run(async () => await DoWorkReceivedPackets(m_CancellationTokenSource.Token));
         m_TaskReceivedBuffers = Task.Run(async () => await DoWorkReceivedBuffers(m_CancellationTokenSource.Token));
+        m_TaskSendBuffers = Task.Run(async () => await DoWorkSendBuffers(m_CancellationTokenSource.Token));
+
     }
 
     public string GetSessionAddress() => m_Socket.RemoteEndPoint?.ToString() ?? " Unknown";
@@ -158,7 +165,7 @@ public abstract class BaseSession
             return;
         }
 
-        // Insert Queue 
+        m_SendBuffers.Write(buffers, 0, buffers.Length);
     }
 
     protected void RequestSendString(string message)
@@ -174,11 +181,12 @@ public abstract class BaseSession
         while (await m_ReceivedPackets.OutputAvailableAsync(cancellationToken))
         {
             var packet = await m_ReceivedPackets.ReceiveAsync();
+            await Task.Run(() => OnReceived(packet), cancellationToken);
         }
 
     }
 
-    public async Task DoWorkReceivedBuffers(CancellationToken cancellationToken)
+    private async Task DoWorkReceivedBuffers(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -195,11 +203,28 @@ public abstract class BaseSession
             foreach (var basePacket in basePackets)
             {
                 m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
-                
+
                 await m_ReceivedPackets.SendAsync(basePacket);
             }
 
             m_ReceivedPackets.Complete(); // Complete the block when done processing
         }
+    }
+
+    private async Task DoWorkSendBuffers(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (m_SendBuffers.CanReadSize <= 0)
+            {
+                await Task.Yield(); // Yield to avoid busy waiting
+                continue;
+            }
+
+            byte[] sendBuffers = new byte[m_SendBuffers.CanReadSize];
+            m_SendBuffers.Peek(ref sendBuffers);
+            
+        }
+
     }
 }

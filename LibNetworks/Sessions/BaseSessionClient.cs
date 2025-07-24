@@ -7,8 +7,8 @@ namespace LibNetworks.Sessions;
 /// </summary>
 public class BaseSessionClient : BaseSession
 {
-    public BaseSessionClient(ILogger<BaseSessionClient> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers)
-        : base(logger, socket, receivedBuffers)
+    public BaseSessionClient(ILogger<BaseSessionClient> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendBuffers)
+        : base(logger, socket, receivedBuffers, sendBuffers)
     {
         
     }
