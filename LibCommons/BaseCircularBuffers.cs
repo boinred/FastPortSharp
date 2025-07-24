@@ -125,51 +125,88 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
         return buffersSize;
     }
+    public int GetPacketBuffers(out byte[]? buffers, int size)
+    {
+        if (CanReadSize <= size)
+        {
+            buffers = null;
+            return 0;
+        }
+
+        buffers = new byte[size]; // 읽을 버퍼 생성
+        if (m_Head + size > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+        {
+            int forwardSize = m_Capacity - m_Head;
+            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize);
+
+            int remainSize = size - forwardSize;
+            Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
+        }
+        else // 데이터가 버퍼의 끝을 넘지 않는 경우
+        {
+            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, size);
+        }
+
+        return Drain(size);
+    }
 
     public int Drain(int size)
     {
-        m_Lock.EnterWriteLock();
-        try
+        if (size > CanReadSize)
         {
-            if (size > CanReadSize)
-            {
-                size = CanReadSize;
-            }
-
-            if (size <= 0)
-            {
-                return 0;
-            }
-
-            m_Head = (m_Head + size) % m_Capacity; // 읽기 위치 업데이트
-            CanReadSize -= size; // 읽은 데이터 크기만큼 감소
+            size = CanReadSize;
         }
-        finally
+
+        if (size <= 0)
         {
-            m_Lock.ExitWriteLock();
+            return 0;
         }
+
+        m_Head = (m_Head + size) % m_Capacity; // 읽기 위치 업데이트
+        CanReadSize -= size; // 읽은 데이터 크기만큼 감소
 
         return size;
     }
 
 
-    public bool TryGetPackets(out BasePacket[]? basePackets)
-    {
-        // Lock 
-
-        if (CanReadSize < BasePacket.HeaderSize)
-        {
-            basePackets = null; // 읽을 수 있는 패킷이 없음
-            return false; // 패킷이 없음
-        }
-
-        // TODO: TEST
-        basePackets = new List<BasePacket>().ToArray();
-        return true;
-    }
     public bool TryGetBasePackets(out List<BasePacket> basePackets)
     {
-        throw new NotImplementedException();
+        basePackets = new();
+
+        int basePacketSize = 0;
+
+        m_Lock.EnterWriteLock(); 
+        // 패킷이 전체다 읽을 수 있는지 확인
+        do
+        {
+            int currentBuffersSize = CanReadSize;
+            if (CanReadSize <= BasePacket.HeaderSize)
+            {
+                break;
+            }
+
+            // 패킷 크기 계산
+            basePacketSize = GetPacketSizeInBuffers();
+            if (currentBuffersSize < basePacketSize)
+            {
+                break;
+            }
+
+            int readBufferSize = GetPacketBuffers(out var buffers, basePacketSize);
+            if (readBufferSize <= 0 || null == buffers)
+            {
+                break;
+            }
+
+            Drain(readBufferSize);
+
+            var basePacket = new BasePacket(basePacketSize, buffers);
+            basePackets.Add(basePacket);
+
+        }
+        while (CanReadSize >= basePacketSize);
+
+        return basePackets.Count > 0;
     }
 
     public int GetPacketSizeInBuffers()
@@ -197,30 +234,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         return packetSize;
     }
 
-    public int GetPacketBuffers(out byte[]? buffers, int size)
-    {
-        if (CanReadSize <= size)
-        {
-            buffers = null;
-            return 0;
-        }
 
-        buffers = new byte[size]; // 읽을 버퍼 생성
-        if (m_Head + size > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-        {
-            int forwardSize = m_Capacity - m_Head;
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize);
-
-            int remainSize = size - forwardSize;
-            Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
-        }
-        else // 데이터가 버퍼의 끝을 넘지 않는 경우
-        {
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, size);
-        }
-
-        return Drain(size);
-    }
 
     public void Dispose()
     {
@@ -244,6 +258,4 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         m_bDisposed = true;
 
     }
-
-
 }

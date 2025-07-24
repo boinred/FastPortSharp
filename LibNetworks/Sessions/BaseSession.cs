@@ -1,16 +1,18 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+﻿using LibCommons;
+using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks.Dataflow;
 
 namespace LibNetworks.Sessions;
 
 public abstract class BaseSession
 {
+
     protected ILogger m_Logger;
     private System.Net.Sockets.Socket m_Socket;
 
-    private readonly byte[] m_ReceivedBuffers = new byte[1024 * 8]; // 8KB
+    private readonly byte[] m_ReceivedSocketBuffers = new byte[1024 * 8]; // 8KB
 
     private readonly SocketAsyncEventArgs m_SocketEventsReceived = new SocketAsyncEventArgs();
     private readonly SocketAsyncEventArgs m_SockenEventsSent = new SocketAsyncEventArgs();
@@ -18,43 +20,54 @@ public abstract class BaseSession
     // Session이 Disconnected 되었을 경우 호출 함수
     public Action? OnEventSessionDisconnected;
 
-    private BlockingCollection<byte[]> m_ReceivedBuffersQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
-
-    private BlockingCollection<byte[]> m_SendBuffersQueue = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
-
     private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
-    private LibCommons.BaseCircularBuffers m_CircularBuffers = new LibCommons.BaseCircularBuffers(1024 * 8); // 8KB Circular Buffer
+    private readonly LibCommons.IBuffers m_ReceivedBuffers;
 
-    private Task m_TaskReceived;
+    private Task m_TaskReceivedBuffers;
+    private Task m_TaskReceivedPackets;
+
+    private readonly BufferBlock<LibCommons.BasePacket> m_ReceivedPackets;
+    private readonly ActionBlock<LibCommons.BasePacket> m_ReceivedWorks;
 
 
-    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket)
+    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers buffers)
     {
-        BlockingCollection<byte[]> abc = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
-
         m_Logger = logger;
         m_Socket = socket;
+        m_ReceivedBuffers = buffers;
 
-        m_SocketEventsReceived.SetBuffer(m_ReceivedBuffers, 0, m_ReceivedBuffers.Length);
+        m_SocketEventsReceived.SetBuffer(m_ReceivedSocketBuffers, 0, m_ReceivedSocketBuffers.Length);
         m_SocketEventsReceived.Completed += OnSocketEventsReceivedCompleted;
         m_SocketEventsReceived.UserToken = this;
 
         m_SockenEventsSent.Completed += OnSocketEventsSentCompleted;
         m_SockenEventsSent.UserToken = this;
 
-        m_TaskReceived = Task.Run(() => DoWorkReceived(m_CircularBuffers, m_CancellationTokenSource.Token));
+        m_ReceivedPackets = new(new System.Threading.Tasks.Dataflow.DataflowBlockOptions { BoundedCapacity = 1000, CancellationToken = m_CancellationTokenSource.Token });
+        m_ReceivedWorks = new ActionBlock<LibCommons.BasePacket>(OnReceived);
+
+        m_TaskReceivedPackets = Task.Run(async () => await DoWorkReceivedPackets(m_CancellationTokenSource.Token));
+        m_TaskReceivedBuffers = Task.Run(async () => await DoWorkReceivedBuffers(m_CancellationTokenSource.Token));
     }
 
     public string GetSessionAddress() => m_Socket.RemoteEndPoint?.ToString() ?? " Unknown";
 
 
-
-    protected virtual void OnReceived() { }
+    protected virtual void OnReceived(BasePacket basePacket) { }
 
     protected virtual void OnSent() { }
 
     protected virtual void OnDisconnected() { }
+
+    public async Task WaitSession()
+    {
+        // 소켓 및 패킷 처리 대기
+        await Task.WhenAll(m_TaskReceivedPackets, m_TaskReceivedBuffers);
+
+        // Wait for all received works to complete
+        await m_ReceivedWorks.Completion;
+    }
 
 
     private void OnSocketEventsReceivedCompleted(object? sender, SocketAsyncEventArgs e)
@@ -93,7 +106,7 @@ public abstract class BaseSession
         }
 
         // Process the received data
-        var wroteSize = m_CircularBuffers.Write(buffer, e.Offset, e.Count);
+        var wroteSize = m_ReceivedBuffers.Write(buffer, e.Offset, e.Count);
 
         m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Received {wroteSize} bytes from {GetSessionAddress()}");
 
@@ -155,18 +168,38 @@ public abstract class BaseSession
         RequestSendBuffers(bytes);
     }
 
-    public static void DoWorkReceived(LibCommons.BaseCircularBuffers circularBuffers, CancellationToken cancellationToken)
+    public async Task DoWorkReceivedPackets(CancellationToken cancellationToken)
+    {
+        // 블록이 완료되고 버퍼가 비워질 때까지 계속해서 데이터를 수신합니다.
+        while (await m_ReceivedPackets.OutputAvailableAsync(cancellationToken))
+        {
+            var packet = await m_ReceivedPackets.ReceiveAsync();
+        }
+
+    }
+
+    public async Task DoWorkReceivedBuffers(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (circularBuffers.CanReadSize < LibCommons.BasePacket.HeaderSize)
+            if (m_ReceivedBuffers.CanReadSize < LibCommons.BasePacket.HeaderSize)
             {
                 continue;
             }
-            // circularBuffer.Peek()
 
-            // CircularBuffer에서 패킷 사이즈만큼 가지고 와서 BlockingCollection에 넣어줘야 한다.
+            if (!m_ReceivedBuffers.TryGetBasePackets(out List<LibCommons.BasePacket> basePackets))
+            {
+                continue;
+            }
+
+            foreach (var basePacket in basePackets)
+            {
+                m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
+                
+                await m_ReceivedPackets.SendAsync(basePacket);
+            }
+
+            m_ReceivedPackets.Complete(); // Complete the block when done processing
         }
-
     }
 }
