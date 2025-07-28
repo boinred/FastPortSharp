@@ -175,36 +175,43 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
         int basePacketSize = 0;
 
-        m_Lock.EnterWriteLock(); 
-        // 패킷이 전체다 읽을 수 있는지 확인
-        do
+        m_Lock.EnterWriteLock();
+        try
         {
-            int currentBuffersSize = CanReadSize;
-            if (CanReadSize <= BasePacket.HeaderSize)
+            // 패킷이 전체다 읽을 수 있는지 확인
+            do
             {
-                break;
+                int currentBuffersSize = CanReadSize;
+                if (CanReadSize <= BasePacket.HeaderSize)
+                {
+                    break;
+                }
+
+                // 패킷 크기 계산
+                basePacketSize = GetPacketSizeInBuffers();
+                if (currentBuffersSize < basePacketSize)
+                {
+                    break;
+                }
+
+                int readBufferSize = GetPacketBuffers(out var buffers, basePacketSize);
+                if (readBufferSize <= 0 || null == buffers)
+                {
+                    break;
+                }
+
+                Drain(readBufferSize);
+
+                var basePacket = new BasePacket(basePacketSize, buffers);
+                basePackets.Add(basePacket);
+
             }
-
-            // 패킷 크기 계산
-            basePacketSize = GetPacketSizeInBuffers();
-            if (currentBuffersSize < basePacketSize)
-            {
-                break;
-            }
-
-            int readBufferSize = GetPacketBuffers(out var buffers, basePacketSize);
-            if (readBufferSize <= 0 || null == buffers)
-            {
-                break;
-            }
-
-            Drain(readBufferSize);
-
-            var basePacket = new BasePacket(basePacketSize, buffers);
-            basePackets.Add(basePacket);
-
+            while (CanReadSize >= basePacketSize);
         }
-        while (CanReadSize >= basePacketSize);
+        finally
+        {
+            m_Lock.ExitWriteLock();
+        }
 
         return basePackets.Count > 0;
     }

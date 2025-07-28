@@ -14,6 +14,7 @@ public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
 
     protected override void OnReceived(BasePacket packet)
     {
+        base.OnReceived(packet);
         // Handle received data here
         m_Logger.LogInformation($"FastPortClientSession, OnReceived, Packet Size : {packet.PacketSize}, Date Size : {packet.DataSize}");
 

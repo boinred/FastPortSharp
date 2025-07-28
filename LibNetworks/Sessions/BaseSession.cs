@@ -47,7 +47,7 @@ public abstract class BaseSession
         m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, new LingerOption(true, 1));
 
         // Nagle 알고리즘 비활성화
-        m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true); 
+        m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
         m_ReceivedBuffers = receivedBuffers;
         m_SendBuffers = sendbuffers;
@@ -158,9 +158,10 @@ public abstract class BaseSession
             return;
         }
 
+        m_Logger.LogDebug($"BaseSession, OnSocketEventsSentCompleted, Dran Buffer Length : {e.BytesTransferred}");
         m_SendBuffers.Drain(e.BytesTransferred);
     }
-    
+
 
     public void RequestDisconnect()
     {
@@ -168,6 +169,13 @@ public abstract class BaseSession
         {
             return;
         }
+
+        if (m_CancellationTokenSource.IsCancellationRequested)
+        {
+            return;
+        }
+
+        m_Logger.LogInformation($"BaseSession, RequestDisconnect."); 
 
         m_CancellationTokenSource.Cancel();
 
@@ -181,11 +189,13 @@ public abstract class BaseSession
             m_Logger.LogError($"BaseSession, RequestDisconnect, Exception : {ex}");
         }
 
+        m_ReceivedPackets.Complete(); // Complete the block when done processing
         OnEventSessionDisconnected?.Invoke(); // Return With Id
     }
 
     protected void RequestReceived()
     {
+        m_Logger.LogDebug($"BaseSession, RequestReceived");
         if (!m_Socket.ReceiveAsync(m_SocketEventsReceived))
         {
             // If ReceiveAsync returns false, we handle the receive operation immediately
@@ -197,7 +207,7 @@ public abstract class BaseSession
     {
         if (buffers.Length <= 0)
         {
-            m_Logger.LogError($"BaseSession, RequestSendBuffers, Buffers is zero."); 
+            m_Logger.LogError($"BaseSession, RequestSendBuffers, Buffers is zero.");
             return;
         }
 
@@ -210,6 +220,8 @@ public abstract class BaseSession
 
         // Copy the actual data into the buffer after the header
         Buffer.BlockCopy(buffers.ToArray(), 0, sendBuffers, BasePacket.HeaderSize, buffers.Length);
+
+        m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {sendBuffers.Length}");
 
         m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
     }
@@ -253,8 +265,6 @@ public abstract class BaseSession
 
                 await m_ReceivedPackets.SendAsync(basePacket);
             }
-
-            m_ReceivedPackets.Complete(); // Complete the block when done processing
         }
     }
 
@@ -272,7 +282,10 @@ public abstract class BaseSession
             m_SendBuffers.Peek(ref sendBuffers);
 
             m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);
-            if(!m_Socket.SendAsync(m_SockenEventsSent))
+
+            m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {sendBuffers.Length}");
+
+            if (!m_Socket.SendAsync(m_SockenEventsSent))
             {
                 OnSocketEventsSentCompleted(m_Socket, m_SockenEventsSent);
             }
