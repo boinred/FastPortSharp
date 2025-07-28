@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LibCommons;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,8 +19,18 @@ public class FastPortServerSession : LibNetworks.Sessions.BaseSessionServer
 
     public override void OnConnected()
     {
-        RequestSendString("Hello world. FastPortServerSession connected.");
+        base.OnConnected(); 
 
+        RequestSendString("Hello world. FastPortServerSession connected.");
+    }
+
+    protected override void OnReceived(BasePacket basePacket)
+    {
+        base.OnReceived(basePacket);
+
+        m_Logger.LogInformation($"FastPortServerSession, OnReceived, Packet Size : {basePacket.PacketSize}, Date Size : {basePacket.DataSize}");
+
+        RequestSendBuffers(basePacket.Data.ToArray());
     }
 }
 

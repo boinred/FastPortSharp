@@ -1,4 +1,5 @@
 ﻿using LibCommons;
+using LibNetworks;
 using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 
@@ -14,11 +15,22 @@ public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
     protected override void OnReceived(BasePacket packet)
     {
         // Handle received data here
-        m_Logger.LogInformation("Data received from client.");
+        m_Logger.LogInformation($"FastPortClientSession, OnReceived, Packet Size : {packet.PacketSize}, Date Size : {packet.DataSize}");
+
+        RequestSendBuffers(packet.Data.ToArray());
     }
 
     public override void OnAccepted()
     {
+        base.OnAccepted();
+
         m_Logger.LogInformation("FastPortClientSession, OnAccepted. ");
+    }
+
+    protected override void OnDisconnected()
+    {
+        base.OnDisconnected();
+
+        m_Logger.LogInformation($"FastPortClientSession, OnDisconnected. Remote End Point : {GetSessionAddress()}");
     }
 }

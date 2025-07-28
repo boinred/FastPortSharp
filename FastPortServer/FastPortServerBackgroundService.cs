@@ -27,7 +27,6 @@ public class FastPortServerBackgroundService : BackgroundService
             return;
         }
 
-        // 5초 동안 대기합니다.
         // stoppingToken.IsCancellationRequested를 체크하여 중간에 취소 요청이 오면 바로 종료할 수 있습니다.
         while(!stoppingToken.IsCancellationRequested)
         {

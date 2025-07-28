@@ -11,6 +11,6 @@ public class BaseSessionServer : BaseSession
 
     public virtual void OnConnected()
     {
-        RequestSendString("baseSessionServer connected.");
+        RequestReceived();
     }
 }

@@ -1,5 +1,6 @@
 ﻿using LibCommons;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks.Dataflow;
@@ -39,6 +40,15 @@ public abstract class BaseSession
         m_Logger = logger;
         m_Socket = socket;
 
+        // 10초마다 KeepAlive 신호를 보내도록 설정 (Windows에서는 레지스트리 수정 필요)
+        m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+        // 소켓을 닫을 때, 보내지 않은 데이터가 있으면 1초간 대기 후 닫음
+        m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Linger, new LingerOption(true, 1));
+
+        // Nagle 알고리즘 비활성화
+        m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true); 
+
         m_ReceivedBuffers = receivedBuffers;
         m_SendBuffers = sendbuffers;
 
@@ -55,8 +65,9 @@ public abstract class BaseSession
         m_TaskReceivedPackets = Task.Run(async () => await DoWorkReceivedPackets(m_CancellationTokenSource.Token));
         m_TaskReceivedBuffers = Task.Run(async () => await DoWorkReceivedBuffers(m_CancellationTokenSource.Token));
         m_TaskSendBuffers = Task.Run(async () => await DoWorkSendBuffers(m_CancellationTokenSource.Token));
-
     }
+
+
 
     public string GetSessionAddress() => m_Socket.RemoteEndPoint?.ToString() ?? " Unknown";
 
@@ -113,7 +124,7 @@ public abstract class BaseSession
         }
 
         // Process the received data
-        var wroteSize = m_ReceivedBuffers.Write(buffer, e.Offset, e.Count);
+        var wroteSize = m_ReceivedBuffers.Write(buffer, e.Offset, e.BytesTransferred);
 
         m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Received {wroteSize} bytes from {GetSessionAddress()}");
 
@@ -124,10 +135,34 @@ public abstract class BaseSession
 
     private void OnSocketEventsSentCompleted(object? sender, SocketAsyncEventArgs e)
     {
+        if (e.SocketError == SocketError.IOPending)
+        {
+            m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Socket IOPeding.");
+            return;
+        }
 
+        if (e.BytesTransferred <= 0)
+        {
+            m_Logger.LogInformation($"BaseSession, OnSocketEventsSentCompleted, Disconnected. BytesTransferred is zero.");
+            RequestDisconnect();
+
+            return;
+        }
+
+        if (e.SocketError != SocketError.Success)
+        {
+            m_Logger.LogInformation($"BaseSession, OnSocketEventsSentCompleted, Disconnected. SocketError : {e.SocketError}");
+
+            RequestDisconnect();
+
+            return;
+        }
+
+        m_SendBuffers.Drain(e.BytesTransferred);
     }
+    
 
-    private void RequestDisconnect()
+    public void RequestDisconnect()
     {
         if (null == m_Socket)
         {
@@ -158,14 +193,25 @@ public abstract class BaseSession
         }
     }
 
-    protected void RequestSendBuffers(byte[] buffers)
+    protected void RequestSendBuffers(ReadOnlySpan<byte> buffers)
     {
-        if (null == buffers || buffers.Length <= 0)
+        if (buffers.Length <= 0)
         {
+            m_Logger.LogError($"BaseSession, RequestSendBuffers, Buffers is zero."); 
             return;
         }
 
-        m_SendBuffers.Write(buffers, 0, buffers.Length);
+        ushort buffersSize = (ushort)(buffers.Length + BasePacket.HeaderSize);
+
+        byte[] sendBuffers = new byte[buffersSize];
+
+        // Insert Packet Size at the beginning of the buffer
+        BitConverter.GetBytes(buffersSize).CopyTo(sendBuffers, 0);
+
+        // Copy the actual data into the buffer after the header
+        Buffer.BlockCopy(buffers.ToArray(), 0, sendBuffers, BasePacket.HeaderSize, buffers.Length);
+
+        m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
     }
 
     protected void RequestSendString(string message)
@@ -175,7 +221,8 @@ public abstract class BaseSession
         RequestSendBuffers(bytes);
     }
 
-    public async Task DoWorkReceivedPackets(CancellationToken cancellationToken)
+
+    private async Task DoWorkReceivedPackets(CancellationToken cancellationToken)
     {
         // 블록이 완료되고 버퍼가 비워질 때까지 계속해서 데이터를 수신합니다.
         while (await m_ReceivedPackets.OutputAvailableAsync(cancellationToken))
@@ -223,7 +270,12 @@ public abstract class BaseSession
 
             byte[] sendBuffers = new byte[m_SendBuffers.CanReadSize];
             m_SendBuffers.Peek(ref sendBuffers);
-            
+
+            m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);
+            if(!m_Socket.SendAsync(m_SockenEventsSent))
+            {
+                OnSocketEventsSentCompleted(m_Socket, m_SockenEventsSent);
+            }
         }
 
     }

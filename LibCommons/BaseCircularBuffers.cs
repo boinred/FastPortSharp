@@ -127,7 +127,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     }
     public int GetPacketBuffers(out byte[]? buffers, int size)
     {
-        if (CanReadSize <= size)
+        if (CanReadSize < size)
         {
             buffers = null;
             return 0;
