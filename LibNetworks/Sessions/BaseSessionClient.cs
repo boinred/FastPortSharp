@@ -19,6 +19,4 @@ public class BaseSessionClient : BaseSession
 
         RequestReceived();
     }
-
-
 }

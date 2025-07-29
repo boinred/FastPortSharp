@@ -74,31 +74,23 @@ public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
 
     public int Drain(int size)
     {
-        m_Lock.EnterReadLock();
-        try
+        int bytesInDrain = Math.Min(size, m_QueueBuffers.Count);
+        if (0 >= bytesInDrain)
         {
-            int bytesInDrain = Math.Min(size, m_QueueBuffers.Count);
-            if (0 >= bytesInDrain)
-            {
-                return 0;
-            }
-
-            for (int i = 0; i < bytesInDrain; i++)
-            {
-                m_QueueBuffers.Dequeue();
-            }
-
-            return bytesInDrain;
+            return 0;
         }
-        finally
+
+        for (int i = 0; i < bytesInDrain; i++)
         {
-            m_Lock.ExitReadLock();
+            m_QueueBuffers.Dequeue();
         }
+
+        return bytesInDrain;
     }
 
     public bool TryGetBasePackets(out List<BasePacket> basePackets)
     {
-        m_Lock.EnterReadLock();
+        m_Lock.EnterWriteLock();
         int readBuffersSize = 0;
 
         try
@@ -129,6 +121,7 @@ public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
                 {
                     m_QueueBuffers.Dequeue();
                 }
+                Drain(BasePacket.HeaderSize);
 
                 // Assuming the first two bytes represent the packet size
                 byte[] packetDataBuffers = new byte[basePacketSize];
@@ -140,12 +133,13 @@ public class BaseQueueBuffers(int capacity) : IBuffers, IDisposable
                     }
                     packetDataBuffers[i] = m_QueueBuffers.Dequeue();
                 }
+                Drain(basePacketSize);
             }
 
         }
         finally
         {
-            m_Lock.ExitReadLock();
+            m_Lock.ExitWriteLock();
         }
 
         return basePackets.Count > 0;
