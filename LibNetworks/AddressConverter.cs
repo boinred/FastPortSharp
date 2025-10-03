@@ -20,7 +20,7 @@ public static class AddressConverter
             endPoint = new System.Net.IPEndPoint(ipAddress, port);
             return true; 
         }
-        catch (System.Exception ex)
+        catch (System.Exception)
         {
             
         }

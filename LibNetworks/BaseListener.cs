@@ -11,7 +11,7 @@ public abstract class BaseListener : BaseSocket
 
     // TODO : 파일 설정에서 불러온다.
     private readonly int C_MaxConnections;
-    private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
+    //private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
     private IClientSessionFactory m_ClientSessionFactory;
 
     protected ILogger m_Logger;

@@ -1,11 +1,7 @@
-﻿using LibCommons;
+﻿using Google.Protobuf;
+using LibCommons;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace FastPortClient.Sessions; 
 
@@ -17,20 +13,53 @@ public class FastPortServerSession : LibNetworks.Sessions.BaseSessionServer
 
     }
 
+    public void SendMessage<T>(FastPort.Protocols.EPacketId ePacketId, T message) where T : IMessage<T> => RequestSendMessage((int)ePacketId, message);
+
     public override void OnConnected()
     {
-        base.OnConnected(); 
+        base.OnConnected();
 
-        RequestSendString("Hello world. FastPortServerSession connected.");
+        FastPort.Protocols.TestRequest request = new()
+        {
+            Name = Protocols.TestMessage.C_MESSAGE_CLIENT
+        };
+        FastPort.Protocols.Character character = new()
+        {
+            TickCount = Stopwatch.GetTimestamp(),
+            Name = request.Name
+        };
+        request.Binaries = ByteString.CopyFrom(character.ToByteArray());
+
+        SendMessage(FastPort.Protocols.EPacketId.TestRequest, request);
     }
 
     protected override void OnReceived(BasePacket basePacket)
     {
         base.OnReceived(basePacket);
 
+        if(!ParseMessageFromPacket(basePacket, out int packetId, out FastPort.Protocols.TestResponse? response))
+        {
+            m_Logger.LogError($"FastPortServerSession, OnReceived, ParseMessageFromPacket failed.");
+
+            return; 
+        }
+
+        Debug.Assert(response!.Name != Protocols.TestMessage.C_MESSAGE_SERVER);
+
         m_Logger.LogInformation($"FastPortServerSession, OnReceived, Packet Size : {basePacket.PacketSize}, Date Size : {basePacket.DataSize}");
 
-        RequestSendBuffers(basePacket.Data.ToArray());
+        FastPort.Protocols.TestRequest request = new()
+        {
+            Name = Protocols.TestMessage.C_MESSAGE_CLIENT
+        };
+        FastPort.Protocols.Character character = new()
+        {
+            TickCount = Stopwatch.GetTimestamp(),
+            Name = request.Name
+        };
+        request.Binaries = ByteString.CopyFrom(character.ToByteArray());
+
+        SendMessage(FastPort.Protocols.EPacketId.TestRequest, request);
     }
 }
 

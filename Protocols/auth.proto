@@ -1,0 +1,34 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "FastPort.Protocols";
+
+enum EPacketId 
+{
+	EPacketId_None			= 0;
+	EPacketId_AuthRequest	= 1;
+	EPacketId_AuthResponse	= 2;
+	EPacketId_TestRequest	= 3;
+	EPacketId_TestResponse	= 4;
+}
+
+message Character
+{
+	int64 tick_count	= 1;
+	string name			= 2; 
+	string icon_name	= 3; 
+
+}
+
+
+message TestRequest
+{
+	string		name		= 1;
+	bytes		binaries	= 2;
+}
+
+message TestResponse 
+{
+	int64		request_seconds = 1;
+	string		name			= 2; 
+	bytes		binaries		= 3;  // message Character
+}

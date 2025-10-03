@@ -1,5 +1,7 @@
-﻿using LibCommons;
+﻿using Google.Protobuf;
+using LibCommons;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
@@ -34,6 +36,8 @@ public abstract class BaseSession
     private readonly BufferBlock<LibCommons.BasePacket> m_ReceivedPackets;
     private readonly ActionBlock<LibCommons.BasePacket> m_ReceivedWorks;
 
+    private readonly System.Net.EndPoint? m_RemoteEndPoint;
+
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
     {
@@ -65,18 +69,25 @@ public abstract class BaseSession
         m_TaskReceivedPackets = Task.Run(async () => await DoWorkReceivedPackets(m_CancellationTokenSource.Token));
         m_TaskReceivedBuffers = Task.Run(async () => await DoWorkReceivedBuffers(m_CancellationTokenSource.Token));
         m_TaskSendBuffers = Task.Run(async () => await DoWorkSendBuffers(m_CancellationTokenSource.Token));
+
+        OnEventSessionDisconnected += OnDisconnected;
+
+        m_RemoteEndPoint = m_Socket.RemoteEndPoint!;
     }
 
 
 
-    public string GetSessionAddress() => m_Socket.RemoteEndPoint?.ToString() ?? " Unknown";
+    public string GetSessionAddress() => m_RemoteEndPoint?.ToString() ?? " Unknown";
 
 
     protected virtual void OnReceived(BasePacket basePacket) { }
 
     protected virtual void OnSent() { }
 
-    protected virtual void OnDisconnected() { }
+    protected virtual void OnDisconnected()
+    {
+        OnEventSessionDisconnected -= OnDisconnected;
+    }
 
     public async Task WaitSession()
     {
@@ -175,7 +186,7 @@ public abstract class BaseSession
             return;
         }
 
-        m_Logger.LogInformation($"BaseSession, RequestDisconnect."); 
+        m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
 
         m_CancellationTokenSource.Cancel();
 
@@ -213,13 +224,13 @@ public abstract class BaseSession
 
         ushort buffersSize = (ushort)(buffers.Length + BasePacket.HeaderSize);
 
+        // List로 바꾸는 것도 고려
         byte[] sendBuffers = new byte[buffersSize];
 
         // Insert Packet Size at the beginning of the buffer
-        BitConverter.GetBytes(buffersSize).CopyTo(sendBuffers, 0);
+        BitConverter.GetBytes(buffersSize).AsSpan().CopyTo(sendBuffers);
+        buffers.CopyTo(sendBuffers.AsSpan(BasePacket.HeaderSize));
 
-        // Copy the actual data into the buffer after the header
-        Buffer.BlockCopy(buffers.ToArray(), 0, sendBuffers, BasePacket.HeaderSize, buffers.Length);
 
         m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {sendBuffers.Length}");
 
@@ -233,6 +244,41 @@ public abstract class BaseSession
         RequestSendBuffers(bytes);
     }
 
+
+
+    protected void RequestSendMessage<T>(int packetId, Google.Protobuf.IMessage<T> message) where T : IMessage<T>
+    {
+
+        Span<byte> packetIdBuffers = BitConverter.GetBytes(packetId);
+        ReadOnlySpan<byte> messageBuffers = message.ToByteArray();
+
+        byte[] packetBuffers = new byte[packetIdBuffers.Length + messageBuffers.Length];
+
+        packetIdBuffers.CopyTo(packetBuffers);
+        messageBuffers.CopyTo(packetBuffers.AsSpan(packetIdBuffers.Length));
+        
+        RequestSendBuffers(packetBuffers);
+    }
+
+    protected bool ParseMessageFromPacket<T>(BasePacket basePacket, out int packetId, out T? message) where T : IMessage<T>, new()
+    {
+        packetId = 0;
+        message = default;
+        if (basePacket.DataSize < 4)
+        {
+            m_Logger.LogError($"BaseSession, ReceivedMessage, Data Size is too small. Data Size : {basePacket.DataSize}");
+            
+            return false; 
+        }
+        packetId = BitConverter.ToInt32(basePacket.Data.Slice(0, 4));
+        
+        var messageBuffers = basePacket.Data.Slice(4, basePacket.DataSize - 4).ToArray();
+        
+        message = new T();
+        message.MergeFrom(messageBuffers);
+
+        return true; 
+    }
 
     private async Task DoWorkReceivedPackets(CancellationToken cancellationToken)
     {

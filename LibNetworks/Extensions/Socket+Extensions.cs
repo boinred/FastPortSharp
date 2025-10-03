@@ -26,7 +26,7 @@ public static class SocketExtensions
         BitConverter.GetBytes(keepAliveInterval).CopyTo(keepAliveOptions, 8);
 
         // 소켓에 IOControl을 사용하여 옵션 적용
-        // SIO_KEEPALIVE_VALS 코드를 사용
+        // SIO_KEEPALIVE_VALS 코드를 사용 only windows
         socket.IOControl(IOControlCode.KeepAliveValues, keepAliveOptions, null);
 
     }

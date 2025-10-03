@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+    <ProjectReference Include="..\Protocols\Protocols.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
