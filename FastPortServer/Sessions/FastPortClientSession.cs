@@ -9,7 +9,7 @@ namespace FastPortServer.Sessions;
 
 public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
 {
-    private static LibCommons.IDGenerator m_IdGenerator = new IDGenerator();
+    private static readonly LibCommons.IDGenerator m_IdGenerator = new IDGenerator();
 
     private readonly long m_Id = m_IdGenerator.GetNextGeneratedId();
 
@@ -28,7 +28,7 @@ public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
     {
         base.OnReceived(packet);
 
-        if(!ParseMessageFromPacket(packet, out int packetId, out FastPort.Protocols.TestRequest? request))
+        if (!ParseMessageFromPacket(packet, out int packetId, out FastPort.Protocols.TestRequest? request))
         {
             m_Logger.LogError($"FastPortClientSession, OnReceived, ParseMessageFromPacket failed.");
 

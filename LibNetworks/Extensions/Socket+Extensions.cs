@@ -25,9 +25,11 @@ public static class SocketExtensions
         // 3. 재전송 간격: 5초 (5000 ms)
         BitConverter.GetBytes(keepAliveInterval).CopyTo(keepAliveOptions, 8);
 
-        // 소켓에 IOControl을 사용하여 옵션 적용
-        // SIO_KEEPALIVE_VALS 코드를 사용 only windows
-        socket.IOControl(IOControlCode.KeepAliveValues, keepAliveOptions, null);
-
+        if (OperatingSystem.IsWindows())
+        {
+            // 소켓에 IOControl을 사용하여 옵션 적용
+            // SIO_KEEPALIVE_VALS 코드를 사용 only windows
+            socket.IOControl(IOControlCode.KeepAliveValues, keepAliveOptions, null);
+        }
     }
 }
