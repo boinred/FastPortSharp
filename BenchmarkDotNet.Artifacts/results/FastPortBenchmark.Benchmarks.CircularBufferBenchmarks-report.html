@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>FastPortBenchmark.Benchmarks.CircularBufferBenchmarks-20260120-091340</title>
+<title>FastPortBenchmark.Benchmarks.CircularBufferBenchmarks-20260120-121613</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -16,23 +16,22 @@
 BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.7623/25H2/2025Update/HudsonValley2)
 Intel Core i5-14600K 3.50GHz, 1 CPU, 20 logical and 14 physical cores
 .NET SDK 10.0.101
-  [Host]   : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
-  .NET 9.0 : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
+  [Host]     : .NET 10.0.1 (10.0.1, 10.0.125.57005), X64 RyuJIT x86-64-v3
+  Job-CNUJVU : .NET 10.0.1 (10.0.1, 10.0.125.57005), X64 RyuJIT x86-64-v3
 </code></pre>
-<pre><code>Job=.NET 9.0  Runtime=.NET 9.0  InvocationCount=1  
-UnrollFactor=1  
+<pre><code>InvocationCount=1  UnrollFactor=1  
 </code></pre>
 
 <table>
 <thead><tr><th>Method                    </th><th>Mean </th><th>Error</th><th>StdDev</th><th>Median</th><th>Rank</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>&#39;Write 64B&#39;</td><td>360.2 ns</td><td>19.54 ns</td><td>55.44 ns</td><td>400.0 ns</td><td>1</td><td>-</td>
-</tr><tr><td>&#39;Write 1KB&#39;</td><td>430.4 ns</td><td>29.61 ns</td><td>83.52 ns</td><td>400.0 ns</td><td>2</td><td>-</td>
-</tr><tr><td>&#39;Write 8KB&#39;</td><td>669.9 ns</td><td>23.12 ns</td><td>65.58 ns</td><td>700.0 ns</td><td>4</td><td>-</td>
-</tr><tr><td>&#39;Write+Read 64B&#39;</td><td>500.0 ns</td><td>0.00 ns</td><td>0.00 ns</td><td>500.0 ns</td><td>3</td><td>-</td>
-</tr><tr><td>&#39;Write+Read 1KB&#39;</td><td>707.0 ns</td><td>61.59 ns</td><td>181.61 ns</td><td>700.0 ns</td><td>4</td><td>-</td>
-</tr><tr><td>&#39;Write x10 (버퍼 확장)&#39;</td><td>13,539.3 ns</td><td>270.61 ns</td><td>388.10 ns</td><td>13,500.0 ns</td><td>6</td><td>442584 B</td>
-</tr><tr><td>&#39;TryGetBasePackets (10 packets)&#39;</td><td>3,476.4 ns</td><td>112.16 ns</td><td>310.80 ns</td><td>3,400.0 ns</td><td>5</td><td>1864 B</td>
+</thead><tbody><tr><td>&#39;Write 64B&#39;</td><td>560.0 ns</td><td>65.48 ns</td><td>193.1 ns</td><td>550.0 ns</td><td>1</td><td>-</td>
+</tr><tr><td>&#39;Write 1KB&#39;</td><td>753.0 ns</td><td>55.48 ns</td><td>163.6 ns</td><td>800.0 ns</td><td>2</td><td>-</td>
+</tr><tr><td>&#39;Write 8KB&#39;</td><td>1,099.0 ns</td><td>75.38 ns</td><td>221.1 ns</td><td>1,100.0 ns</td><td>3</td><td>-</td>
+</tr><tr><td>&#39;Write+Read 64B&#39;</td><td>701.0 ns</td><td>61.44 ns</td><td>178.2 ns</td><td>600.0 ns</td><td>2</td><td>-</td>
+</tr><tr><td>&#39;Write+Read 1KB&#39;</td><td>718.2 ns</td><td>102.45 ns</td><td>300.5 ns</td><td>700.0 ns</td><td>2</td><td>-</td>
+</tr><tr><td>&#39;Write x10 (버퍼 확장)&#39;</td><td>15,659.0 ns</td><td>675.91 ns</td><td>1,992.9 ns</td><td>15,750.0 ns</td><td>5</td><td>442584 B</td>
+</tr><tr><td>&#39;TryGetBasePackets (10 packets)&#39;</td><td>3,009.5 ns</td><td>147.84 ns</td><td>397.2 ns</td><td>2,800.0 ns</td><td>4</td><td>1864 B</td>
 </tr></tbody></table>
 </body>
 </html>

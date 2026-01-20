@@ -5,7 +5,7 @@ using LibCommons;
 namespace FastPortBenchmark.Benchmarks;
 
 /// <summary>
-/// CircularBuffer vs QueueBuffer 비교 벤치마크
+/// CircularBuffer vs QueueBuffer vs ArrayPoolCircularBuffer 비교 벤치마크
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob]  // 현재 호스트 런타임 사용 (.NET 10)
@@ -26,7 +26,7 @@ public class BufferComparisonBenchmarks
         Random.Shared.NextBytes(_testData);
     }
 
-    // === CircularBuffer ===
+    // === CircularBuffer (기존) ===
 
     [Benchmark(Description = "CircularBuffer Write")]
     public int CircularBuffer_Write()
@@ -47,6 +47,31 @@ public class BufferComparisonBenchmarks
     public int CircularBuffer_WriteAndDrain()
     {
         using var buffer = new BaseCircularBuffers(8192);
+        buffer.Write(_testData, 0, _testData.Length);
+        return buffer.Drain(_testData.Length);
+    }
+
+    // === ArrayPoolCircularBuffer (최적화) ===
+
+    [Benchmark(Description = "ArrayPoolCircular Write")]
+    public int ArrayPoolCircular_Write()
+    {
+        using var buffer = new ArrayPoolCircularBuffers(8192);
+        return buffer.Write(_testData, 0, _testData.Length);
+    }
+
+    [Benchmark(Description = "ArrayPoolCircular Write+Peek")]
+    public int ArrayPoolCircular_WriteAndPeek()
+    {
+        using var buffer = new ArrayPoolCircularBuffers(8192);
+        buffer.Write(_testData, 0, _testData.Length);
+        return buffer.Peek(ref _readBuffer);
+    }
+
+    [Benchmark(Description = "ArrayPoolCircular Write+Drain")]
+    public int ArrayPoolCircular_WriteAndDrain()
+    {
+        using var buffer = new ArrayPoolCircularBuffers(8192);
         buffer.Write(_testData, 0, _testData.Length);
         return buffer.Drain(_testData.Length);
     }

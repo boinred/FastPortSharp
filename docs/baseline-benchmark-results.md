@@ -1,201 +1,221 @@
-# FastPortSharp ¼º´É ±âÁØÁ¡ (Baseline)
+ï»¿# FastPortSharp ì„±ëŠ¥ ê¸°ì¤€ì  (Baseline)
 
-> **ÃøÁ¤ÀÏ**: 2026-01-20  
-> **È¯°æ**: Windows 11 (25H2), Intel Core i5-14600K 3.50GHz, 14 cores  
-> **·±Å¸ÀÓ**: .NET 10.0, x86-64-v3  
+> **ì¸¡ì •ì¼**: 2026-01-20  
+> **í™˜ê²½**: Windows 11 (25H2), Intel Core i5-14600K 3.50GHz, 14 cores  
+> **ëŸ°íƒ€ì„**: .NET 10.0.1 (10.0.125.57005), x86-64-v3  
 > **BenchmarkDotNet**: v0.15.8
 
 ---
 
-## ?? ÃøÁ¤ °á°ú ¿ä¾à
+## ğŸ“Š ì¸¡ì • ê²°ê³¼ ìš”ì•½
 
-### ÇÙ½É ¹ß°ß»çÇ×
 
-| Ç×¸ñ | °á°ú | °³¼± °¡´É¼º |
-|------|------|-------------|
-| ?? **¹öÆÛ È®Àå** | 442KB ÇÒ´ç (10È¸ ¾²±â) | ArrayPool Àû¿ë ½Ã ´ëÆø °¨¼Ò ¿¹»ó |
-| ?? **QueueBuffer** | CircularBuffer ´ëºñ 20¹è ´À¸² (4KB ±âÁØ) | CircularBuffer »ç¿ë ±ÇÀå |
-| ?? **.NET 10 Lock** | ±âÁ¸ lock ´ëºñ 7~8% ºü¸§ | Áï½Ã Àû¿ë °¡´É |
-| ?? **Channel** | BufferBlock ´ëºñ 2~3¹è ºü¸§, ¸Ş¸ğ¸® 70% Àı¾à | Áï½Ã Àû¿ë ±ÇÀå |
-| ?? **ÆĞÅ¶ ÆÄ½Ì** | 10°³ ÆĞÅ¶´ç 1.8KB ÇÒ´ç | ±¸Á¶ °³¼± ÇÊ¿ä |
+## 1. CircularBuffer ë²¤ì¹˜ë§ˆí¬
 
----
-
-## 1. CircularBuffer º¥Ä¡¸¶Å©
-
-¼øÈ¯ ¹öÆÛÀÇ ÀĞ±â/¾²±â ¼º´ÉÀ» ÃøÁ¤ÇÕ´Ï´Ù.
+ìˆœí™˜ ë²„í¼ì˜ ì½ê¸°/ì“°ê¸° ì„±ëŠ¥ì„ ì¸¡ì •í•©ë‹ˆë‹¤.
 
 | Method | Mean | Error | StdDev | Rank | Allocated |
 |--------|-----:|------:|-------:|:----:|----------:|
-| Write 64B | 360.2 ns | 19.54 ns | 55.44 ns | 1 | - |
-| Write 1KB | 430.4 ns | 29.61 ns | 83.52 ns | 2 | - |
-| Write 8KB | 669.9 ns | 23.12 ns | 65.58 ns | 4 | - |
-| Write+Read 64B | 500.0 ns | 0.00 ns | 0.00 ns | 3 | - |
-| Write+Read 1KB | 707.0 ns | 61.59 ns | 181.61 ns | 4 | - |
-| **Write x10 (¹öÆÛ È®Àå)** | **13,539.3 ns** | 270.61 ns | 388.10 ns | 6 | **442,584 B** ?? |
-| TryGetBasePackets (10 packets) | 3,476.4 ns | 112.16 ns | 310.80 ns | 5 | 1,864 B |
+| Write 64B | 560.0 ns | 65.48 ns | 193.1 ns | 1 | - |
+| Write 1KB | 753.0 ns | 55.48 ns | 163.6 ns | 2 | - |
+| Write 8KB | 1,099.0 ns | 75.38 ns | 221.1 ns | 3 | - |
+| Write+Read 64B | 701.0 ns | 61.44 ns | 178.2 ns | 2 | - |
+| Write+Read 1KB | 718.2 ns | 102.45 ns | 300.5 ns | 2 | - |
+| **Write x10 (ë²„í¼ í™•ì¥)** | **15,659.0 ns** | 675.91 ns | 1,992.9 ns | 5 | **442,584 B** ğŸ”´ |
+| TryGetBasePackets (10 packets) | 3,009.5 ns | 147.84 ns | 397.2 ns | 4 | 1,864 B |
 
-### ºĞ¼®
-- ? **±âº» Write ¼º´É**: ¿ì¼ö (64B~8KB ¸ğµÎ 1¥ìs ¹Ì¸¸)
-- ?? **¹öÆÛ È®Àå ½Ã ¹®Á¦**: `Array.Resize()` È£Ãâ·Î **442KB ¸Ş¸ğ¸® ÇÒ´ç** ¹ß»ı
-- ?? **ÆĞÅ¶ ÆÄ½Ì**: 10°³ ÆĞÅ¶´ç 1.8KB ÇÒ´ç (LINQ `Skip().Take().ToArray()` ¿µÇâ)
+### ë¶„ì„
+- âœ… **ê¸°ë³¸ Write ì„±ëŠ¥**: ìš°ìˆ˜ (64B~8KB ëª¨ë‘ ì•½ 1Î¼s)
+- ğŸ”´ **ë²„í¼ í™•ì¥ ì‹œ ë¬¸ì œ**: `Array.Resize()` í˜¸ì¶œë¡œ **442KB ë©”ëª¨ë¦¬ í• ë‹¹** ë°œìƒ
+- ğŸŸ¡ **íŒ¨í‚· íŒŒì‹±**: 10ê°œ íŒ¨í‚·ë‹¹ 1.8KB í• ë‹¹ (LINQ `Skip().Take().ToArray()` ì˜í–¥)
 
 ---
 
-## 2. Buffer ºñ±³ º¥Ä¡¸¶Å© (CircularBuffer vs QueueBuffer)
+## 2. Buffer ë¹„êµ ë²¤ì¹˜ë§ˆí¬ (CircularBuffer vs QueueBuffer)
 
 | Method | DataSize | Mean | Rank | Allocated |
 |--------|:--------:|-----:|:----:|----------:|
-| **CircularBuffer Write** | **64** | **244.3 ns** | **1** | 8.17 KB |
-| CircularBuffer Write+Peek | 64 | 255.4 ns | 1 | 8.17 KB |
-| CircularBuffer Write+Drain | 64 | 236.3 ns | 1 | 8.17 KB |
-| QueueBuffer Write | 64 | 315.1 ns | 2 | 8.2 KB |
-| QueueBuffer Write+Peek | 64 | 339.9 ns | 3 | 8.28 KB |
-| QueueBuffer Write+Drain | 64 | 386.0 ns | 4 | 8.2 KB |
-| **CircularBuffer Write** | **512** | **239.6 ns** | **1** | 8.17 KB |
-| QueueBuffer Write | 512 | 913.4 ns | 5 | 8.2 KB |
-| **CircularBuffer Write** | **4096** | **267.2 ns** | **1** | 8.17 KB |
-| QueueBuffer Write | 4096 | **5,546.9 ns** | 8 | 8.2 KB |
-| QueueBuffer Write+Drain | 4096 | **8,282.3 ns** | 10 | 8.2 KB |
+| **CircularBuffer Write** | **64** | **230.0 ns** | **1** | 8.17 KB |
+| CircularBuffer Write+Peek | 64 | 250.7 ns | 2 | 8.17 KB |
+| CircularBuffer Write+Drain | 64 | 228.1 ns | 1 | 8.17 KB |
+| QueueBuffer Write | 64 | 311.9 ns | 3 | 8.2 KB |
+| QueueBuffer Write+Peek | 64 | 317.4 ns | 3 | 8.28 KB |
+| QueueBuffer Write+Drain | 64 | 392.0 ns | 4 | 8.2 KB |
+| **CircularBuffer Write** | **512** | **230.5 ns** | **1** | 8.17 KB |
+| QueueBuffer Write | 512 | 907.3 ns | 5 | 8.2 KB |
+| QueueBuffer Write+Drain | 512 | 1,394.7 ns | 6 | 8.2 KB |
+| **CircularBuffer Write** | **4096** | **261.2 ns** | **2** | 8.17 KB |
+| QueueBuffer Write | 4096 | **9,195.6 ns** | 7 | 8.2 KB |
+| QueueBuffer Write+Drain | 4096 | **16,077.1 ns** | 8 | 8.2 KB |
 
-### ºĞ¼®
+### ë¶„ì„
 ```
-µ¥ÀÌÅÍ Å©±âº° ¼º´É ºñ±³ (Write ±âÁØ):
+ë°ì´í„° í¬ê¸°ë³„ ì„±ëŠ¥ ë¹„êµ (Write ê¸°ì¤€):
 
-64B:   CircularBuffer 244ns vs QueueBuffer 315ns   ¡æ 1.3¹è Â÷ÀÌ
-512B:  CircularBuffer 240ns vs QueueBuffer 913ns   ¡æ 3.8¹è Â÷ÀÌ
-4KB:   CircularBuffer 267ns vs QueueBuffer 5,547ns ¡æ 20.8¹è Â÷ÀÌ ??
+64B:   CircularBuffer 230ns vs QueueBuffer 312ns    â†’ 1.4ë°° ì°¨ì´
+512B:  CircularBuffer 231ns vs QueueBuffer 907ns    â†’ 3.9ë°° ì°¨ì´
+4KB:   CircularBuffer 261ns vs QueueBuffer 9,196ns  â†’ 35.2ë°° ì°¨ì´ ğŸ”´
 ```
 
-- ?? **QueueBuffer´Â ´ë¿ë·® µ¥ÀÌÅÍ¿¡ ºÎÀûÇÕ** - ¹ÙÀÌÆ® ´ÜÀ§ Enqueue·Î ÀÎÇÑ ¼º´É ÀúÇÏ
-- ? **CircularBuffer ±ÇÀå** - µ¥ÀÌÅÍ Å©±â Áõ°¡¿¡µµ ¼º´É ÀÏÁ¤
+- ğŸ”´ **QueueBufferëŠ” ëŒ€ìš©ëŸ‰ ë°ì´í„°ì— ë¶€ì í•©** - ë°”ì´íŠ¸ ë‹¨ìœ„ Enqueueë¡œ ì¸í•œ ì„±ëŠ¥ ì €í•˜
+- âœ… **CircularBuffer ê¶Œì¥** - ë°ì´í„° í¬ê¸° ì¦ê°€ì—ë„ ì„±ëŠ¥ ì¼ì •
 
 ---
 
-## 3. Channel vs BufferBlock (TPL Dataflow) º¥Ä¡¸¶Å©
+## 3. Channel vs BufferBlock (TPL Dataflow) ë²¤ì¹˜ë§ˆí¬
 
 | Method | MessageCount | Mean | Rank | Allocated |
 |--------|:------------:|-----:|:----:|----------:|
-| **Channel TryWrite (sync)** | **100** | **3.980 ¥ìs** | **1** | 16.5 KB |
-| BufferBlock Post (sync) | 100 | 6.959 ¥ìs | 2 | 15.61 KB |
-| Channel\<T\> Unbounded | 100 | 15.803 ¥ìs | 3 | 15.84 KB |
-| Channel\<T\> Bounded | 100 | 17.380 ¥ìs | 4 | 15.52 KB |
-| **BufferBlock\<T\>** | **100** | **35.328 ¥ìs** | **5** | **42.98 KB** ?? |
-| Channel TryWrite (sync) | 1000 | 40.566 ¥ìs | 6 | 150.72 KB |
-| BufferBlock Post (sync) | 1000 | 62.262 ¥ìs | 7 | 136.39 KB |
-| Channel\<T\> Unbounded | 1000 | 90.261 ¥ìs | 8 | 132.54 KB |
-| Channel\<T\> Bounded | 1000 | 120.360 ¥ìs | 9 | 131.51 KB |
-| **BufferBlock\<T\>** | **1000** | **359.378 ¥ìs** | **10** | **395.98 KB** ?? |
+| **Channel TryWrite (sync)** | **100** | **4.199 Î¼s** | **1** | 16.45 KB |
+| BufferBlock Post (sync) | 100 | 6.952 Î¼s | 2 | 15.61 KB |
+| Channel\<T\> Unbounded | 100 | 17.739 Î¼s | 3 | 15.79 KB |
+| Channel\<T\> Bounded | 100 | 20.523 Î¼s | 4 | 15.37 KB |
+| **BufferBlock\<T\>** | **100** | **44.354 Î¼s** | **6** | **42.93 KB** ğŸ”´ |
+| Channel TryWrite (sync) | 1000 | 22.847 Î¼s | 4 | 150.67 KB |
+| BufferBlock Post (sync) | 1000 | 36.809 Î¼s | 5 | 136.39 KB |
+| Channel\<T\> Unbounded | 1000 | 75.606 Î¼s | 7 | 122.81 KB |
+| Channel\<T\> Bounded | 1000 | 101.744 Î¼s | 8 | 128.2 KB |
+| **BufferBlock\<T\>** | **1000** | **220.892 Î¼s** | **9** | **396.51 KB** ğŸ”´ |
 
-### ºĞ¼®
+### ë¶„ì„
 ```
-ºñµ¿±â Ã³¸® (100 ¸Ş½ÃÁö):
-Channel Unbounded: 15.8¥ìs, 15.84KB
-BufferBlock:       35.3¥ìs, 42.98KB
-¡æ ChannelÀÌ 2.2¹è ºü¸£°í, ¸Ş¸ğ¸® 63% Àı¾à
+ë¹„ë™ê¸° ì²˜ë¦¬ (100 ë©”ì‹œì§€):
+Channel Unbounded: 17.7Î¼s, 15.79KB
+BufferBlock:       44.4Î¼s, 42.93KB
+â†’ Channelì´ 2.5ë°° ë¹ ë¥´ê³ , ë©”ëª¨ë¦¬ 63% ì ˆì•½
 
-ºñµ¿±â Ã³¸® (1000 ¸Ş½ÃÁö):
-Channel Unbounded: 90.3¥ìs,  132.54KB
-BufferBlock:       359.4¥ìs, 395.98KB
-¡æ ChannelÀÌ 4¹è ºü¸£°í, ¸Ş¸ğ¸® 66% Àı¾à ??
+ë¹„ë™ê¸° ì²˜ë¦¬ (1000 ë©”ì‹œì§€):
+Channel Unbounded: 75.6Î¼s,  122.81KB
+BufferBlock:       220.9Î¼s, 396.51KB
+â†’ Channelì´ 2.9ë°° ë¹ ë¥´ê³ , ë©”ëª¨ë¦¬ 69% ì ˆì•½ ğŸ¯
 ```
 
-- ?? **Channel\<T\> °­·Â ±ÇÀå** - ¼Óµµ 2~4¹è, ¸Ş¸ğ¸® 60~70% °³¼±
-- µ¿±â ¾²±â ½Ã `TryWrite`°¡ °¡Àå È¿À²Àû
+- ğŸŸ¢ **Channel\<T\> ê°•ë ¥ ê¶Œì¥** - ì†ë„ 2.5~3ë°°, ë©”ëª¨ë¦¬ 60~70% ê°œì„ 
+- ë™ê¸° ì“°ê¸° ì‹œ `TryWrite`ê°€ ê°€ì¥ íš¨ìœ¨ì 
 
 ---
 
-## 4. Lock º¥Ä¡¸¶Å©
+## 4. Lock ë²¤ì¹˜ë§ˆí¬
 
 | Method | Iterations | Mean | Ratio | Rank |
 |--------|:----------:|-----:|------:|:----:|
-| **Interlocked.Increment** | **1000** | **6.736 ¥ìs** | **0.39** | **1** |
-| **.NET 10 Lock** | **1000** | **15.801 ¥ìs** | **0.92** | **2** |
-| .NET 10 Lock (EnterScope) | 1000 | ~16 ¥ìs | ~0.93 | 2 |
-| lock (object) | 1000 | 17.223 ¥ìs | 1.00 | 3 |
-| ReaderWriterLockSlim (Write) | 1000 | 19.535 ¥ìs | 1.14 | 4 |
-| ReaderWriterLockSlim (Read) | 1000 | 20.324 ¥ìs | 1.18 | 4 |
-| **Interlocked.Increment** | **10000** | **37.986 ¥ìs** | **0.27** | **1** |
-| **.NET 10 Lock** | **10000** | **128.908 ¥ìs** | **0.93** | **2** |
-| lock (object) | 10000 | 138.614 ¥ìs | 1.00 | 3 |
-| ReaderWriterLockSlim (Write) | 10000 | 151.169 ¥ìs | 1.09 | 4 |
-| ReaderWriterLockSlim (Read) | 10000 | 158.814 ¥ìs | 1.15 | 5 |
+| **Interlocked.Increment** | **1000** | **7.775 Î¼s** | **0.44** | **1** |
+| **.NET 10 Lock (EnterScope)** | **1000** | **16.700 Î¼s** | **0.94** | **2** |
+| **.NET 10 Lock** | **1000** | **16.898 Î¼s** | **0.96** | **2** |
+| lock (object) | 1000 | 17.734 Î¼s | 1.00 | 2 |
+| ReaderWriterLockSlim (Write) | 1000 | 18.132 Î¼s | 1.03 | 2 |
+| ReaderWriterLockSlim (Read) | 1000 | 19.713 Î¼s | 1.12 | 3 |
+| **Interlocked.Increment** | **10000** | **39.193 Î¼s** | **0.28** | **1** |
+| **.NET 10 Lock** | **10000** | **125.085 Î¼s** | **0.91** | **2** |
+| **.NET 10 Lock (EnterScope)** | **10000** | **126.313 Î¼s** | **0.92** | **2** |
+| ReaderWriterLockSlim (Read) | 10000 | 121.107 Î¼s | 0.88 | 2 |
+| ReaderWriterLockSlim (Write) | 10000 | 136.654 Î¼s | 0.99 | 3 |
+| lock (object) | 10000 | 138.014 Î¼s | 1.00 | 3 |
 
-### ºĞ¼®
+### ë¶„ì„
 ```
-¼º´É ¼øÀ§ (ºü¸¥ ¼ø):
-1. Interlocked.Increment - ±âÁØ ´ëºñ 61~73% ºü¸§ (´Ü¼ø Ä«¿îÅÍ¿ë)
-2. .NET 10 Lock          - ±âÁØ ´ëºñ 7~8% ºü¸§ ?
-3. lock (object)         - ±âÁØÁ¡
-4. ReaderWriterLockSlim  - ±âÁØ ´ëºñ 9~15% ´À¸²
+ì„±ëŠ¥ ìˆœìœ„ (ë¹ ë¥¸ ìˆœ, 10K iterations ê¸°ì¤€):
+1. Interlocked.Increment  - ê¸°ì¤€ ëŒ€ë¹„ 72% ë¹ ë¦„ (ë‹¨ìˆœ ì¹´ìš´í„°ìš©)
+2. RWLS (Read)            - ê¸°ì¤€ ëŒ€ë¹„ 12% ë¹ ë¦„
+3. .NET 10 Lock           - ê¸°ì¤€ ëŒ€ë¹„ 9% ë¹ ë¦„ âœ…
+4. .NET 10 Lock (EnterScope) - ê¸°ì¤€ ëŒ€ë¹„ 8% ë¹ ë¦„
+5. RWLS (Write)           - ê¸°ì¤€ ëŒ€ë¹„ 1% ë¹ ë¦„
+6. lock (object)          - ê¸°ì¤€ì 
 ```
 
-- ?? **.NET 10 Lock ±ÇÀå** - ±âÁ¸ `lock` ´ëºñ **7~8% ¼º´É Çâ»ó**, Áï½Ã Àû¿ë °¡´É
-- ? **Interlocked** - ´Ü¼ø Ä«¿îÅÍ¿¡´Â °¡Àå È¿À²Àû (2.5~3.6¹è ºü¸§)
-- ?? **RWLS** - ÀĞ±â/¾²±â ºĞ¸®°¡ ¸íÈ®ÇÑ °æ¿ì¿¡¸¸ »ç¿ë
+- ğŸŸ¢ **.NET 10 Lock ê¶Œì¥** - ê¸°ì¡´ `lock` ëŒ€ë¹„ **9% ì„±ëŠ¥ í–¥ìƒ**, ì¦‰ì‹œ ì ìš© ê°€ëŠ¥
+- âš¡ **Interlocked** - ë‹¨ìˆœ ì¹´ìš´í„°ì—ëŠ” ê°€ì¥ íš¨ìœ¨ì  (3.5ë°° ë¹ ë¦„)
+- ğŸŸ¢ **RWLS Read** - ì½ê¸° ìœ„ì£¼ ì‘ì—…ì—ì„œ ì˜ì™¸ë¡œ ë¹ ë¦„ (12% í–¥ìƒ)
 
 ---
 
-## ?? ÃÖÀûÈ­ ¿ì¼±¼øÀ§ (ÃøÁ¤ ±â¹İ)
+## 5. ìµœì í™” ê¸°ë²• ë²¤ì¹˜ë§ˆí¬
 
-| ¼øÀ§ | Ç×¸ñ | ÇöÀç ¹®Á¦ | ¿¹»ó °³¼± | ³­ÀÌµµ |
+### ë°°ì—´ í• ë‹¹ ë¹„êµ
+
+| Method | BufferSize | Mean | Ratio | Allocated |
+|--------|:----------:|-----:|------:|----------:|
+| **new byte[] í• ë‹¹** | **256** | **10.86 ns** | **1.00** | **280 B** |
+| ArrayPool.Rent | 256 | 8.64 ns | 0.80 | 0 B |
+| **new byte[] í• ë‹¹** | **1024** | **33.21 ns** | **1.00** | **1,048 B** |
+| ArrayPool.Rent | 1024 | 14.85 ns | 0.45 | 0 B |
+| **new byte[] í• ë‹¹** | **4096** | **128.44 ns** | **1.00** | **4,120 B** |
+| ArrayPool.Rent | 4096 | 28.72 ns | 0.22 | 0 B |
+
+### ë³µì‚¬ ë°©ì‹ ë¹„êµ (4KB ê¸°ì¤€)
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| Buffer.BlockCopy | 128.91 ns | 4,120 B |
+| Array.Copy | 127.26 ns | 4,120 B |
+| Span.CopyTo | 126.60 ns | 4,120 B |
+
+### ì •ìˆ˜ ë³€í™˜ ë¹„êµ
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| BitConverter.ToUInt16 | 0.11 ns | 0 B |
+| **BinaryPrimitives (stackalloc)** | **0.30 ns** | **0 B** |
+| BitConverter.GetBytes | 2.57 ns | 32 B |
+| BinaryPrimitives.ReadUInt16 | 2.68 ns | 0 B |
+
+### ë¶„ì„
+```
+ArrayPool íš¨ê³¼ (vs new byte[]):
+256B:  20% ë¹ ë¦„, í• ë‹¹ ì œê±°
+1KB:   55% ë¹ ë¦„, í• ë‹¹ ì œê±°
+4KB:   78% ë¹ ë¦„, í• ë‹¹ ì œê±° ğŸ¯
+
+ë³µì‚¬ ë°©ì‹: ì„±ëŠ¥ ì°¨ì´ ê±°ì˜ ì—†ìŒ (Span.CopyToê°€ ì•½ê°„ ë¹ ë¦„)
+
+ì •ìˆ˜ ë³€í™˜:
+- ì½ê¸°: BitConverter.ToUInt16 ê°€ì¥ ë¹ ë¦„ (0.11ns)
+- ì“°ê¸°: BinaryPrimitives + stackalloc ê°€ì¥ ë¹ ë¦„ (0.30ns, í• ë‹¹ ì—†ìŒ)
+```
+
+- ğŸŸ¢ **ArrayPool ê°•ë ¥ ê¶Œì¥** - í¬ê¸°ê°€ í´ìˆ˜ë¡ íš¨ê³¼ í¼ (4KBì—ì„œ 78% í–¥ìƒ)
+- ğŸŸ¢ **BinaryPrimitives** - ì •ìˆ˜ ì“°ê¸° ì‹œ í• ë‹¹ ì—†ì´ ì²˜ë¦¬ ê°€ëŠ¥
+
+---
+
+## 6. Packet ë²¤ì¹˜ë§ˆí¬
+
+| Method | Mean | Allocated |
+|--------|-----:|----------:|
+| Create Packet 64B | 15.91 ns | 216 B |
+| Create Packet 256B | 21.86 ns | 408 B |
+| Create Packet 1KB | 45.34 ns | 1,176 B |
+| Create 100 Packets (64B each) | 1,497.48 ns | 21,600 B |
+| Access Packet Data | 19.05 ns | 376 B |
+
+### ë¶„ì„
+- ğŸŸ¡ **100ê°œ íŒ¨í‚· ìƒì„± ì‹œ 21.6KB í• ë‹¹** - LINQ ì‚¬ìš©ìœ¼ë¡œ ì¸í•œ ì˜¤ë²„í—¤ë“œ
+- ğŸ’¡ **ê°œì„ ì•ˆ**: `ArrayPool` + `Span` ìŠ¬ë¼ì´ì‹±ìœ¼ë¡œ í• ë‹¹ ìµœì†Œí™” ê°€ëŠ¥
+
+---
+
+## ğŸ“ˆ ìµœì í™” ìš°ì„ ìˆœìœ„ (ì¸¡ì • ê¸°ë°˜)
+
+| ìˆœìœ„ | í•­ëª© | í˜„ì¬ ë¬¸ì œ | ì˜ˆìƒ ê°œì„  | ë‚œì´ë„ |
 |:----:|------|----------|----------|:------:|
-| **1** | **ArrayPool Àû¿ë** | ¹öÆÛ È®Àå ½Ã 442KB ÇÒ´ç | ¸Ş¸ğ¸® 90%¡é | Áß |
-| **2** | **Channel\<T\> ÀüÈ¯** | BufferBlock ´À¸² | ¼Óµµ 4¹è¡è, ¸Ş¸ğ¸® 66%¡é | Áß |
-| **3** | **.NET 10 Lock Àû¿ë** | ±âÁ¸ lock »ç¿ë | ¼Óµµ 8%¡è | ³·À½ |
-| **4** | **BasePacket ÃÖÀûÈ­** | LINQ·Î ¹è¿­ º¹»ç | ÇÒ´ç °¨¼Ò | Áß |
-| **5** | **QueueBuffer Á¦°Å** | 20¹è ´À¸² | CircularBuffer·Î ÅëÀÏ | ³·À½ |
+| **1** | **ArrayPool ì ìš©** | ë²„í¼ í™•ì¥ ì‹œ 442KB í• ë‹¹ | ë©”ëª¨ë¦¬ 90%â†“, ì†ë„ 78%â†‘ | ì¤‘ |
+| **2** | **Channel\<T\> ì „í™˜** | BufferBlock ëŠë¦¼ | ì†ë„ 3ë°°â†‘, ë©”ëª¨ë¦¬ 69%â†“ | ì¤‘ |
+| **3** | **.NET 10 Lock ì ìš©** | ê¸°ì¡´ lock ì‚¬ìš© | ì†ë„ 9%â†‘ | ë‚®ìŒ |
+| **4** | **BasePacket ìµœì í™”** | LINQë¡œ ë°°ì—´ ë³µì‚¬ | í• ë‹¹ ê°ì†Œ | ì¤‘ |
+| **5** | **QueueBuffer ì œê±°** | 35ë°° ëŠë¦¼ | CircularBufferë¡œ í†µì¼ | ë‚®ìŒ |
 
 ---
 
-## ?? Áï½Ã Àû¿ë °¡´ÉÇÑ °³¼± (Quick Wins)
 
-### 1. .NET 10 Lock ÀüÈ¯ (5ºĞ)
-```csharp
-// Before
-private readonly ReaderWriterLockSlim m_Lock = new();
+## ğŸ“ ì›ë³¸ ë°ì´í„°
 
-// After
-private readonly Lock m_Lock = new();
-
-// »ç¿ë¹ı 1: lock ¹® »ç¿ë
-lock (m_Lock)
-{
-    // critical section
-}
-
-// »ç¿ë¹ı 2: EnterScope() »ç¿ë (using°ú ÇÔ²²)
-using (m_Lock.EnterScope())
-{
-    // critical section
-}
-```
-
-### 2. Channel ÀüÈ¯ (30ºĞ)
-```csharp
-// Before
-private readonly BufferBlock<BasePacket> m_ReceivedPackets;
-
-// After  
-private readonly Channel<BasePacket> m_ReceivedPackets = 
-    Channel.CreateBounded<BasePacket>(new BoundedChannelOptions(1000)
-    {
-        SingleReader = true,
-        SingleWriter = true
-    });
-```
+ë²¤ì¹˜ë§ˆí¬ ê²°ê³¼ íŒŒì¼: `BenchmarkDotNet.Artifacts/results/`
 
 ---
 
-## ?? ¿øº» µ¥ÀÌÅÍ
+## ğŸ”„ ë‹¤ìŒ ë‹¨ê³„
 
-º¥Ä¡¸¶Å© °á°ú ÆÄÀÏ: `BenchmarkDotNet.Artifacts/results/`
-
----
-
-## ?? ´ÙÀ½ ´Ü°è
-
-1. [x] ±âÁØÁ¡(Baseline) ÃøÁ¤ ¿Ï·á
-2. [ ] ÃÖÀûÈ­ Àû¿ë (ArrayPool, Channel, .NET 10 Lock)
-3. [ ] ÃÖÀûÈ­ ÈÄ ÀçÃøÁ¤
-4. [ ] Before/After ºñ±³ ¹®¼­ ÀÛ¼º
+1. [x] ê¸°ì¤€ì (Baseline) ì¸¡ì • ì™„ë£Œ âœ…
+2. [ ] ìµœì í™” ì ìš© (ArrayPool, Channel, .NET 10 Lock)
+3. [ ] ìµœì í™” í›„ ì¬ì¸¡ì •
+4. [ ] Before/After ë¹„êµ ë¬¸ì„œ ì‘ì„±

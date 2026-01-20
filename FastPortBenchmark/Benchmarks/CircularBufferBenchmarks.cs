@@ -5,10 +5,10 @@ using LibCommons;
 namespace FastPortBenchmark.Benchmarks;
 
 /// <summary>
-/// CircularBuffer 성능 벤치마크
+/// CircularBuffer vs ArrayPoolCircularBuffer 성능 벤치마크
 /// - Write/Read 성능
 /// - 다양한 데이터 크기별 성능
-/// - 버퍼 확장 시 성능
+/// - 버퍼 확장 시 성능 (ArrayPool 효과 측정)
 /// </summary>
 [MemoryDiagnoser]
 [SimpleJob]  // 현재 호스트 런타임 사용 (.NET 10)
@@ -16,6 +16,7 @@ namespace FastPortBenchmark.Benchmarks;
 public class CircularBufferBenchmarks
 {
     private BaseCircularBuffers _buffer = null!;
+    private ArrayPoolCircularBuffers _arrayPoolBuffer = null!;
     private byte[] _smallData = null!;   // 64 bytes
     private byte[] _mediumData = null!;  // 1KB
     private byte[] _largeData = null!;   // 8KB
@@ -25,6 +26,7 @@ public class CircularBufferBenchmarks
     public void Setup()
     {
         _buffer = new BaseCircularBuffers(8192);
+        _arrayPoolBuffer = new ArrayPoolCircularBuffers(8192);
         _smallData = new byte[64];
         _mediumData = new byte[1024];
         _largeData = new byte[8192];
@@ -40,6 +42,7 @@ public class CircularBufferBenchmarks
     public void Cleanup()
     {
         _buffer.Dispose();
+        _arrayPoolBuffer.Dispose();
     }
 
     [IterationSetup]
@@ -47,10 +50,12 @@ public class CircularBufferBenchmarks
     {
         // 각 반복마다 버퍼 초기화
         _buffer.Dispose();
+        _arrayPoolBuffer.Dispose();
         _buffer = new BaseCircularBuffers(8192);
+        _arrayPoolBuffer = new ArrayPoolCircularBuffers(8192);
     }
 
-    // === Write 벤치마크 ===
+    // === 기존 CircularBuffer Write 벤치마크 ===
 
     [Benchmark(Description = "Write 64B")]
     public int Write_Small() => _buffer.Write(_smallData, 0, _smallData.Length);
@@ -61,7 +66,7 @@ public class CircularBufferBenchmarks
     [Benchmark(Description = "Write 8KB")]
     public int Write_Large() => _buffer.Write(_largeData, 0, _largeData.Length);
 
-    // === Write + Read 벤치마크 ===
+    // === 기존 Write + Read 벤치마크 ===
 
     [Benchmark(Description = "Write+Read 64B")]
     public int WriteRead_Small()
@@ -77,9 +82,9 @@ public class CircularBufferBenchmarks
         return _buffer.Peek(ref _readBuffer);
     }
 
-    // === 연속 Write (버퍼 확장 테스트) ===
+    // === 버퍼 확장 테스트 (핵심 비교) ===
 
-    [Benchmark(Description = "Write x10 (버퍼 확장)")]
+    [Benchmark(Description = "Write x10 (버퍼 확장) - 기존")]
     public int Write_Multiple_WithExpansion()
     {
         int total = 0;
@@ -90,9 +95,20 @@ public class CircularBufferBenchmarks
         return total;
     }
 
+    [Benchmark(Description = "Write x10 (버퍼 확장) - ArrayPool")]
+    public int Write_Multiple_WithExpansion_ArrayPool()
+    {
+        int total = 0;
+        for (int i = 0; i < 10; i++)
+        {
+            total += _arrayPoolBuffer.Write(_largeData, 0, _largeData.Length);
+        }
+        return total;
+    }
+
     // === 패킷 파싱 벤치마크 ===
 
-    [Benchmark(Description = "TryGetBasePackets (10 packets)")]
+    [Benchmark(Description = "TryGetBasePackets (10 packets) - 기존")]
     public int TryGetPackets()
     {
         // 패킷 형식: [2바이트 크기][데이터]
@@ -106,6 +122,23 @@ public class CircularBufferBenchmarks
         }
 
         _buffer.TryGetBasePackets(out var packets);
+        return packets.Count;
+    }
+
+    [Benchmark(Description = "TryGetBasePackets (10 packets) - ArrayPool")]
+    public int TryGetPackets_ArrayPool()
+    {
+        // 패킷 형식: [2바이트 크기][데이터]
+        byte[] packetData = new byte[66]; // 2 + 64
+        BitConverter.GetBytes((ushort)66).CopyTo(packetData, 0);
+        _smallData.CopyTo(packetData, 2);
+
+        for (int i = 0; i < 10; i++)
+        {
+            _arrayPoolBuffer.Write(packetData, 0, packetData.Length);
+        }
+
+        _arrayPoolBuffer.TryGetBasePackets(out var packets);
         return packets.Count;
     }
 }

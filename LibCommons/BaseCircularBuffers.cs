@@ -17,6 +17,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
     // 버퍼의 총 크기
     private int m_Capacity;
+
     private readonly ReaderWriterLockSlim m_Lock = new ReaderWriterLockSlim();
 
     // 버퍼에 현재 데이터 사이즈

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>FastPortBenchmark.Benchmarks.OptimizationTechniquesBenchmarks-20260120-121618</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.7623/25H2/2025Update/HudsonValley2)
+Intel Core i5-14600K 3.50GHz, 1 CPU, 20 logical and 14 physical cores
+.NET SDK 10.0.101
+  [Host]     : .NET 10.0.1 (10.0.1, 10.0.125.57005), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 10.0.1 (10.0.1, 10.0.125.57005), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method                   </th><th>BufferSize</th><th>Mean </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Rank</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>&#39;new byte[] 할당&#39;</td><td>256</td><td>10.8603 ns</td><td>0.1536 ns</td><td>0.1437 ns</td><td>1.000</td><td>0.02</td><td>5</td><td>0.0223</td><td>280 B</td><td>1.00</td>
+</tr><tr><td>ArrayPool.Rent</td><td>256</td><td>8.6415 ns</td><td>0.0087 ns</td><td>0.0077 ns</td><td>0.796</td><td>0.01</td><td>4</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>Buffer.BlockCopy</td><td>256</td><td>10.9777 ns</td><td>0.2032 ns</td><td>0.1900 ns</td><td>1.011</td><td>0.02</td><td>5</td><td>0.0223</td><td>280 B</td><td>1.00</td>
+</tr><tr><td>Array.Copy</td><td>256</td><td>10.1759 ns</td><td>0.1629 ns</td><td>0.1444 ns</td><td>0.937</td><td>0.02</td><td>5</td><td>0.0223</td><td>280 B</td><td>1.00</td>
+</tr><tr><td>Span.CopyTo</td><td>256</td><td>10.5647 ns</td><td>0.1375 ns</td><td>0.1286 ns</td><td>0.973</td><td>0.02</td><td>5</td><td>0.0223</td><td>280 B</td><td>1.00</td>
+</tr><tr><td>BitConverter.GetBytes</td><td>256</td><td>2.5689 ns</td><td>0.0889 ns</td><td>0.1023 ns</td><td>0.237</td><td>0.01</td><td>3</td><td>0.0025</td><td>32 B</td><td>0.11</td>
+</tr><tr><td>&#39;BinaryPrimitives (stackalloc)&#39;</td><td>256</td><td>0.2994 ns</td><td>0.0032 ns</td><td>0.0030 ns</td><td>0.028</td><td>0.00</td><td>2</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>BitConverter.ToUInt16</td><td>256</td><td>0.1019 ns</td><td>0.0022 ns</td><td>0.0020 ns</td><td>0.009</td><td>0.00</td><td>1</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>BinaryPrimitives.ReadUInt16</td><td>256</td><td>2.6848 ns</td><td>0.0061 ns</td><td>0.0057 ns</td><td>0.247</td><td>0.00</td><td>3</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>&#39;new byte[] 할당&#39;</td><td>1024</td><td>33.2065 ns</td><td>0.4398 ns</td><td>0.3899 ns</td><td>1.000</td><td>0.02</td><td>5</td><td>0.0835</td><td>1048 B</td><td>1.00</td>
+</tr><tr><td>ArrayPool.Rent</td><td>1024</td><td>14.8548 ns</td><td>0.0180 ns</td><td>0.0168 ns</td><td>0.447</td><td>0.01</td><td>4</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>Buffer.BlockCopy</td><td>1024</td><td>33.2638 ns</td><td>0.6512 ns</td><td>1.4156 ns</td><td>1.002</td><td>0.04</td><td>5</td><td>0.0835</td><td>1048 B</td><td>1.00</td>
+</tr><tr><td>Array.Copy</td><td>1024</td><td>31.7659 ns</td><td>0.6383 ns</td><td>0.7095 ns</td><td>0.957</td><td>0.02</td><td>5</td><td>0.0835</td><td>1048 B</td><td>1.00</td>
+</tr><tr><td>Span.CopyTo</td><td>1024</td><td>33.5066 ns</td><td>0.6307 ns</td><td>0.5591 ns</td><td>1.009</td><td>0.02</td><td>5</td><td>0.0835</td><td>1048 B</td><td>1.00</td>
+</tr><tr><td>BitConverter.GetBytes</td><td>1024</td><td>2.6075 ns</td><td>0.0866 ns</td><td>0.0851 ns</td><td>0.079</td><td>0.00</td><td>3</td><td>0.0025</td><td>32 B</td><td>0.03</td>
+</tr><tr><td>&#39;BinaryPrimitives (stackalloc)&#39;</td><td>1024</td><td>0.2972 ns</td><td>0.0018 ns</td><td>0.0016 ns</td><td>0.009</td><td>0.00</td><td>2</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>BitConverter.ToUInt16</td><td>1024</td><td>0.1088 ns</td><td>0.0033 ns</td><td>0.0029 ns</td><td>0.003</td><td>0.00</td><td>1</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>BinaryPrimitives.ReadUInt16</td><td>1024</td><td>2.6839 ns</td><td>0.0051 ns</td><td>0.0040 ns</td><td>0.081</td><td>0.00</td><td>3</td><td>-</td><td>-</td><td>0.00</td>
+</tr><tr><td>&#39;new byte[] 할당&#39;</td><td>4096</td><td>128.4397 ns</td><td>2.4492 ns</td><td>2.4055 ns</td><td>1.000</td><td>0.03</td><td>5</td><td>0.3281</td><td>4120 B</td><td>1.000</td>
+</tr><tr><td>ArrayPool.Rent</td><td>4096</td><td>28.7196 ns</td><td>0.0996 ns</td><td>0.0883 ns</td><td>0.224</td><td>0.00</td><td>4</td><td>-</td><td>-</td><td>0.000</td>
+</tr><tr><td>Buffer.BlockCopy</td><td>4096</td><td>128.9100 ns</td><td>2.3799 ns</td><td>2.2261 ns</td><td>1.004</td><td>0.02</td><td>5</td><td>0.3281</td><td>4120 B</td><td>1.000</td>
+</tr><tr><td>Array.Copy</td><td>4096</td><td>127.2616 ns</td><td>2.0915 ns</td><td>1.9564 ns</td><td>0.991</td><td>0.02</td><td>5</td><td>0.3281</td><td>4120 B</td><td>1.000</td>
+</tr><tr><td>Span.CopyTo</td><td>4096</td><td>126.5970 ns</td><td>2.1964 ns</td><td>1.9470 ns</td><td>0.986</td><td>0.02</td><td>5</td><td>0.3281</td><td>4120 B</td><td>1.000</td>
+</tr><tr><td>BitConverter.GetBytes</td><td>4096</td><td>2.7103 ns</td><td>0.0849 ns</td><td>0.0794 ns</td><td>0.021</td><td>0.00</td><td>3</td><td>0.0025</td><td>32 B</td><td>0.008</td>
+</tr><tr><td>&#39;BinaryPrimitives (stackalloc)&#39;</td><td>4096</td><td>0.2988 ns</td><td>0.0036 ns</td><td>0.0032 ns</td><td>0.002</td><td>0.00</td><td>2</td><td>-</td><td>-</td><td>0.000</td>
+</tr><tr><td>BitConverter.ToUInt16</td><td>4096</td><td>0.1079 ns</td><td>0.0019 ns</td><td>0.0018 ns</td><td>0.001</td><td>0.00</td><td>1</td><td>-</td><td>-</td><td>0.000</td>
+</tr><tr><td>BinaryPrimitives.ReadUInt16</td><td>4096</td><td>2.6857 ns</td><td>0.0051 ns</td><td>0.0048 ns</td><td>0.021</td><td>0.00</td><td>3</td><td>-</td><td>-</td><td>0.000</td>
+</tr></tbody></table>
+</body>
+</html>

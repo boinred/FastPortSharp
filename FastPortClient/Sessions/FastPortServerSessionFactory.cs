@@ -18,5 +18,5 @@ public class FastPortServerSessionFactory : LibNetworks.Sessions.IServerSessionF
         m_Logger = logger; 
     }
 
-    public BaseSessionServer Create(Socket connectedSocket) => new FastPortServerSession(m_Logger, connectedSocket, new LibCommons.BaseCircularBuffers(8 * 1024), new LibCommons.BaseCircularBuffers(8 * 1024));
+    public BaseSessionServer Create(Socket connectedSocket) => new FastPortServerSession(m_Logger, connectedSocket, new LibCommons.ArrayPoolCircularBuffers(8 * 1024), new LibCommons.ArrayPoolCircularBuffers(8 * 1024));
 }

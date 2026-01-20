@@ -2,7 +2,7 @@
 
 FastPortSharp 프로젝트의 성능을 측정하기 위한 벤치마크 프로젝트입니다.
 
-## ?? 벤치마크 목록
+## 벤치마크 목록
 
 | 파일 | 설명 |
 |------|------|
@@ -13,7 +13,7 @@ FastPortSharp 프로젝트의 성능을 측정하기 위한 벤치마크 프로젝트입니다.
 | `ChannelVsDataflowBenchmarks` | Channel vs BufferBlock |
 | `LockBenchmarks` | lock vs .NET 9 Lock vs RWLS |
 
-## ?? 실행 방법
+## 실행 방법
 
 ### 전체 벤치마크 실행
 ```bash
@@ -52,7 +52,7 @@ dotnet run -c Release -- --filter * --exporters md
 dotnet run -c Release -- --filter * --exporters html
 ```
 
-## ?? 결과 해석
+## 결과 해석
 
 ### 주요 지표
 - **Mean**: 평균 실행 시간
@@ -68,14 +68,14 @@ dotnet run -c Release -- --filter * --exporters html
 | ArrayPool.Rent  | 50 ns    | 0 B       |  ← 재사용
 ```
 
-## ?? 결과 저장 위치
+## 결과 저장 위치
 
 벤치마크 결과는 `BenchmarkDotNet.Artifacts/` 폴더에 저장됩니다:
 - `results/` - 상세 결과 파일
 - `*.md` - 마크다운 리포트
 - `*.html` - HTML 리포트
 
-## ?? 주의사항
+## 주의사항
 
 1. **반드시 Release 모드로 실행**
    ```bash
