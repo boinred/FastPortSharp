@@ -11,6 +11,7 @@
 - [프로젝트 개요](#-프로젝트-개요)
 - [주요 기능](#-주요-기능)
 - [기술 스택](#-기술-스택)
+- [성능 벤치마크](#-성능-벤치마크)
 - [아키텍처](#-아키텍처)
 - [프로젝트 구조](#-프로젝트-구조)
 - [핵심 구현](#-핵심-구현)
@@ -46,18 +47,39 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 
 ## 🛠 기술 스택
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      FastPortSharp                          │
-├─────────────────────────────────────────────────────────────┤
-│  Language        │  C# 13 / .NET 9                          │
-│  Async Pattern   │  SocketAsyncEventArgs (IOCP)             │
-│  Serialization   │  Google Protocol Buffers (gRPC)          │
-│  DI Container    │  Microsoft.Extensions.DependencyInjection│
-│  Hosting         │  Microsoft.Extensions.Hosting            │
-│  Concurrency     │  TPL Dataflow, ReaderWriterLockSlim      │
-│  Testing         │  xUnit (LibCommonTest)                   │
-└─────────────────────────────────────────────────────────────┘
+| 영역 | 기술 |
+|------|------|
+| Language | C# 13 / .NET 9 |
+| Async Pattern | SocketAsyncEventArgs (IOCP) |
+| Serialization | Google Protocol Buffers |
+| DI Container | Microsoft.Extensions.DependencyInjection |
+| Hosting | Microsoft.Extensions.Hosting |
+| Concurrency | TPL Dataflow, ReaderWriterLockSlim |
+| Testing | xUnit, BenchmarkDotNet |
+
+---
+
+## 📊 성능 벤치마크
+
+> **측정 환경**: Windows 11, Intel Core i5-14600K 3.50GHz, .NET 9.0.11
+
+### 핵심 성능 지표
+
+| 항목 | 결과 | 비고 |
+|------|------|------|
+| **CircularBuffer Write** | 244~670 ns | 64B~8KB 데이터 |
+| **CircularBuffer vs QueueBuffer** | **20배 빠름** | 4KB 데이터 기준 |
+| **Channel vs BufferBlock** | **4배 빠름** | 메모리 66% 절약 |
+| **.NET 9 Lock vs lock** | **7% 빠름** | 단일 스레드 기준 |
+
+### 📈 상세 벤치마크 결과
+
+👉 **[전체 벤치마크 결과 보기](docs/baseline-benchmark-results.md)**
+
+### 벤치마크 실행
+
+```bash
+dotnet run -c Release --project FastPortBenchmark
 ```
 
 ---
@@ -90,14 +112,12 @@ flowchart TB
     
     subgraph LibCommons ["LibCommons"]
         CB[CircularBuffer]
-        QB[QueueBuffer]
         BP[BasePacket]
         IDG[IDGenerator]
     end
     
     subgraph Protocols ["Protocols"]
         PB[Protobuf Messages]
-        GRPC[gRPC Definitions]
     end
     
     CC --> BC
@@ -106,7 +126,6 @@ flowchart TB
     FCS --> BS
     
     BS --> CB
-    BS --> QB
     BS --> BP
     
     FCS --> PB
@@ -145,25 +164,6 @@ sequenceDiagram
     S->>S: OnDisconnected()
 ```
 
-### 패킷 처리 파이프라인
-
-```mermaid
-flowchart LR
-    subgraph Receive ["수신 처리"]
-        R1[Socket Receive] --> R2[CircularBuffer Write]
-        R2 --> R3[Packet Parsing]
-        R3 --> R4[BufferBlock Queue]
-        R4 --> R5[OnReceived Handler]
-    end
-    
-    subgraph Send ["송신 처리"]
-        S1[RequestSendMessage] --> S2[Protobuf Serialize]
-        S2 --> S3[Add Header]
-        S3 --> S4[SendBuffer Write]
-        S4 --> S5[Socket SendAsync]
-    end
-```
-
 ---
 
 ## 📁 프로젝트 구조
@@ -172,51 +172,23 @@ flowchart LR
 FastPortSharp/
 ├── 📂 LibCommons/                 # 공통 유틸리티 라이브러리
 │   ├── BaseCircularBuffers.cs     # 순환 버퍼 구현
-│   ├── BaseQueueBuffers.cs        # 큐 기반 버퍼 구현
 │   ├── BasePacket.cs              # 패킷 구조체
-│   ├── IBuffers.cs                # 버퍼 인터페이스
-│   └── IDGenerator.cs             # 고유 ID 생성기
+│   └── IBuffers.cs                # 버퍼 인터페이스
 │
 ├── 📂 LibNetworks/                # 네트워크 코어 라이브러리
-│   ├── BaseSocket.cs              # 소켓 기본 클래스
 │   ├── BaseListener.cs            # TCP 리스너 베이스
 │   ├── BaseConnector.cs           # TCP 커넥터 베이스
-│   ├── BaseMessageListener.cs     # 메시지 기반 리스너
-│   ├── BaseMessageConnector.cs    # 메시지 기반 커넥터
 │   ├── SocketEventsPool.cs        # SocketAsyncEventArgs 풀
-│   ├── AddressConverter.cs        # IP 주소 변환 유틸
-│   ├── 📂 Sessions/
-│   │   ├── BaseSession.cs         # 세션 핵심 로직
-│   │   ├── BaseSessionClient.cs   # 클라이언트 세션
-│   │   ├── BaseSessionServer.cs   # 서버 세션
-│   │   ├── IClientSessionFactory.cs
-│   │   └── IServerSessionFactory.cs
-│   └── 📂 Extensions/
-│       └── Socket+Extensions.cs   # 소켓 확장 메서드
+│   └── 📂 Sessions/
+│       ├── BaseSession.cs         # 세션 핵심 로직
+│       └── IClientSessionFactory.cs
 │
 ├── 📂 FastPortServer/             # TCP 서버 애플리케이션
-│   ├── FastPortServer.cs          # 서버 메인 클래스
-│   ├── FastPortServerBackgroundService.cs
-│   ├── Program.cs
-│   └── 📂 Sessions/
-│       ├── FastPortClientSession.cs
-│       ├── FastPortClientSessionFactory.cs
-│       └── FastPortClientSessionManager.cs
-│
 ├── 📂 FastPortClient/             # TCP 클라이언트 애플리케이션
-│   ├── FastPortConnector.cs       # 클라이언트 커넥터
-│   ├── FastPortClientBackgroundService.cs
-│   ├── Program.cs
-│   └── 📂 Sessions/
-│       ├── FastPortServerSession.cs
-│       └── FastPortServerSessionFactory.cs
-│
 ├── 📂 Protocols/                  # Protocol Buffers 정의
-│   ├── TestMessage.cs
-│   └── *.proto files
-│
-└── 📂 LibCommonTest/              # 단위 테스트
-    └── BufferTests.cs
+├── 📂 FastPortBenchmark/          # 성능 벤치마크
+└── 📂 docs/                       # 문서
+    └── baseline-benchmark-results.md
 ```
 
 ---
@@ -239,41 +211,10 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         // 용량 부족 시 자동 확장
         // 순환 쓰기 로직으로 메모리 효율화
     }
-    
-    public bool TryGetBasePackets(out List<BasePacket> basePackets)
-    {
-        // 패킷 단위로 데이터 추출
-    }
 }
 ```
 
-### 2. 비동기 세션 관리
-
-TPL Dataflow를 활용한 생산자-소비자 패턴으로 패킷을 처리합니다.
-
-```csharp
-public abstract class BaseSession
-{
-    private readonly BufferBlock<BasePacket> m_ReceivedPackets;
-    
-    // 수신 버퍼 처리 태스크
-    private async Task DoWorkReceivedBuffers(CancellationToken ct)
-    {
-        while (!ct.IsCancellationRequested)
-        {
-            if (m_ReceivedBuffers.TryGetBasePackets(out var packets))
-            {
-                foreach (var packet in packets)
-                    await m_ReceivedPackets.SendAsync(packet);
-            }
-        }
-    }
-}
-```
-
-### 3. Factory 패턴 기반 세션 생성
-
-의존성 주입과 Factory 패턴을 결합하여 유연한 세션 관리를 구현합니다.
+### 2. Factory 패턴 기반 세션 생성
 
 ```csharp
 public interface IClientSessionFactory
@@ -292,7 +233,7 @@ public class FastPortClientSessionFactory : IClientSessionFactory
 }
 ```
 
-### 4. Protocol Buffers 메시지 처리
+### 3. Protocol Buffers 메시지 처리
 
 ```csharp
 protected void RequestSendMessage<T>(int packetId, IMessage<T> message) 
@@ -307,4 +248,58 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
     
     RequestSendBuffers(packetBuffers);
 }
+```
+
+---
+
+## 🚀 시작하기
+
+### 필수 조건
+
+- .NET 9 SDK
+- Visual Studio 2022 또는 VS Code
+
+### 빌드 및 실행
+
+```bash
+# 솔루션 빌드
+dotnet build FastPortSharp.sln
+
+# 서버 실행
+dotnet run --project FastPortServer
+
+# 클라이언트 실행 (새 터미널)
+dotnet run --project FastPortClient
+```
+
+---
+
+## 📈 성능 최적화 로드맵
+
+| 순위 | 항목 | 예상 개선 | 상태 |
+|:----:|------|----------|:----:|
+| 1 | ArrayPool 적용 | 메모리 90%↓ | 🔲 |
+| 2 | Channel\<T\> 전환 | 속도 4배↑ | 🔲 |
+| 3 | .NET 9 Lock 적용 | 속도 8%↑ | 🔲 |
+| 4 | BasePacket struct 변환 | 할당 감소 | 🔲 |
+
+👉 **[최적화 가이드 상세](docs/FastPortSharp-Optimization-Guide-Confluence.md)**
+
+---
+
+## 📝 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+
+---
+
+## 👤 개발자
+
+**boinred**
+
+[![GitHub](https://img.shields.io/badge/GitHub-boinred-181717?style=for-the-badge&logo=github)](https://github.com/boinred)
+
+---
+
+> 💡 이 프로젝트는 지속적으로 개선되고 있습니다. 피드백과 기여를 환영합니다!
 

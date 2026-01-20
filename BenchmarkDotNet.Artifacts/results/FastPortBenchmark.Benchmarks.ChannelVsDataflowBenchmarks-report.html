@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>FastPortBenchmark.Benchmarks.ChannelVsDataflowBenchmarks-20260120-090543</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.8, Windows 11 (10.0.26200.7623/25H2/2025Update/HudsonValley2)
+Intel Core i5-14600K 3.50GHz, 1 CPU, 20 logical and 14 physical cores
+.NET SDK 10.0.101
+  [Host]   : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
+  .NET 9.0 : .NET 9.0.11 (9.0.11, 9.0.1125.51716), X64 RyuJIT x86-64-v3
+</code></pre>
+<pre><code>Job=.NET 9.0  Runtime=.NET 9.0  
+</code></pre>
+
+<table>
+<thead><tr><th>Method             </th><th>MessageCount</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Median</th><th>Rank</th><th>Gen0</th><th>Gen1</th><th>Allocated</th>
+</tr>
+</thead><tbody><tr><td>&#39;Channel&lt;T&gt; Bounded&#39;</td><td>100</td><td>17.380 &mu;s</td><td>0.3468 &mu;s</td><td>0.4509 &mu;s</td><td>17.262 &mu;s</td><td>4</td><td>1.2512</td><td>-</td><td>15.52 KB</td>
+</tr><tr><td>&#39;Channel&lt;T&gt; Unbounded&#39;</td><td>100</td><td>15.803 &mu;s</td><td>0.3068 &mu;s</td><td>0.3881 &mu;s</td><td>15.762 &mu;s</td><td>3</td><td>1.2817</td><td>-</td><td>15.84 KB</td>
+</tr><tr><td>BufferBlock&lt;T&gt;</td><td>100</td><td>35.328 &mu;s</td><td>0.5552 &mu;s</td><td>0.5194 &mu;s</td><td>35.238 &mu;s</td><td>5</td><td>3.4790</td><td>0.1221</td><td>42.98 KB</td>
+</tr><tr><td>&#39;Channel TryWrite (sync)&#39;</td><td>100</td><td>3.980 &mu;s</td><td>0.1501 &mu;s</td><td>0.4401 &mu;s</td><td>4.115 &mu;s</td><td>1</td><td>1.3466</td><td>0.0839</td><td>16.5 KB</td>
+</tr><tr><td>&#39;BufferBlock Post (sync)&#39;</td><td>100</td><td>6.959 &mu;s</td><td>0.1339 &mu;s</td><td>0.1920 &mu;s</td><td>6.973 &mu;s</td><td>2</td><td>0.6256</td><td>0.2441</td><td>15.61 KB</td>
+</tr><tr><td>&#39;Channel&lt;T&gt; Bounded&#39;</td><td>1000</td><td>120.360 &mu;s</td><td>2.3994 &mu;s</td><td>6.4457 &mu;s</td><td>120.497 &mu;s</td><td>9</td><td>10.7422</td><td>1.7090</td><td>131.51 KB</td>
+</tr><tr><td>&#39;Channel&lt;T&gt; Unbounded&#39;</td><td>1000</td><td>90.261 &mu;s</td><td>1.7983 &mu;s</td><td>3.5074 &mu;s</td><td>90.631 &mu;s</td><td>8</td><td>10.7422</td><td>1.9531</td><td>132.54 KB</td>
+</tr><tr><td>BufferBlock&lt;T&gt;</td><td>1000</td><td>359.378 &mu;s</td><td>7.1173 &mu;s</td><td>18.9974 &mu;s</td><td>362.580 &mu;s</td><td>10</td><td>32.2266</td><td>7.3242</td><td>395.98 KB</td>
+</tr><tr><td>&#39;Channel TryWrite (sync)&#39;</td><td>1000</td><td>40.566 &mu;s</td><td>0.6975 &mu;s</td><td>0.6524 &mu;s</td><td>40.648 &mu;s</td><td>6</td><td>12.2986</td><td>4.5776</td><td>150.72 KB</td>
+</tr><tr><td>&#39;BufferBlock Post (sync)&#39;</td><td>1000</td><td>62.262 &mu;s</td><td>1.2368 &mu;s</td><td>1.7738 &mu;s</td><td>62.254 &mu;s</td><td>7</td><td>7.6904</td><td>3.1128</td><td>136.39 KB</td>
+</tr></tbody></table>
+</body>
+</html>
