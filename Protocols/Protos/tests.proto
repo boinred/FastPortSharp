@@ -1,0 +1,51 @@
+﻿syntax = "proto3";
+
+import "commons.proto";
+
+package fastport.protocols.tests;
+
+option csharp_namespace = "FastPort.Protocols.Tests";
+
+option optimize_for = SPEED;
+
+message PingRequest 
+{
+	fastport.protocols.commons.Header header	= 1;
+	string payload	= 2;
+}
+
+message PingResponse 
+{
+	fastport.protocols.commons.Header		header	= 1;
+	fastport.protocols.commons.ResultCode	result	= 2;
+	string				payload = 3;
+}
+
+message EchoRequest 
+{
+	fastport.protocols.commons.Header	header		= 1;
+	bytes			data		= 2;
+	string			data_str	= 3; // For convenience, allow string data as well.
+}
+
+message EchoResponse 
+{
+	fastport.protocols.commons.Header		header		= 1;
+	fastport.protocols.commons.ResultCode	result		= 2;
+	bytes				data		= 3;
+	string				data_str	= 4; // For convenience, allow string data as well.
+}
+
+message ErrorResponse 
+{
+	fastport.protocols.commons.Header		header		= 1;
+	fastport.protocols.commons.ResultCode	result		= 2;
+	string				message		= 3;
+	int32				error_code	= 4;
+}
+
+service TestService 
+{
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}

@@ -1,6 +1,6 @@
 ﻿using Google.Protobuf;
 using LibCommons;
-using LibNetworks;
+using LibNetworks.Extensions;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net.Sockets;
@@ -22,31 +22,38 @@ public class FastPortClientSession : LibNetworks.Sessions.BaseSessionClient
 
     }
 
-    public void SendMessage<T>(FastPort.Protocols.EPacketId ePacketId, T message) where T : IMessage<T> => RequestSendMessage((int)ePacketId, message);
+    public void SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message) where T : IMessage<T> => RequestSendMessage((int)protocolId, message);
 
     protected override void OnReceived(BasePacket packet)
     {
         base.OnReceived(packet);
 
-        if (!ParseMessageFromPacket(packet, out int packetId, out FastPort.Protocols.TestRequest? request))
+        if (!packet.ParseMessageFromPacket(out int packetId, out FastPort.Protocols.Tests.EchoRequest? request))
         {
             m_Logger.LogError($"FastPortClientSession, OnReceived, ParseMessageFromPacket failed.");
 
-            return; 
+            return;
         }
 
-        FastPort.Protocols.Character character = FastPort.Protocols.Character.Parser.ParseFrom(request!.Binaries);
+        var header = request!.Header;
 
-        m_Logger.LogInformation($"FastPortClientSession, OnReceived, Packet Size : {packet.PacketSize}, Date Size : {packet.DataSize}, Elapsed Seconds : {Stopwatch.GetTimestamp() - character.TickCount}");
 
-        FastPort.Protocols.TestResponse response = new();
-        Debug.Assert(null != response);
-        if(null != request )
+        m_Logger.LogInformation($"FastPortClientSession, OnReceived, Packet Size : {packet.PacketSize}, Date Size : {packet.DataSize}, Elapsed Seconds : {(ulong)Stopwatch.GetTimestamp() - header.TimestampMs}, Packet Data : {request.DataStr}");
+
+        FastPort.Protocols.Tests.EchoResponse response = new FastPort.Protocols.Tests.EchoResponse
         {
-            response.Binaries = request.Binaries;
-            response.Name = request.Name;
-            SendMessage(FastPort.Protocols.EPacketId.TestResponse, response);
-        }
+            Header = new FastPort.Protocols.Commons.Header
+            {
+                TimestampMs = (ulong)Stopwatch.GetTimestamp(),
+                RequestId = header.RequestId + 1,
+            },
+            Result = FastPort.Protocols.Commons.ResultCode.Ok,
+        };
+
+
+        response.DataStr = request.DataStr;
+        response.Data = request.Data;
+        SendMessage(FastPort.Protocols.Commons.ProtocolId.Tests, response);
     }
 
     public override void OnAccepted()

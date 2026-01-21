@@ -1,4 +1,4 @@
-癤�<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -14,7 +14,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="auth.proto" Acccess="Public"/>
+    <!-- 
+      Protobuf 설정 옵션:
+      - ProtoRoot: import 경로 기준 폴더
+      - GrpcServices: None | Client | Server | Both
+      - Access: Public | Internal
+    -->
+    <Protobuf Include="Protos\**\*.proto" 
+              ProtoRoot="Protos" 
+              GrpcServices="Both" 
+              Access="Public" />
   </ItemGroup>
 
 </Project>
