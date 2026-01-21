@@ -1,5 +1,4 @@
 ﻿using System.Buffers;
-using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 
 namespace LibCommons;
@@ -19,7 +18,8 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     // 버퍼의 총 크기
     private int m_Capacity;
 
-    private readonly ReaderWriterLockSlim m_Lock = new ReaderWriterLockSlim();
+    // .NET 9+ 경량 Lock 클래스 사용
+    private readonly Lock m_Lock = new();
 
     // 버퍼에 현재 데이터 사이즈
     public int CanReadSize { get; private set; } = 0;
@@ -44,8 +44,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     {
         int writeSize = count;
 
-        m_Lock.EnterWriteLock();
-        try
+        lock (m_Lock)
         {
             if (buffers == null || writeSize == 0)
             {
@@ -65,10 +64,6 @@ public class BaseCircularBuffers : IBuffers, IDisposable
             m_Tail = (m_Tail + writeSize) % m_Capacity; // 쓰기 위치 업데이트
             CanReadSize += writeSize;
         }
-        finally
-        {
-            m_Lock.ExitWriteLock();
-        }
 
         return writeSize;
     }
@@ -78,8 +73,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     {
         int buffersSize = buffers.Length;
 
-        m_Lock.EnterReadLock();
-        try
+        lock (m_Lock)
         {
             if (CanReadSize <= 0)
             {
@@ -94,10 +88,6 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
             // 순환 버퍼에서 데이터 복사
             CopyFromCircularBuffer(buffers.AsSpan(0, buffersSize), m_Head);
-        }
-        finally
-        {
-            m_Lock.ExitReadLock();
         }
 
         return buffersSize;
@@ -139,12 +129,11 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
     public bool TryGetBasePackets(out List<BasePacket> basePackets)
     {
-        basePackets = new();
+        basePackets = [];
 
         int basePacketSize = 0;
 
-        m_Lock.EnterWriteLock();
-        try
+        lock (m_Lock)
         {
             // 패킷이 전체다 읽을 수 있는지 확인
             do
@@ -175,10 +164,6 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
             }
             while (CanReadSize >= basePacketSize);
-        }
-        finally
-        {
-            m_Lock.ExitWriteLock();
         }
 
         return basePackets.Count > 0;
@@ -293,11 +278,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
             return;
         }
 
-        if (bDisposing)
-        {
-            m_Lock.Dispose();
-        }
-
+        // Lock은 IDisposable을 구현하지 않으므로 Dispose 불필요
         m_bDisposed = true;
     }
 }

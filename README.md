@@ -321,7 +321,7 @@ dotnet test LibCommonTest
 |:----:|------|----------|:----:|
 | 1 | ArrayPool 적용 | 메모리 90%↓ | ☑  |
 | 2 | Channel\<T\> 전환 | 속도 4배↑ | 🔲 |
-| 3 | .NET 9 Lock 적용 | 속도 8%↑ | 🔲 |
+| 3 | .NET 10 Lock 적용 | 속도 9%↑ | ☑  |
 | 4 | BasePacket struct 변환 | 할당 감소 | 🔲 |
 
 👉 **[최적화 가이드 상세](docs/FastPortSharp-Optimization-Guide-Confluence.md)**
