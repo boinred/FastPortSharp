@@ -78,15 +78,18 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
             return 0;
         }
 
+        int writeSize = source.Length;
         lock (m_Lock)
         {
-            if (source.Length > CanWriteSize)
+            if (writeSize > CanWriteSize)
             {
-                ExpandBuffer(source.Length - CanWriteSize);
+                // 용량을 증가 시켜 준다.
+                var increaseSize = writeSize - CanWriteSize; // 증가시켜야 하는 크기
+                ExpandBuffer(increaseSize);
             }
 
             WriteInternal(source);
-            return source.Length;
+            return writeSize;
         }
     }
 

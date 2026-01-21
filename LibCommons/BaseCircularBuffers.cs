@@ -1,5 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Buffers;
 using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
 
 namespace LibCommons;
 
@@ -55,28 +56,14 @@ public class BaseCircularBuffers : IBuffers, IDisposable
             {
                 // 용량을 증가 시켜 준다.
                 var increaseSize = writeSize - CanWriteSize; // 증가시켜야 하는 크기
-                Array.Resize(ref m_Buffers, m_Capacity + increaseSize);
-                m_Capacity += increaseSize;
+                ExpandBuffer(increaseSize);
             }
 
-            // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-            if (m_Tail + writeSize > m_Capacity)
-            {
-                int forwardSize = m_Capacity - m_Tail; // 버퍼의 끝까지 쓸 수 있는 크기
-
-                Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, forwardSize); // 첫 번째 부분 복사
-
-                int remainSize = writeSize - forwardSize; // 남은 크기
-                Buffer.BlockCopy(buffers, offset + forwardSize, m_Buffers, 0, remainSize);
-            }
-            else // 데이터가 버퍼의 끝을 넘지 않는 경우
-            {
-                Buffer.BlockCopy(buffers, offset, m_Buffers, m_Tail, writeSize);
-            }
+            // 순환 버퍼에 데이터 복사
+            CopyToCircularBuffer(buffers.AsSpan(offset, writeSize), m_Tail);
 
             m_Tail = (m_Tail + writeSize) % m_Capacity; // 쓰기 위치 업데이트
             CanReadSize += writeSize;
-
         }
         finally
         {
@@ -99,25 +86,14 @@ public class BaseCircularBuffers : IBuffers, IDisposable
                 return 0; // 읽을 데이터가 없는 경우
             }
 
-
             if (buffersSize > CanReadSize)
             {
                 // 읽을 수 있는 데이터가 부족한 경우
                 buffersSize = CanReadSize;
             }
 
-            if (m_Head + buffersSize > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-            {
-                int forwardSize = m_Capacity - m_Head; // 버퍼의 끝까지 읽을 수 있는 크기
-                Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize); // 첫 번째 부분 복사
-
-                int remainSize = buffersSize - forwardSize; // 남은 크기
-                Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
-            }
-            else // 데이터가 버퍼의 끝을 넘지 않는 경우
-            {
-                Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, buffersSize);
-            }
+            // 순환 버퍼에서 데이터 복사
+            CopyFromCircularBuffer(buffers.AsSpan(0, buffersSize), m_Head);
         }
         finally
         {
@@ -126,6 +102,7 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
         return buffersSize;
     }
+
     public int GetPacketBuffers(out byte[]? buffers, int size)
     {
         if (CanReadSize < size)
@@ -135,18 +112,9 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         }
 
         buffers = new byte[size]; // 읽을 버퍼 생성
-        if (m_Head + size > m_Capacity) // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-        {
-            int forwardSize = m_Capacity - m_Head;
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, forwardSize);
-
-            int remainSize = size - forwardSize;
-            Buffer.BlockCopy(m_Buffers, 0, buffers, forwardSize, remainSize);
-        }
-        else // 데이터가 버퍼의 끝을 넘지 않는 경우
-        {
-            Buffer.BlockCopy(m_Buffers, m_Head, buffers, 0, size);
-        }
+        
+        // 순환 버퍼에서 데이터 복사
+        CopyFromCircularBuffer(buffers.AsSpan(), m_Head);
 
         return Drain(size);
     }
@@ -168,7 +136,6 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 
         return size;
     }
-
 
     public bool TryGetBasePackets(out List<BasePacket> basePackets)
     {
@@ -242,13 +209,81 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         return packetSize;
     }
 
+    #region Private Helper Methods
 
+    /// <summary>
+    /// 순환 버퍼에 데이터를 복사합니다 (쓰기용)
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void CopyToCircularBuffer(ReadOnlySpan<byte> source, int startIndex)
+    {
+        int size = source.Length;
+
+        // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+        if (startIndex + size > m_Capacity)
+        {
+            int forwardSize = m_Capacity - startIndex;
+            source[..forwardSize].CopyTo(m_Buffers.AsSpan(startIndex));
+            source[forwardSize..].CopyTo(m_Buffers.AsSpan(0));
+        }
+        else
+        {
+            source.CopyTo(m_Buffers.AsSpan(startIndex));
+        }
+    }
+
+    /// <summary>
+    /// 순환 버퍼에서 데이터를 복사합니다 (읽기용)
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void CopyFromCircularBuffer(Span<byte> destination, int startIndex)
+    {
+        int size = destination.Length;
+
+        // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
+        if (startIndex + size > m_Capacity)
+        {
+            int forwardSize = m_Capacity - startIndex;
+            m_Buffers.AsSpan(startIndex, forwardSize).CopyTo(destination);
+            m_Buffers.AsSpan(0, size - forwardSize).CopyTo(destination[forwardSize..]);
+        }
+        else
+        {
+            m_Buffers.AsSpan(startIndex, size).CopyTo(destination);
+        }
+    }
+
+    /// <summary>
+    /// 버퍼 용량을 확장합니다
+    /// </summary>
+    private void ExpandBuffer(int requiredSize)
+    {
+        int newCapacity = m_Capacity;
+        while (newCapacity - CanReadSize < requiredSize)
+        {
+            newCapacity *= 2; // 버퍼 크기를 두 배로 증가
+        }
+
+        byte[] newBuffers = new byte[newCapacity];
+
+        // 기존 데이터를 새 버퍼로 복사
+        if (CanReadSize > 0)
+        {
+            CopyFromCircularBuffer(newBuffers.AsSpan(0, CanReadSize), m_Head);
+        }
+
+        m_Buffers = newBuffers;
+        m_Capacity = newCapacity;
+        m_Head = 0;
+        m_Tail = CanReadSize;
+    }
+
+    #endregion
 
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
-
     }
 
     protected virtual void Dispose(bool bDisposing)
@@ -264,6 +299,5 @@ public class BaseCircularBuffers : IBuffers, IDisposable
         }
 
         m_bDisposed = true;
-
     }
 }
