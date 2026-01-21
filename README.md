@@ -56,7 +56,7 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 | Serialization | Google Protocol Buffers |
 | DI Container | Microsoft.Extensions.DependencyInjection |
 | Hosting | Microsoft.Extensions.Hosting |
-| Concurrency | TPL Dataflow, ReaderWriterLockSlim |
+| Concurrency | **Channel\<T\>**, .NET 10 Lock |
 | Testing | MSTest, BenchmarkDotNet |
 
 ---
@@ -71,8 +71,8 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 |------|------|------|
 | **CircularBuffer Write** | 244~670 ns | 64B~8KB 데이터 |
 | **CircularBuffer vs QueueBuffer** | **20배 빠름** | 4KB 데이터 기준 |
-| **Channel vs BufferBlock** | **4배 빠름** | 메모리 66% 절약 |
-| **.NET 9 Lock vs lock** | **7% 빠름** | 단일 스레드 기준 |
+| **Channel vs BufferBlock** | **4배 빠름** | 메모리 69% 절약 |
+| **.NET 10 Lock vs lock** | **9% 빠름** | 10,000 iterations 기준 |
 
 ### 📈 상세 벤치마크 결과
 
@@ -92,8 +92,19 @@ dotnet run -c Release --project FastPortBenchmark
 
 | 리포트 | 설명 | 링크 |
 |--------|------|------|
-| **개선 전 퍼포먼스 리포트** | Latency 성능 테스트 결과 (RTT, 서버 처리 시간, 네트워크 지연) | [📄 보기](docs/latency-performance-report.md) |
+| **개선 전 퍼포먼스 리포트** | 최적화 전 Latency 성능 테스트 결과 | [📄 보기](docs/latency-performance-report.md) |
+| **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-lock.md) |
+| **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-channel.md) |
 | **벤치마크 결과** | BenchmarkDotNet 기반 컴포넌트별 성능 측정 | [📄 보기](docs/baseline-benchmark-results.md) |
+
+### 최적화 효과 요약
+
+| 지표 | 개선 전 | 최종 (Channel 적용) | 개선율 |
+|------|--------|---------------------|--------|
+| 평균 RTT | 96.03 ms | 55.68 ms | **42.0%↓** |
+| 서버 처리 시간 | 0.234 ms | 0.002 ms | **99.1%↓** |
+| 최대 RTT | 434.40 ms | 83.13 ms | **80.9%↓** |
+| 처리량 | ~489/분 | ~1,080/분 | **2.2배↑** |
 
 ---
 
@@ -187,7 +198,7 @@ sequenceDiagram
 ```
 FastPortSharp/
 ├── 📂 LibCommons/                 # 공통 유틸리티 라이브러리
-│   ├── BaseCircularBuffers.cs     # 순환 버퍼 구현
+│   ├── BaseCircularBuffers.cs     # 순환 버퍼 구현 (.NET 10 Lock)
 │   ├── ArrayPoolCircularBuffers.cs # ArrayPool 기반 순환 버퍼
 │   ├── BasePacket.cs              # 패킷 구조체
 │   ├── LatencyStats.cs            # Latency 통계 수집
@@ -198,7 +209,7 @@ FastPortSharp/
 │   ├── BaseConnector.cs           # TCP 커넥터 베이스
 │   ├── SocketEventsPool.cs        # SocketAsyncEventArgs 풀
 │   └── 📂 Sessions/
-│       ├── BaseSession.cs         # 세션 핵심 로직
+│       ├── BaseSession.cs         # 세션 핵심 로직 (Channel<T>)
 │       └── IClientSessionFactory.cs
 │
 ├── 📂 FastPortServer/             # TCP 서버 애플리케이션
@@ -207,8 +218,9 @@ FastPortSharp/
 ├── 📂 FastPortBenchmark/          # 성능 벤치마크
 ├── 📂 LibCommonTest/              # 단위 테스트
 └── 📂 docs/                       # 문서
-    ├── latency-performance-report.md    # Latency 성능 리포트
-    ├── baseline-benchmark-results.md    # 벤치마크 결과
+    ├── latency-performance-report.md           # 개선 전 성능 리포트
+    ├── latency-performance-report-after-lock.md # Lock 개선 후 리포트
+    ├── baseline-benchmark-results.md           # 벤치마크 결과
     └── FastPortSharp-Optimization-Guide-Confluence.md
 ```
 
@@ -227,15 +239,42 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     private int m_Head = 0;  // 읽기 위치
     private int m_Tail = 0;  // 쓰기 위치
     
+    // .NET 10 경량 Lock 사용
+    private readonly Lock m_Lock = new();
+    
     public int Write(byte[] buffers, int offset, int count)
     {
-        // 용량 부족 시 자동 확장
-        // 순환 쓰기 로직으로 메모리 효율화
+        lock (m_Lock)
+        {
+            // 용량 부족 시 자동 확장
+            // 순환 쓰기 로직으로 메모리 효율화
+        }
     }
 }
 ```
 
-### 2. Factory 패턴 기반 세션 생성
+### 2. Channel\<T\> 기반 패킷 처리
+
+고성능 비동기 메시지 전달을 위해 `Channel<T>`를 사용합니다.
+
+```csharp
+// BufferBlock<T> 대비 4배 빠르고 메모리 69% 절약
+private readonly Channel<BasePacket> m_ReceivedPackets = 
+    Channel.CreateBounded<BasePacket>(new BoundedChannelOptions(1000)
+    {
+        FullMode = BoundedChannelFullMode.Wait,
+        SingleReader = true,
+        SingleWriter = true
+    });
+
+// 패킷 처리 루프
+await foreach (var packet in m_ReceivedPackets.Reader.ReadAllAsync(cancellationToken))
+{
+    OnReceived(packet);
+}
+```
+
+### 3. Factory 패턴 기반 세션 생성
 
 ```csharp
 public interface IClientSessionFactory
@@ -254,7 +293,7 @@ public class FastPortClientSessionFactory : IClientSessionFactory
 }
 ```
 
-### 3. Protocol Buffers 메시지 처리
+### 4. Protocol Buffers 메시지 처리
 
 ```csharp
 protected void RequestSendMessage<T>(int packetId, IMessage<T> message) 
@@ -271,7 +310,7 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
 }
 ```
 
-### 4. Latency 통계 수집
+### 5. Latency 통계 수집
 
 ```csharp
 // appsettings.json 설정
@@ -298,13 +337,13 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
 
 ```bash
 # 솔루션 빌드
-dotnet build FastPortSharp.sln
+dotnet build FastPortSharp.sln -c Release
 
 # 서버 실행
-dotnet run --project FastPortServer
+dotnet run --project FastPortServer -c Release
 
 # 클라이언트 실행 (새 터미널)
-dotnet run --project FastPortClient
+dotnet run --project FastPortClient -c Release
 ```
 
 ### 테스트 실행
@@ -312,19 +351,6 @@ dotnet run --project FastPortClient
 ```bash
 dotnet test LibCommonTest
 ```
-
----
-
-## 📈 성능 최적화 로드맵
-
-| 순위 | 항목 | 예상 개선 | 상태 |
-|:----:|------|----------|:----:|
-| 1 | ArrayPool 적용 | 메모리 90%↓ | ☑  |
-| 2 | Channel\<T\> 전환 | 속도 4배↑ | 🔲 |
-| 3 | .NET 10 Lock 적용 | 속도 9%↑ | ☑  |
-| 4 | BasePacket struct 변환 | 할당 감소 | 🔲 |
-
-👉 **[최적화 가이드 상세](docs/FastPortSharp-Optimization-Guide-Confluence.md)**
 
 ---
 
