@@ -21,8 +21,15 @@ enum ResultCode {
 
 message Empty {}
 
+// Latency 측정을 위한 타임스탬프 포함 헤더
+// T1: client_send_ts - 클라이언트가 요청을 보낸 시간
+// T2: server_recv_ts - 서버가 요청을 받은 시간  
+// T3: server_send_ts - 서버가 응답을 보낸 시간
+// T4: (클라이언트에서 측정) - 클라이언트가 응답을 받은 시간
 message Header 
 {  
 	uint64 request_id		= 1;	// Client-generated request id for correlating request/response.  
-	uint64 timestamp_ms		= 2;	// Unix epoch milliseconds.
+	uint64 client_send_ts	= 2;	// T1: Client send timestamp (Stopwatch ticks)
+	uint64 server_recv_ts	= 3;	// T2: Server receive timestamp (Stopwatch ticks)
+	uint64 server_send_ts	= 4;	// T3: Server send timestamp (Stopwatch ticks)
 }

@@ -27,10 +27,18 @@ public class FastPortServerBackgroundService : BackgroundService
             return;
         }
 
-        // stoppingToken.IsCancellationRequested를 체크하여 중간에 취소 요청이 오면 바로 종료할 수 있습니다.
-        while(!stoppingToken.IsCancellationRequested)
+        try
         {
-            await Task.Delay(1000, stoppingToken);
+            // stoppingToken.IsCancellationRequested를 체크하여 중간에 취소 요청이 오면 바로 종료할 수 있습니다.
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(1000, stoppingToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 정상적인 종료 요청 (Ctrl+C 등)
+            _logger.LogInformation("FastPortServerBackgroundService가 종료 요청을 받았습니다.");
         }
 
         _logger.LogInformation("✅ FastPortServerBackgroundService 작업이 완료되었습니다. (종료 시간: {time})", DateTimeOffset.Now);
@@ -38,10 +46,11 @@ public class FastPortServerBackgroundService : BackgroundService
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        m_FastPortServer.RequestShutdown(); 
+        _logger.LogInformation("FastPortServerBackgroundService 종료를 시작합니다.");
 
-        _logger.LogInformation("MyWorker가 종료됩니다.");
+        m_FastPortServer.RequestShutdown();
 
+        _logger.LogInformation("FastPortServerBackgroundService가 종료되었습니다.");
 
         return base.StopAsync(cancellationToken);
     }

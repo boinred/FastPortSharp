@@ -13,7 +13,7 @@ public abstract class BaseSession
 {
 
     protected ILogger m_Logger;
-    private System.Net.Sockets.Socket m_Socket;
+    private System.Net.Sockets.Socket? m_Socket;
 
     private readonly byte[] m_ReceivedSocketBuffers = new byte[1024 * 8]; // 8KB
 
@@ -37,6 +37,9 @@ public abstract class BaseSession
     private readonly ActionBlock<LibCommons.BasePacket> m_ReceivedWorks;
 
     private readonly System.Net.EndPoint? m_RemoteEndPoint;
+
+    // Disconnect 중복 호출 방지를 위한 플래그
+    private int m_DisconnectRequested = 0;
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
@@ -75,7 +78,10 @@ public abstract class BaseSession
         m_RemoteEndPoint = m_Socket.RemoteEndPoint!;
     }
 
-
+    /// <summary>
+    /// 세션이 연결 해제되었는지 여부
+    /// </summary>
+    public bool IsDisconnected => m_DisconnectRequested == 1;
 
     public string GetSessionAddress() => m_RemoteEndPoint?.ToString() ?? " Unknown";
 
@@ -176,41 +182,95 @@ public abstract class BaseSession
 
     public void RequestDisconnect()
     {
-        if (null == m_Socket)
+        // Interlocked.CompareExchange를 사용하여 원자적으로 중복 호출 방지
+        // 0에서 1로 변경 시도, 이미 1이면 다른 스레드가 먼저 호출한 것
+        if (Interlocked.CompareExchange(ref m_DisconnectRequested, 1, 0) != 0)
         {
-            return;
-        }
-
-        if (m_CancellationTokenSource.IsCancellationRequested)
-        {
+            m_Logger.LogDebug("BaseSession, RequestDisconnect, Already disconnecting or disconnected.");
             return;
         }
 
         m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
 
-        m_CancellationTokenSource.Cancel();
-
+        // CancellationToken 취소
         try
         {
-            m_Socket.Shutdown(SocketShutdown.Both);
-            m_Socket.Close();
+            m_CancellationTokenSource.Cancel();
         }
-        catch (Exception ex)
+        catch (ObjectDisposedException)
         {
-            m_Logger.LogError($"BaseSession, RequestDisconnect, Exception : {ex}");
+            // 이미 Dispose된 경우 무시
         }
 
-        m_ReceivedPackets.Complete(); // Complete the block when done processing
-        OnEventSessionDisconnected?.Invoke(); // Return With Id
+        // 소켓 종료
+        var socket = Interlocked.Exchange(ref m_Socket, null);
+        if (socket != null)
+        {
+            try
+            {
+                if (socket.Connected)
+                {
+                    socket.Shutdown(SocketShutdown.Both);
+                }
+            }
+            catch (SocketException ex)
+            {
+                m_Logger.LogDebug($"BaseSession, RequestDisconnect, Socket Shutdown Exception : {ex.Message}");
+            }
+            catch (ObjectDisposedException)
+            {
+                // 이미 Dispose된 경우 무시
+            }
+
+            try
+            {
+                socket.Close();
+            }
+            catch (Exception ex)
+            {
+                m_Logger.LogError($"BaseSession, RequestDisconnect, Socket Close Exception : {ex}");
+            }
+        }
+
+        // BufferBlock 완료 (한 번만 호출됨)
+        m_ReceivedPackets.Complete();
+
+        // 이벤트 호출 (한 번만 호출됨)
+        OnEventSessionDisconnected?.Invoke();
     }
 
     protected void RequestReceived()
     {
-        m_Logger.LogDebug($"BaseSession, RequestReceived");
-        if (!m_Socket.ReceiveAsync(m_SocketEventsReceived))
+        // 이미 연결 해제 중이면 무시
+        if (IsDisconnected)
         {
-            // If ReceiveAsync returns false, we handle the receive operation immediately
-            OnSocketEventsReceivedCompleted(this, m_SocketEventsReceived);
+            return;
+        }
+
+        var socket = m_Socket;
+        if (socket == null || !socket.Connected)
+        {
+            return;
+        }
+
+        m_Logger.LogDebug($"BaseSession, RequestReceived");
+        try
+        {
+            if (!socket.ReceiveAsync(m_SocketEventsReceived))
+            {
+                // If ReceiveAsync returns false, we handle the receive operation immediately
+                OnSocketEventsReceivedCompleted(this, m_SocketEventsReceived);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // 소켓이 이미 Dispose된 경우
+            RequestDisconnect();
+        }
+        catch (SocketException ex)
+        {
+            m_Logger.LogDebug($"BaseSession, RequestReceived, SocketException : {ex.Message}");
+            RequestDisconnect();
         }
     }
 
@@ -264,60 +324,99 @@ public abstract class BaseSession
 
     private async Task DoWorkReceivedPackets(CancellationToken cancellationToken)
     {
-        // 블록이 완료되고 버퍼가 비워질 때까지 계속해서 데이터를 수신합니다.
-        while (await m_ReceivedPackets.OutputAvailableAsync(cancellationToken))
+        try
         {
-            var packet = await m_ReceivedPackets.ReceiveAsync();
-            await Task.Run(() => OnReceived(packet), cancellationToken);
+            // 블록이 완료되고 버퍼가 비워질 때까지 계속해서 데이터를 수신합니다.
+            while (await m_ReceivedPackets.OutputAvailableAsync(cancellationToken))
+            {
+                var packet = await m_ReceivedPackets.ReceiveAsync(cancellationToken);
+                await Task.Run(() => OnReceived(packet), cancellationToken);
+            }
         }
-
+        catch (OperationCanceledException)
+        {
+            // 정상적인 취소
+        }
+        catch (InvalidOperationException)
+        {
+            // BufferBlock이 완료된 경우
+        }
     }
 
     private async Task DoWorkReceivedBuffers(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            if (m_ReceivedBuffers.CanReadSize < LibCommons.BasePacket.HeaderSize)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                continue;
-            }
+                if (m_ReceivedBuffers.CanReadSize < LibCommons.BasePacket.HeaderSize)
+                {
+                    await Task.Delay(1, cancellationToken); // CPU 사용량 감소
+                    continue;
+                }
 
-            if (!m_ReceivedBuffers.TryGetBasePackets(out List<LibCommons.BasePacket> basePackets))
-            {
-                continue;
-            }
+                if (!m_ReceivedBuffers.TryGetBasePackets(out List<LibCommons.BasePacket> basePackets))
+                {
+                    await Task.Delay(1, cancellationToken);
+                    continue;
+                }
 
-            foreach (var basePacket in basePackets)
-            {
-                m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
+                foreach (var basePacket in basePackets)
+                {
+                    m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
 
-                await m_ReceivedPackets.SendAsync(basePacket);
+                    await m_ReceivedPackets.SendAsync(basePacket, cancellationToken);
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // 정상적인 취소
         }
     }
 
     private async Task DoWorkSendBuffers(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            if (m_SendBuffers.CanReadSize <= 0)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Yield(); // Yield to avoid busy waiting
-                continue;
-            }
+                if (m_SendBuffers.CanReadSize <= 0)
+                {
+                    await Task.Delay(1, cancellationToken); // CPU 사용량 감소
+                    continue;
+                }
 
-            byte[] sendBuffers = new byte[m_SendBuffers.CanReadSize];
-            m_SendBuffers.Peek(ref sendBuffers);
+                var socket = m_Socket;
+                if (socket == null || !socket.Connected)
+                {
+                    break;
+                }
 
-            m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);
+                byte[] sendBuffers = new byte[m_SendBuffers.CanReadSize];
+                m_SendBuffers.Peek(ref sendBuffers);
 
-            m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {sendBuffers.Length}");
+                m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);
 
-            if (!m_Socket.SendAsync(m_SockenEventsSent))
-            {
-                OnSocketEventsSentCompleted(m_Socket, m_SockenEventsSent);
+                m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {sendBuffers.Length}");
+
+                if (!socket.SendAsync(m_SockenEventsSent))
+                {
+                    OnSocketEventsSentCompleted(socket, m_SockenEventsSent);
+                }
             }
         }
-
+        catch (OperationCanceledException)
+        {
+            // 정상적인 취소
+        }
+        catch (ObjectDisposedException)
+        {
+            // 소켓이 이미 Dispose된 경우
+        }
+        catch (SocketException ex)
+        {
+            m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
+        }
     }
 }
