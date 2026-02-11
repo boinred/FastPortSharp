@@ -1,55 +1,57 @@
-﻿# 🚀 FastPortSharp
+# 🚀 FastPortSharp
 
-**고성능 비동기 TCP 소켓 서버/클라이언트 프레임워크**
+**High-Performance Asynchronous TCP Socket Server/Client Framework**
 
-.NET 10 기반의 확장 가능한 네트워크 라이브러리로, 게임 서버, 실시간 통신 시스템 등 대규모 동시 접속을 처리해야 하는 애플리케이션을 위해 설계되었습니다.
+English | [한국어](README.ko.md)
 
----
-
-## 📋 목차
-
-- [프로젝트 개요](#-프로젝트-개요)
-- [주요 기능](#-주요-기능)
-- [기술 스택](#-기술-스택)
-- [성능 벤치마크](#-성능-벤치마크)
-- [리포트](#-리포트)
-- [아키텍처](#-아키텍처)
-- [프로젝트 구조](#-프로젝트-구조)
-- [핵심 구현](#-핵심-구현)
-- [시작하기](#-시작하기)
-- [라이선스](#-라이선스)
+A scalable network library based on .NET 10, designed for applications requiring large-scale concurrent connections, such as game servers and real-time communication systems.
 
 ---
 
-## 🎯 프로젝트 개요
+## 📋 Table of Contents
 
-FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니다. `SocketAsyncEventArgs` 기반의 비동기 I/O 패턴과 효율적인 버퍼 관리를 통해 최소한의 메모리 할당으로 높은 처리량을 달성합니다.
-
-### 개발 동기
-
-- 대규모 동시 접속 환경에서의 안정적인 네트워크 처리
-- 재사용 가능한 모듈화된 네트워크 컴포넌트 설계
-- Protocol Buffers를 활용한 효율적인 직렬화/역직렬화
+- [Project Overview](#-project-overview)
+- [Key Features](#-key-features)
+- [Tech Stack](#-tech-stack)
+- [Performance Benchmarks](#-performance-benchmarks)
+- [Reports](#-reports)
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [Core Implementation](#-core-implementation)
+- [Getting Started](#-getting-started)
+- [License](#-license)
 
 ---
 
-## ✨ 주요 기능
+## 🎯 Project Overview
 
-| 기능 | 설명 |
+FastPortSharp is a framework for high-performance network communication. It achieves high throughput with minimal memory allocation using `SocketAsyncEventArgs`-based asynchronous I/O patterns and efficient buffer management.
+
+### Motivation
+
+- Reliable network processing in large-scale concurrent connection environments
+- Modular and reusable network component design
+- Efficient serialization/deserialization using Protocol Buffers
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
 |------|------|
-| **비동기 I/O** | `SocketAsyncEventArgs` 기반 IOCP 패턴으로 높은 동시성 처리 |
-| **순환 버퍼** | 메모리 재사용을 통한 GC 압박 최소화 |
-| **Protocol Buffers** | Google Protobuf 기반의 효율적인 메시지 직렬화 |
-| **세션 관리** | Factory 패턴 기반의 유연한 세션 생성 및 관리 |
-| **Keep-Alive** | TCP Keep-Alive 설정을 통한 연결 상태 모니터링 |
-| **BackgroundService** | .NET Generic Host 기반의 서비스 생명주기 관리 |
-| **Latency 통계** | 실시간 RTT, 서버 처리 시간, 네트워크 지연 측정 |
+| **Async I/O** | High concurrency processing with `SocketAsyncEventArgs`-based IOCP pattern |
+| **Circular Buffer** | Minimized GC pressure through memory reuse |
+| **Protocol Buffers** | Efficient message serialization based on Google Protobuf |
+| **Session Management** | Flexible session creation and management based on the Factory pattern |
+| **Keep-Alive** | Connection state monitoring via TCP Keep-Alive settings |
+| **BackgroundService** | Service lifecycle management based on .NET Generic Host |
+| **Latency Statistics** | Real-time measurement of RTT, server processing time, and network delay |
 
 ---
 
-## 🛠 기술 스택
+## 🛠 Tech Stack
 
-| 영역 | 기술 |
+| Domain | Technology |
 |------|------|
 | Language | C# 14 / .NET 10 |
 | Async Pattern | SocketAsyncEventArgs (IOCP) |
@@ -61,24 +63,24 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 
 ---
 
-## 📊 성능 벤치마크
+## 📊 Performance Benchmarks
 
-> **측정 환경**: Windows 11, Intel Core i5-14600K 3.50GHz, .NET 10
+> **Environment**: Windows 11, Intel Core i5-14600K 3.50GHz, .NET 10
 
-### 핵심 성능 지표
+### Key Performance Indicators
 
-| 항목 | 결과 | 비고 |
+| Item | Result | Note |
 |------|------|------|
-| **CircularBuffer Write** | 244~670 ns | 64B~8KB 데이터 |
-| **CircularBuffer vs QueueBuffer** | **20배 빠름** | 4KB 데이터 기준 |
-| **Channel vs BufferBlock** | **4배 빠름** | 메모리 69% 절약 |
-| **.NET 10 Lock vs lock** | **9% 빠름** | 10,000 iterations 기준 |
+| **CircularBuffer Write** | 244~670 ns | 64B~8KB data |
+| **CircularBuffer vs QueueBuffer** | **20x faster** | Based on 4KB data |
+| **Channel vs BufferBlock** | **4x faster** | 69% memory savings |
+| **.NET 10 Lock vs lock** | **9% faster** | Based on 10,000 iterations |
 
-### 📈 상세 벤치마크 결과
+### 📈 Detailed Benchmark Results
 
-👉 **[전체 벤치마크 결과 보기](docs/baseline-benchmark-results.md)**
+👉 **[View Full Benchmark Results](docs/baseline-benchmark-results.md)**
 
-### 벤치마크 실행
+### Running Benchmarks
 
 ```bash
 dotnet run -c Release --project FastPortBenchmark
@@ -86,31 +88,31 @@ dotnet run -c Release --project FastPortBenchmark
 
 ---
 
-## 📑 리포트
+## 📑 Reports
 
-### 성능 테스트 리포트
+### Performance Test Reports
 
-| 리포트 | 설명 | 링크 |
-|--------|------|------|
-| **개선 전 퍼포먼스 리포트** | 최적화 전 Latency 성능 테스트 결과 | [📄 보기](docs/latency-performance-report.md) |
-| **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-lock.md) |
-| **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-channel.md) |
-| **벤치마크 결과** | BenchmarkDotNet 기반 컴포넌트별 성능 측정 | [📄 보기](docs/baseline-benchmark-results.md) |
+| Report | Description | Link |
+|--------|-------------|------|
+| **Pre-optimization Performance Report** | Latency performance test results before optimization | [📄 View](docs/latency-performance-report.md) |
+| **Lock-optimized Performance Report** | Performance test after applying ArrayPool + .NET 10 Lock | [📄 View](docs/latency-performance-report-after-lock.md) |
+| **Channel-optimized Performance Report** | Performance test after applying full optimizations | [📄 View](docs/latency-performance-report-after-channel.md) |
+| **Benchmark Results** | Component-specific performance measurement based on BenchmarkDotNet | [📄 View](docs/baseline-benchmark-results.md) |
 
-### 최적화 효과 요약
+### Optimization Summary
 
-| 지표 | 개선 전 | 최종 (Channel 적용) | 개선율 |
+| Metric | Before | Final (Channel applied) | Improvement |
 |------|--------|---------------------|--------|
-| 평균 RTT | 96.03 ms | 55.68 ms | **42.0%↓** |
-| 서버 처리 시간 | 0.234 ms | 0.002 ms | **99.1%↓** |
-| 최대 RTT | 434.40 ms | 83.13 ms | **80.9%↓** |
-| 처리량 | ~489/분 | ~1,080/분 | **2.2배↑** |
+| Average RTT | 96.03 ms | 55.68 ms | **42.0%↓** |
+| Server Processing Time | 0.234 ms | 0.002 ms | **99.1%↓** |
+| Max RTT | 434.40 ms | 83.13 ms | **80.9%↓** |
+| Throughput | ~489/min | ~1,080/min | **2.2x↑** |
 
 ---
 
-## 🏗 아키텍처
+## 🏗 Architecture
 
-### 전체 시스템 구조
+### System Structure
 
 ```mermaid
 flowchart TB
@@ -162,7 +164,7 @@ flowchart TB
     CSS --> LS
 ```
 
-### 서버 연결 흐름
+### Server Connection Flow
 
 ```mermaid
 sequenceDiagram
@@ -193,72 +195,72 @@ sequenceDiagram
 
 ---
 
-## 📁 프로젝트 구조
+## 📁 Project Structure
 
 ```
 FastPortSharp/
-├── 📂 LibCommons/                 # 공통 유틸리티 라이브러리
-│   ├── BaseCircularBuffers.cs     # 순환 버퍼 구현 (.NET 10 Lock)
-│   ├── ArrayPoolCircularBuffers.cs # ArrayPool 기반 순환 버퍼
-│   ├── BasePacket.cs              # 패킷 구조체
-│   ├── LatencyStats.cs            # Latency 통계 수집
-│   └── IBuffers.cs                # 버퍼 인터페이스
+├── 📂 LibCommons/                 # Common utility library
+│   ├── BaseCircularBuffers.cs     # Circular buffer implementation (.NET 10 Lock)
+│   ├── ArrayPoolCircularBuffers.cs # ArrayPool-based circular buffer
+│   ├── BasePacket.cs              # Packet structure
+│   ├── LatencyStats.cs            # Latency statistics collection
+│   └── IBuffers.cs                # Buffer interface
 │
-├── 📂 LibNetworks/                # 네트워크 코어 라이브러리
-│   ├── BaseListener.cs            # TCP 리스너 베이스
-│   ├── BaseConnector.cs           # TCP 커넥터 베이스
-│   ├── SocketEventsPool.cs        # SocketAsyncEventArgs 풀
+├── 📂 LibNetworks/                # Network core library
+│   ├── BaseListener.cs            # TCP listener base
+│   ├── BaseConnector.cs           # TCP connector base
+│   ├── SocketEventsPool.cs        # SocketAsyncEventArgs pool
 │   └── 📂 Sessions/
-│       ├── BaseSession.cs         # 세션 핵심 로직 (Channel<T>)
+│       ├── BaseSession.cs         # Session core logic (Channel<T>)
 │       └── IClientSessionFactory.cs
 │
-├── 📂 FastPortServer/             # TCP 서버 애플리케이션
-├── 📂 FastPortClient/             # TCP 클라이언트 애플리케이션
-├── 📂 Protocols/                  # Protocol Buffers 정의
-├── 📂 FastPortBenchmark/          # 성능 벤치마크
-├── 📂 LibCommonTest/              # 단위 테스트
-└── 📂 docs/                       # 문서
-    ├── latency-performance-report.md           # 개선 전 성능 리포트
-    ├── latency-performance-report-after-lock.md # Lock 개선 후 리포트
-    ├── baseline-benchmark-results.md           # 벤치마크 결과
+├── 📂 FastPortServer/             # TCP server application
+├── 📂 FastPortClient/             # TCP client application
+├── 📂 Protocols/                  # Protocol Buffers definitions
+├── 📂 FastPortBenchmark/          # Performance benchmarks
+├── 📂 LibCommonTest/              # Unit tests
+└── 📂 docs/                       # Documentation
+    ├── latency-performance-report.md           # Pre-optimization performance report
+    ├── latency-performance-report-after-lock.md # Lock-optimized report
+    ├── baseline-benchmark-results.md           # Benchmark results
     └── FastPortSharp-Optimization-Guide-Confluence.md
 ```
 
 ---
 
-## 🔧 핵심 구현
+## 🔧 Core Implementation
 
-### 1. 순환 버퍼 (Circular Buffer)
+### 1. Circular Buffer
 
-메모리 재할당 없이 연속적인 데이터 스트림을 효율적으로 처리합니다.
+Efficiently handles continuous data streams without memory reallocation.
 
 ```csharp
 public class BaseCircularBuffers : IBuffers, IDisposable
 {
     private byte[] m_Buffers;
-    private int m_Head = 0;  // 읽기 위치
-    private int m_Tail = 0;  // 쓰기 위치
+    private int m_Head = 0;  // Read position
+    private int m_Tail = 0;  // Write position
     
-    // .NET 10 경량 Lock 사용
+    // Uses .NET 10 lightweight Lock
     private readonly Lock m_Lock = new();
     
     public int Write(byte[] buffers, int offset, int count)
     {
         lock (m_Lock)
         {
-            // 용량 부족 시 자동 확장
-            // 순환 쓰기 로직으로 메모리 효율화
+            // Auto-expansion when capacity is low
+            // Circular write logic for memory efficiency
         }
     }
 }
 ```
 
-### 2. Channel\<T\> 기반 패킷 처리
+### 2. Channel\<T\> Based Packet Processing
 
-고성능 비동기 메시지 전달을 위해 `Channel<T>`를 사용합니다.
+Uses `Channel<T>` for high-performance asynchronous message delivery.
 
 ```csharp
-// BufferBlock<T> 대비 4배 빠르고 메모리 69% 절약
+// 4x faster and 69% memory savings compared to BufferBlock<T>
 private readonly Channel<BasePacket> m_ReceivedPackets = 
     Channel.CreateBounded<BasePacket>(new BoundedChannelOptions(1000)
     {
@@ -267,14 +269,14 @@ private readonly Channel<BasePacket> m_ReceivedPackets =
         SingleWriter = true
     });
 
-// 패킷 처리 루프
+// Packet processing loop
 await foreach (var packet in m_ReceivedPackets.Reader.ReadAllAsync(cancellationToken))
 {
     OnReceived(packet);
 }
 ```
 
-### 3. Factory 패턴 기반 세션 생성
+### 3. Factory Pattern Based Session Creation
 
 ```csharp
 public interface IClientSessionFactory
@@ -293,7 +295,7 @@ public class FastPortClientSessionFactory : IClientSessionFactory
 }
 ```
 
-### 4. Protocol Buffers 메시지 처리
+### 4. Protocol Buffers Message Processing
 
 ```csharp
 protected void RequestSendMessage<T>(int packetId, IMessage<T> message) 
@@ -310,10 +312,10 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
 }
 ```
 
-### 5. Latency 통계 수집
+### 5. Latency Statistics Collection
 
 ```csharp
-// appsettings.json 설정
+// appsettings.json configuration
 {
   "LatencyStats": {
     "EnableConsoleOutput": true,
@@ -326,27 +328,27 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
 
 ---
 
-## 🚀 시작하기
+## 🚀 Getting Started
 
-### 필수 조건
+### Prerequisites
 
 - .NET 10 SDK
-- Visual Studio 2022 또는 VS Code
+- Visual Studio 2022 or VS Code
 
-### 빌드 및 실행
+### Build and Run
 
 ```bash
-# 솔루션 빌드
+# Build solution
 dotnet build FastPortSharp.sln -c Release
 
-# 서버 실행
+# Run server
 dotnet run --project FastPortServer -c Release
 
-# 클라이언트 실행 (새 터미널)
+# Run client (in a new terminal)
 dotnet run --project FastPortClient -c Release
 ```
 
-### 테스트 실행
+### Run Tests
 
 ```bash
 dotnet test LibCommonTest
@@ -354,13 +356,13 @@ dotnet test LibCommonTest
 
 ---
 
-## 📝 라이선스
+## 📝 License
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+This project is licensed under the MIT License.
 
 ---
 
-## 👤 개발자
+## 👤 Developer
 
 **boinred**
 
@@ -368,5 +370,4 @@ dotnet test LibCommonTest
 
 ---
 
-> 💡 이 프로젝트는 지속적으로 개선되고 있습니다. 피드백과 기여를 환영합니다!
-
+> 💡 This project is continuously improving. Feedbacks and contributions are welcome!
