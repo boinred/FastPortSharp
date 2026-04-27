@@ -1,16 +1,20 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-27T05:44:34.134Z",
-  "activeFeatures": [
-    "fastport-loadrunner"
-  ],
-  "primaryFeature": "fastport-loadrunner",
+  "lastUpdated": "2026-04-27T07:25:06Z",
+  "activeFeatures": [],
+  "primaryFeature": null,
   "features": {
     "fastport-loadrunner": {
-      "phase": "design",
-      "matchRate": null,
-      "iterationCount": 0,
-      "documents": {},
+      "phase": "archived",
+      "matchRate": 91,
+      "iterationCount": 2,
+      "documents": {
+        "plan": "docs/archive/2026-04/fastport-loadrunner/fastport-loadrunner.plan.md",
+        "design": "docs/archive/2026-04/fastport-loadrunner/fastport-loadrunner.design.md",
+        "do": "docs/archive/2026-04/fastport-loadrunner/fastport-loadrunner.do.md",
+        "analysis": "docs/archive/2026-04/fastport-loadrunner/fastport-loadrunner.analysis.md",
+        "report": "docs/archive/2026-04/fastport-loadrunner/fastport-loadrunner.report.md"
+      },
       "taskChain": [
         {
           "phase": "plan",
@@ -20,29 +24,42 @@
         },
         {
           "phase": "design",
-          "status": "active",
-          "createdAt": "2026-04-27T05:43:29.715Z"
+          "status": "completed",
+          "createdAt": "2026-04-27T05:43:29.715Z",
+          "completedAt": "2026-04-27T06:25:59.009Z"
         },
         {
           "phase": "do",
-          "status": "pending",
-          "createdAt": "2026-04-27T05:43:29.715Z"
+          "status": "completed",
+          "createdAt": "2026-04-27T05:43:29.715Z",
+          "completedAt": "2026-04-27T06:43:05.823Z"
         },
         {
           "phase": "check",
-          "status": "pending",
-          "createdAt": "2026-04-27T05:43:29.715Z"
+          "status": "completed",
+          "createdAt": "2026-04-27T05:43:29.715Z",
+          "completedAt": "2026-04-27T06:43:05.823Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-27T05:43:29.715Z",
+          "completedAt": "2026-04-27T06:49:56.907Z"
         },
         {
           "phase": "report",
-          "status": "pending",
-          "createdAt": "2026-04-27T05:43:29.715Z"
+          "status": "completed",
+          "createdAt": "2026-04-27T05:43:29.715Z",
+          "completedAt": "2026-04-27T06:55:32.802Z"
         }
       ],
       "timestamps": {
         "started": "2026-04-27T05:43:29.716Z",
-        "lastUpdated": "2026-04-27T05:44:34.134Z"
-      }
+        "lastUpdated": "2026-04-27T07:25:06Z"
+      },
+      "completedAt": "2026-04-27T06:55:32.796Z",
+      "archivedAt": "2026-04-27T07:25:06Z",
+      "archivePath": "docs/archive/2026-04/fastport-loadrunner"
     }
   },
   "pipeline": {
@@ -53,7 +70,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-27T05:44:34.134Z"
+    "lastActivity": "2026-04-27T06:55:32.802Z"
   },
   "history": [
     {
@@ -68,6 +85,65 @@
       "phase": "plan",
       "nextPhase": "design",
       "timestamp": "2026-04-27T05:44:34.133Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-27T06:24:29.883Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-27T06:25:59.008Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-27T06:25:59.008Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-27T06:43:05.823Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-27T06:43:05.823Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-04-27T06:49:56.906Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-27T06:49:56.907Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-27T06:55:32.800Z"
+    },
+    {
+      "feature": "fastport-loadrunner",
+      "action": "archive",
+      "phase": "archived",
+      "archivePath": "docs/archive/2026-04/fastport-loadrunner",
+      "timestamp": "2026-04-27T07:25:06Z"
     }
   ]
 }

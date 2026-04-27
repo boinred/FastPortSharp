@@ -16,3 +16,6 @@ obj/
 
 ./BenchmarkDotNet.Artifacts
 *.log
+
+# Local agent instructions/notes
+GEMINI.md

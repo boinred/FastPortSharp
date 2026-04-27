@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
+    <ProjectReference Include="..\FastPortLoadRunner\FastPortLoadRunner.csproj" />
   </ItemGroup>
 
   <ItemGroup>
