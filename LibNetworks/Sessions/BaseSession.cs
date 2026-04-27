@@ -1,5 +1,6 @@
 ﻿using Google.Protobuf;
 using LibCommons;
+using LibNetworks.Telemetry;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
@@ -27,6 +28,7 @@ public abstract class BaseSession
 
     private readonly LibCommons.IBuffers m_ReceivedBuffers;
     private readonly LibCommons.IBuffers m_SendBuffers;
+    protected IServerTelemetry ServerTelemetry { get; }
 
     private readonly Task m_TaskReceivedBuffers;
     private readonly Task m_TaskReceivedPackets;
@@ -43,9 +45,15 @@ public abstract class BaseSession
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
+        : this(logger, socket, receivedBuffers, sendbuffers, NullServerTelemetry.Instance)
+    {
+    }
+
+    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers, IServerTelemetry serverTelemetry)
     {
         m_Logger = logger;
         m_Socket = socket;
+        ServerTelemetry = serverTelemetry;
 
         // 10초마다 KeepAlive 신호를 보내도록 설정 (Windows에서는 레지스트리 수정 필요)
         m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
@@ -125,6 +133,7 @@ public abstract class BaseSession
 
         if (e.SocketError != SocketError.Success)
         {
+            ServerTelemetry.RecordSocketError();
             m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. SocketError : {e.SocketError}");
 
             RequestDisconnect();
@@ -170,6 +179,7 @@ public abstract class BaseSession
 
         if (e.SocketError != SocketError.Success)
         {
+            ServerTelemetry.RecordSocketError();
             m_Logger.LogInformation($"BaseSession, OnSocketEventsSentCompleted, Disconnected. SocketError : {e.SocketError}");
 
             RequestDisconnect();
@@ -178,6 +188,7 @@ public abstract class BaseSession
         }
 
         m_Logger.LogDebug($"BaseSession, OnSocketEventsSentCompleted, Dran Buffer Length : {e.BytesTransferred}");
+        ServerTelemetry.RecordSent(e.BytesTransferred);
         m_SendBuffers.Drain(e.BytesTransferred);
     }
 
@@ -193,6 +204,7 @@ public abstract class BaseSession
         }
 
         m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
+        ServerTelemetry.RecordSessionDisconnected();
 
         // CancellationToken 취소
         try
@@ -272,6 +284,7 @@ public abstract class BaseSession
         catch (SocketException ex)
         {
             m_Logger.LogDebug($"BaseSession, RequestReceived, SocketException : {ex.Message}");
+            ServerTelemetry.RecordSocketError();
             RequestDisconnect();
         }
     }
@@ -370,6 +383,7 @@ public abstract class BaseSession
                 foreach (var basePacket in basePackets)
                 {
                     m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
+                    ServerTelemetry.RecordReceived(basePacket.PacketSize);
 
                     // Channel에 패킷 전송
                     await m_ReceivedPackets.Writer.WriteAsync(basePacket, cancellationToken);
@@ -431,6 +445,7 @@ public abstract class BaseSession
         catch (SocketException ex)
         {
             m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
+            ServerTelemetry.RecordSocketError();
         }
     }
 }

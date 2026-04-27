@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using LibNetworks.Telemetry;
+using Microsoft.Extensions.Logging;
 
 namespace LibNetworks.Sessions;
 
@@ -13,6 +14,11 @@ public abstract class BaseSessionClient : BaseSession
         : base(logger, socket, receivedBuffers, sendBuffers)
     {
         
+    }
+
+    public BaseSessionClient(ILogger<BaseSessionClient> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendBuffers, IServerTelemetry serverTelemetry)
+        : base(logger, socket, receivedBuffers, sendBuffers, serverTelemetry)
+    {
     }
 
     public virtual void OnAccepted()

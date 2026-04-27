@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using LibNetworks.Sessions;
+using LibNetworks.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace LibNetworks;
@@ -13,6 +14,7 @@ public abstract class BaseListener : BaseSocket
     private readonly int C_MaxConnections;
     //private readonly int C_MaxBufferSize = 1024 * 8; // 8KB
     private IClientSessionFactory m_ClientSessionFactory;
+    private readonly IServerTelemetry m_ServerTelemetry;
 
     protected ILogger m_Logger;
 
@@ -23,10 +25,16 @@ public abstract class BaseListener : BaseSocket
 
     // TODO: Session Manager 
 
-    public BaseListener(ILogger<BaseListener> logger, IClientSessionFactory clientSessionFactory , int maxConnectionsCount)
+    public BaseListener(ILogger<BaseListener> logger, IClientSessionFactory clientSessionFactory, int maxConnectionsCount)
+        : this(logger, clientSessionFactory, NullServerTelemetry.Instance, maxConnectionsCount)
+    {
+    }
+
+    public BaseListener(ILogger<BaseListener> logger, IClientSessionFactory clientSessionFactory, IServerTelemetry serverTelemetry, int maxConnectionsCount)
     {
         m_Logger = logger;
         m_ClientSessionFactory = clientSessionFactory;
+        m_ServerTelemetry = serverTelemetry;
 
         C_MaxConnections = maxConnectionsCount;
     }
@@ -35,6 +43,7 @@ public abstract class BaseListener : BaseSocket
     {
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
+            m_ServerTelemetry.RecordAcceptError();
             m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
             return false;
         }
@@ -52,10 +61,12 @@ public abstract class BaseListener : BaseSocket
         }
         catch (System.Exception ex)
         {
+            m_ServerTelemetry.RecordAcceptError();
+            m_ServerTelemetry.RecordSocketError();
             m_Logger.LogError($"BaseListener, Start, Exception : {ex}");
         }
 
-        return true;
+        return false;
     }
 
     public void RequestShutdown()
@@ -88,6 +99,8 @@ public abstract class BaseListener : BaseSocket
         }
         catch (Exception ex)
         {
+            m_ServerTelemetry.RecordAcceptError();
+            m_ServerTelemetry.RecordSocketError();
             m_Logger.LogError($"BaseListener, Accept, Exception : {ex}");
         }
 
@@ -99,16 +112,20 @@ public abstract class BaseListener : BaseSocket
         //
         if (args.SocketError != SocketError.Success)
         {
+            m_ServerTelemetry.RecordAcceptError();
+            m_ServerTelemetry.RecordSocketError();
             m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {args.SocketError}");
             return; 
         }
         Socket? clientSocket = args.AcceptSocket;
         if (null == clientSocket)
         {
+            m_ServerTelemetry.RecordAcceptError();
             m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, Socket is not valid.");
             return;
         }
 
+        m_ServerTelemetry.RecordAccept();
         m_Logger.LogInformation($"BaseListener, OnSocketEventsAcceptCompleted, End Point : {clientSocket.RemoteEndPoint}");
 
         // TODO: 다른 쓰레드에서 처리되어야 한다.

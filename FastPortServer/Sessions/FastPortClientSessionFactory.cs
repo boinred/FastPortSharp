@@ -6,11 +6,16 @@ namespace FastPortServer.Sessions;
 
 public class FastPortClientSessionFactory : LibNetworks.Sessions.IClientSessionFactory
 {
-    private ILogger<BaseSessionClient> m_Logger; 
+    private ILogger<BaseSessionClient> m_Logger;
+
     public FastPortClientSessionFactory(ILogger<BaseSessionClient> logger)
     {
-        m_Logger = logger; 
+        m_Logger = logger;
     }
 
-    public LibNetworks.Sessions.BaseSessionClient Create(Socket clientSocket) => new FastPortClientSession(m_Logger, clientSocket, new LibCommons.ArrayPoolCircularBuffers(8 * 1024), new LibCommons.ArrayPoolCircularBuffers(8 * 1024));
+    public LibNetworks.Sessions.BaseSessionClient Create(Socket clientSocket) => new FastPortClientSession(
+        m_Logger,
+        clientSocket,
+        new LibCommons.ArrayPoolCircularBuffers(8 * 1024),
+        new LibCommons.ArrayPoolCircularBuffers(8 * 1024));
 }

@@ -15,6 +15,8 @@
   <ItemGroup>
     <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\FastPortLoadRunner\FastPortLoadRunner.csproj" />
+    <ProjectReference Include="..\FastPortSmokeServer\FastPortSmokeServer.csproj" />
+    <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
   </ItemGroup>
 
   <ItemGroup>
