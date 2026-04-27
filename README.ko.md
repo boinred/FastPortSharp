@@ -59,7 +59,7 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 | DI Container | Microsoft.Extensions.DependencyInjection |
 | Hosting | Microsoft.Extensions.Hosting |
 | Concurrency | **Channel\<T\>**, .NET 10 Lock |
-| Testing | MSTest, BenchmarkDotNet |
+| Testing | MSTest, FastPortLoadRunner |
 
 ---
 
@@ -80,10 +80,10 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 
 👉 **[전체 벤치마크 결과 보기](docs/baseline-benchmark-results.md)**
 
-### 벤치마크 실행
+### 부하 테스트 실행
 
 ```bash
-dotnet run -c Release --project FastPortBenchmark
+dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -97,7 +97,7 @@ dotnet run -c Release --project FastPortBenchmark
 | **개선 전 퍼포먼스 리포트** | 최적화 전 Latency 성능 테스트 결과 | [📄 보기](docs/latency-performance-report.md) |
 | **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-lock.md) |
 | **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-channel.md) |
-| **벤치마크 결과** | BenchmarkDotNet 기반 컴포넌트별 성능 측정 | [📄 보기](docs/baseline-benchmark-results.md) |
+| **기존 벤치마크 결과** | LoadRunner 전환 전에 측정한 컴포넌트별 micro benchmark 결과 | [📄 보기](docs/baseline-benchmark-results.md) |
 
 ### 최적화 효과 요약
 
@@ -217,7 +217,7 @@ FastPortSharp/
 ├── 📂 FastPortServer/             # TCP 서버 애플리케이션
 ├── 📂 FastPortClient/             # TCP 클라이언트 애플리케이션
 ├── 📂 Protocols/                  # Protocol Buffers 정의
-├── 📂 FastPortBenchmark/          # 성능 벤치마크
+├── 📂 FastPortLoadRunner/         # TCP 부하 테스트 실행기
 ├── 📂 LibCommonTest/              # 단위 테스트
 └── 📂 docs/                       # 문서
     ├── latency-performance-report.md           # 개선 전 성능 리포트

@@ -59,7 +59,7 @@ FastPortSharp is a framework for high-performance network communication. It achi
 | DI Container | Microsoft.Extensions.DependencyInjection |
 | Hosting | Microsoft.Extensions.Hosting |
 | Concurrency | **Channel\<T\>**, .NET 10 Lock |
-| Testing | MSTest, BenchmarkDotNet |
+| Testing | MSTest, FastPortLoadRunner |
 
 ---
 
@@ -80,10 +80,10 @@ FastPortSharp is a framework for high-performance network communication. It achi
 
 👉 **[View Full Benchmark Results](docs/baseline-benchmark-results.md)**
 
-### Running Benchmarks
+### Running Load Tests
 
 ```bash
-dotnet run -c Release --project FastPortBenchmark
+dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -97,7 +97,7 @@ dotnet run -c Release --project FastPortBenchmark
 | **Pre-optimization Performance Report** | Latency performance test results before optimization | [📄 View](docs/latency-performance-report.md) |
 | **Lock-optimized Performance Report** | Performance test after applying ArrayPool + .NET 10 Lock | [📄 View](docs/latency-performance-report-after-lock.md) |
 | **Channel-optimized Performance Report** | Performance test after applying full optimizations | [📄 View](docs/latency-performance-report-after-channel.md) |
-| **Benchmark Results** | Component-specific performance measurement based on BenchmarkDotNet | [📄 View](docs/baseline-benchmark-results.md) |
+| **Historical Benchmark Results** | Component-specific micro benchmark results captured before the load runner migration | [📄 View](docs/baseline-benchmark-results.md) |
 
 ### Optimization Summary
 
@@ -217,7 +217,7 @@ FastPortSharp/
 ├── 📂 FastPortServer/             # TCP server application
 ├── 📂 FastPortClient/             # TCP client application
 ├── 📂 Protocols/                  # Protocol Buffers definitions
-├── 📂 FastPortBenchmark/          # Performance benchmarks
+├── 📂 FastPortLoadRunner/         # TCP load test runner
 ├── 📂 LibCommonTest/              # Unit tests
 └── 📂 docs/                       # Documentation
     ├── latency-performance-report.md           # Pre-optimization performance report

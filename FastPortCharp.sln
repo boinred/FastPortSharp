@@ -21,7 +21,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibCommonTest", "LibCommonT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Protocols", "Protocols\Protocols.csproj", "{72E119BB-AF18-4E85-8EF2-9093C1D40AC4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortBenchmark", "FastPortBenchmark\FastPortBenchmark.csproj", "{E6DD2AB4-FEAE-4EF9-8489-51379976948C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortLoadRunner", "FastPortLoadRunner\FastPortLoadRunner.csproj", "{E6DD2AB4-FEAE-4EF9-8489-51379976948C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{FF8E302A-D3F6-40D6-945D-E894F9369882}"
 	ProjectSection(SolutionItems) = preProject
