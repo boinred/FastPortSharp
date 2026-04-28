@@ -17,13 +17,14 @@ public sealed class FastPortSmokeServerTests
     {
         await using FastPortSmokeServerTestHost server = await FastPortSmokeServerTestHost.StartAsync();
 
-        (MetricsSnapshot client, ServerTelemetrySnapshot serverSnapshot) = await RunSmokeAsync(
+        (MetricsSnapshot client, ServerTelemetrySnapshot serverSnapshot, ServerObservedMetricsSnapshot serverObserved) = await RunSmokeAsync(
             server,
             sessions: 10,
             payload: PayloadProfile.Fixed(1024));
 
         AssertClientMetrics(client);
         AssertServerTelemetry(serverSnapshot, expectedAcceptedSessions: 10);
+        AssertServerObservedMetrics(serverObserved, expectedAcceptedSessions: 10);
     }
 
     [TestMethod]
@@ -31,16 +32,17 @@ public sealed class FastPortSmokeServerTests
     {
         await using FastPortSmokeServerTestHost server = await FastPortSmokeServerTestHost.StartAsync();
 
-        (MetricsSnapshot client, ServerTelemetrySnapshot serverSnapshot) = await RunSmokeAsync(
+        (MetricsSnapshot client, ServerTelemetrySnapshot serverSnapshot, ServerObservedMetricsSnapshot serverObserved) = await RunSmokeAsync(
             server,
             sessions: 2,
             payload: new PayloadProfile(PayloadMode.Random, 4096, 16384));
 
         AssertClientMetrics(client);
         AssertServerTelemetry(serverSnapshot, expectedAcceptedSessions: 2);
+        AssertServerObservedMetrics(serverObserved, expectedAcceptedSessions: 2);
     }
 
-    private static async Task<(MetricsSnapshot Client, ServerTelemetrySnapshot Server)> RunSmokeAsync(
+    private static async Task<(MetricsSnapshot Client, ServerTelemetrySnapshot Server, ServerObservedMetricsSnapshot ServerObserved)> RunSmokeAsync(
         FastPortSmokeServerTestHost server,
         int sessions,
         PayloadProfile payload)
@@ -66,8 +68,9 @@ public sealed class FastPortSmokeServerTests
             server.Telemetry,
             snapshot => snapshot.ConnectedSessions == 0 && snapshot.DisconnectedSessions >= sessions,
             TimeSpan.FromSeconds(5));
+        ServerObservedMetricsSnapshot serverObserved = server.TelemetryExporter.CreateSnapshot();
 
-        return (clientSnapshot, serverSnapshot);
+        return (clientSnapshot, serverSnapshot, serverObserved);
     }
 
     private static void AssertClientMetrics(MetricsSnapshot snapshot)
@@ -92,6 +95,20 @@ public sealed class FastPortSmokeServerTests
         Assert.AreEqual(0, snapshot.AcceptErrors, "Smoke run should not record accept errors.");
         Assert.AreEqual(0, snapshot.SocketErrors, "Smoke run should not record server socket errors.");
         Assert.AreEqual(0, snapshot.SocketErrorRate, "Smoke run socket error rate should remain zero.");
+    }
+
+    private static void AssertServerObservedMetrics(ServerObservedMetricsSnapshot snapshot, long expectedAcceptedSessions)
+    {
+        Assert.IsTrue(snapshot.TotalAcceptedSessions >= expectedAcceptedSessions, "Server observed metrics should expose accepted sessions.");
+        Assert.IsTrue(snapshot.TotalDisconnectedSessions >= expectedAcceptedSessions, "Server observed metrics should expose disconnects.");
+        Assert.AreEqual(0, snapshot.CurrentSessions, "Server observed current sessions should return to zero.");
+        Assert.IsTrue(snapshot.TotalReceivedPackets > 0, "Server observed metrics should expose received packets.");
+        Assert.IsTrue(snapshot.TotalSendCompletions > 0, "Server observed metrics should expose send completions.");
+        Assert.IsTrue(snapshot.TotalParsedPacketBytes > 0, "Server observed metrics should expose parsed packet bytes.");
+        Assert.IsTrue(snapshot.TotalSentBytes > 0, "Server observed metrics should expose sent bytes.");
+        Assert.AreEqual(0, snapshot.SocketErrorCount, "Server observed metrics should expose socket error count.");
+        Assert.AreEqual(0, snapshot.ParseErrorCount, "Server observed metrics should expose parse error count.");
+        Assert.AreEqual(0, snapshot.ProtocolErrorCount, "Server observed metrics should expose protocol error count.");
     }
 
     private static async Task<ServerTelemetrySnapshot> WaitForTelemetryAsync(
@@ -120,16 +137,23 @@ public sealed class FastPortSmokeServerTests
     {
         private readonly IHost _host;
 
-        private FastPortSmokeServerTestHost(IHost host, int port, IServerTelemetry telemetry)
+        private FastPortSmokeServerTestHost(
+            IHost host,
+            int port,
+            IServerTelemetry telemetry,
+            IServerTelemetryExporter telemetryExporter)
         {
             _host = host;
             Port = port;
             Telemetry = telemetry;
+            TelemetryExporter = telemetryExporter;
         }
 
         public int Port { get; }
 
         public IServerTelemetry Telemetry { get; }
+
+        public IServerTelemetryExporter TelemetryExporter { get; }
 
         public static async Task<FastPortSmokeServerTestHost> StartAsync()
         {
@@ -150,13 +174,15 @@ public sealed class FastPortSmokeServerTests
                         Port = port
                     });
                     services.AddSingleton<IServerTelemetry>(telemetry);
+                    services.AddSingleton<IServerTelemetryExporter, ServerTelemetryExporter>();
                     services.AddHostedService<FastPortSmokeServer.FastPortSmokeServerBackgroundService>();
                     services.AddSingleton<IClientSessionFactory, FastPortSmokeServer.Sessions.FastPortSmokeClientSessionFactory>();
                     services.AddSingleton<FastPortSmokeServer.FastPortSmokeServer>();
                 })
                 .Build();
 
-            var server = new FastPortSmokeServerTestHost(host, port, telemetry);
+            var telemetryExporter = host.Services.GetRequiredService<IServerTelemetryExporter>();
+            var server = new FastPortSmokeServerTestHost(host, port, telemetry, telemetryExporter);
             await host.StartAsync();
             await server.WaitUntilReadyAsync();
             telemetry.Reset();

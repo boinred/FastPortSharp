@@ -13,6 +13,7 @@ builder.ConfigureServices((context, services) =>
 
     services.AddSingleton(new FastPortSmokeServerOptions { Host = host, Port = port });
     services.AddSingleton<IServerTelemetry, ServerTelemetryCollector>();
+    services.AddSingleton<IServerTelemetryExporter, ServerTelemetryExporter>();
     services.AddHostedService<FastPortSmokeServer.FastPortSmokeServerBackgroundService>();
     services.AddSingleton<LibNetworks.Sessions.IClientSessionFactory, FastPortSmokeServer.Sessions.FastPortSmokeClientSessionFactory>();
     services.AddSingleton<FastPortSmokeServer.FastPortSmokeServer>();
