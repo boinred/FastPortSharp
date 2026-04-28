@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FastPortLoadRunner;
 
 namespace LibCommonTest;
@@ -151,5 +152,47 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsTrue(snapshot.SentBytesPerSecond > 0);
         Assert.IsTrue(snapshot.ReceivedBytesPerSecond > 0);
         Assert.IsTrue(snapshot.SocketErrorRate > 0);
+    }
+
+    [TestMethod]
+    public void JsonMetricsReporter_SerializeSnapshot_WritesObservedClientEnvelope()
+    {
+        var snapshot = new MetricsSnapshot(
+            Timestamp: new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            TargetSessions: 100,
+            ConnectedSessions: 90,
+            TotalSentPackets: 1000,
+            TotalReceivedPackets: 990,
+            TotalSentBytes: 8192,
+            TotalReceivedBytes: 4096,
+            SentPacketsPerSecond: 100,
+            ReceivedPacketsPerSecond: 99,
+            SentBytesPerSecond: 819.2,
+            ReceivedBytesPerSecond: 409.6,
+            Tps: 99,
+            RttAverageMs: 2.5,
+            RttP50Ms: 2,
+            RttP95Ms: 4,
+            RttP99Ms: 6,
+            AcceptCount: 100,
+            DisconnectCount: 10,
+            SocketErrorCount: 1,
+            SocketErrorRate: 0.001);
+
+        string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
+
+        Assert.IsTrue(json.Contains("\"clientObserved\"", StringComparison.Ordinal));
+        Assert.IsTrue(json.Contains("\"serverObserved\":null", StringComparison.Ordinal));
+        Assert.IsFalse(json.Contains("\"connectedSessions\"", StringComparison.Ordinal));
+
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+
+        Assert.IsTrue(root.TryGetProperty("clientObserved", out JsonElement clientObserved));
+        Assert.AreEqual(JsonValueKind.Null, root.GetProperty("serverObserved").ValueKind);
+        Assert.IsFalse(root.TryGetProperty("connectedSessions", out _));
+        Assert.AreEqual(90, clientObserved.GetProperty("currentSessions").GetInt32());
+        Assert.AreEqual(100, clientObserved.GetProperty("connectCount").GetInt64());
+        Assert.AreEqual(990, clientObserved.GetProperty("totalReceivedPackets").GetInt64());
     }
 }

@@ -1,8 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-28T00:30:34Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
+  "lastUpdated": "2026-04-28T01:06:38.410Z",
+  "activeFeatures": [
+    "loadrunner-observed-jsonl"
+  ],
+  "primaryFeature": "loadrunner-observed-jsonl",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -162,6 +164,49 @@
       "completedAt": "2026-04-28T00:24:31.150Z",
       "archivedAt": "2026-04-28T00:30:34Z",
       "archivePath": "docs/archive/2026-04/telemetry-export-metric-contract"
+    },
+    "loadrunner-observed-jsonl": {
+      "phase": "completed",
+      "matchRate": null,
+      "iterationCount": 1,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-28T00:43:27.307Z",
+          "completedAt": "2026-04-28T00:44:05.621Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-28T00:43:27.307Z",
+          "completedAt": "2026-04-28T00:48:41.376Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-28T00:43:27.307Z",
+          "completedAt": "2026-04-28T00:53:19.720Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-28T00:43:27.307Z",
+          "completedAt": "2026-04-28T01:03:01.160Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-28T00:43:27.307Z",
+          "completedAt": "2026-04-28T01:06:38.410Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-28T00:43:27.307Z",
+        "lastUpdated": "2026-04-28T01:06:38.410Z"
+      },
+      "completedAt": "2026-04-28T01:06:38.407Z"
     }
   },
   "pipeline": {
@@ -172,7 +217,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-28T00:30:34Z"
+    "lastActivity": "2026-04-28T01:06:38.410Z"
   },
   "history": [
     {
@@ -390,6 +435,71 @@
       "phase": "archived",
       "archivePath": "docs/archive/2026-04/telemetry-export-metric-contract",
       "timestamp": "2026-04-28T00:30:34Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-28T00:44:05.619Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-28T00:44:05.620Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-28T00:47:42.322Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-28T00:48:41.375Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-28T00:48:41.376Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-28T00:53:19.718Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-28T00:53:19.719Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-28T01:03:01.158Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-28T01:03:01.159Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-28T01:06:38.408Z"
     }
   ]
 }

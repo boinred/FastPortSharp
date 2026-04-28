@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Text.Json;
+using LibNetworks.Telemetry;
 
 namespace FastPortLoadRunner;
 
@@ -227,11 +227,6 @@ internal sealed class ConsoleMetricsReporter : IMetricsReporter
 
 internal sealed class JsonMetricsReporter : IMetricsReporter, IDisposable
 {
-    private static readonly JsonSerializerOptions s_JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     private readonly StreamWriter _writer;
 
     public JsonMetricsReporter(string outputPath)
@@ -255,10 +250,17 @@ internal sealed class JsonMetricsReporter : IMetricsReporter, IDisposable
             MetricsSnapshot snapshot = metricsCollector.CreateSnapshot(previous);
             previous = snapshot;
 
-            string json = JsonSerializer.Serialize(snapshot, s_JsonOptions);
+            string json = SerializeSnapshot(snapshot);
             await _writer.WriteLineAsync(json.AsMemory(), cancellationToken);
             await _writer.FlushAsync(cancellationToken);
         }
+    }
+
+    internal static string SerializeSnapshot(MetricsSnapshot snapshot)
+    {
+        ClientObservedMetricsSnapshot clientObserved = snapshot.ToClientObservedMetricsSnapshot();
+        ObservedMetricsSnapshot observed = ObservedMetricsSnapshot.FromClient(clientObserved);
+        return ObservedMetricsJson.Serialize(observed);
     }
 
     public void Dispose()
