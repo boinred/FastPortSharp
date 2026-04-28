@@ -1,10 +1,8 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-28T05:44:27.658Z",
-  "activeFeatures": [
-    "staged-load-validation"
-  ],
-  "primaryFeature": "staged-load-validation",
+  "lastUpdated": "2026-04-28T06:57:09Z",
+  "activeFeatures": [],
+  "primaryFeature": null,
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -217,10 +215,16 @@
       "archivePath": "docs/archive/2026-04/loadrunner-observed-jsonl"
     },
     "staged-load-validation": {
-      "phase": "completed",
-      "matchRate": null,
+      "phase": "archived",
+      "matchRate": 100,
       "iterationCount": 1,
-      "documents": {},
+      "documents": {
+        "plan": "docs/archive/2026-04/staged-load-validation/staged-load-validation.plan.md",
+        "design": "docs/archive/2026-04/staged-load-validation/staged-load-validation.design.md",
+        "do": "docs/archive/2026-04/staged-load-validation/staged-load-validation.do.md",
+        "analysis": "docs/archive/2026-04/staged-load-validation/staged-load-validation.analysis.md",
+        "report": "docs/archive/2026-04/staged-load-validation/staged-load-validation.report.md"
+      },
       "taskChain": [
         {
           "phase": "plan",
@@ -255,9 +259,11 @@
       ],
       "timestamps": {
         "started": "2026-04-28T01:23:58.156Z",
-        "lastUpdated": "2026-04-28T05:44:27.658Z"
+        "lastUpdated": "2026-04-28T06:57:09Z"
       },
-      "completedAt": "2026-04-28T05:44:27.654Z"
+      "completedAt": "2026-04-28T05:44:27.654Z",
+      "archivedAt": "2026-04-28T06:57:09Z",
+      "archivePath": "docs/archive/2026-04/staged-load-validation"
     }
   },
   "pipeline": {
@@ -268,7 +274,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-28T05:44:27.658Z"
+    "lastActivity": "2026-04-28T06:57:09Z"
   },
   "history": [
     {
@@ -623,6 +629,13 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-04-28T05:44:27.657Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "archive",
+      "phase": "archived",
+      "archivePath": "docs/archive/2026-04/staged-load-validation",
+      "timestamp": "2026-04-28T06:57:09Z"
     }
   ]
 }
