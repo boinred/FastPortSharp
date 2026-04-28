@@ -1,10 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-28T01:06:38.410Z",
+  "lastUpdated": "2026-04-28T05:44:27.658Z",
   "activeFeatures": [
-    "loadrunner-observed-jsonl"
+    "staged-load-validation"
   ],
-  "primaryFeature": "loadrunner-observed-jsonl",
+  "primaryFeature": "staged-load-validation",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -166,10 +166,16 @@
       "archivePath": "docs/archive/2026-04/telemetry-export-metric-contract"
     },
     "loadrunner-observed-jsonl": {
-      "phase": "completed",
-      "matchRate": null,
+      "phase": "archived",
+      "matchRate": 100,
       "iterationCount": 1,
-      "documents": {},
+      "documents": {
+        "plan": "docs/archive/2026-04/loadrunner-observed-jsonl/loadrunner-observed-jsonl.plan.md",
+        "design": "docs/archive/2026-04/loadrunner-observed-jsonl/loadrunner-observed-jsonl.design.md",
+        "do": "docs/archive/2026-04/loadrunner-observed-jsonl/loadrunner-observed-jsonl.do.md",
+        "analysis": "docs/archive/2026-04/loadrunner-observed-jsonl/loadrunner-observed-jsonl.analysis.md",
+        "report": "docs/archive/2026-04/loadrunner-observed-jsonl/loadrunner-observed-jsonl.report.md"
+      },
       "taskChain": [
         {
           "phase": "plan",
@@ -204,9 +210,54 @@
       ],
       "timestamps": {
         "started": "2026-04-28T00:43:27.307Z",
-        "lastUpdated": "2026-04-28T01:06:38.410Z"
+        "lastUpdated": "2026-04-28T01:21:49Z"
       },
-      "completedAt": "2026-04-28T01:06:38.407Z"
+      "completedAt": "2026-04-28T01:06:38.407Z",
+      "archivedAt": "2026-04-28T01:21:49Z",
+      "archivePath": "docs/archive/2026-04/loadrunner-observed-jsonl"
+    },
+    "staged-load-validation": {
+      "phase": "completed",
+      "matchRate": null,
+      "iterationCount": 1,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-28T01:23:58.156Z",
+          "completedAt": "2026-04-28T01:25:19.472Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-28T01:23:58.156Z",
+          "completedAt": "2026-04-28T04:44:39.366Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-28T01:23:58.156Z",
+          "completedAt": "2026-04-28T05:34:29.423Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-28T01:23:58.156Z",
+          "completedAt": "2026-04-28T05:42:54.964Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-28T01:23:58.156Z",
+          "completedAt": "2026-04-28T05:44:27.658Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-28T01:23:58.156Z",
+        "lastUpdated": "2026-04-28T05:44:27.658Z"
+      },
+      "completedAt": "2026-04-28T05:44:27.654Z"
     }
   },
   "pipeline": {
@@ -217,7 +268,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-28T01:06:38.410Z"
+    "lastActivity": "2026-04-28T05:44:27.658Z"
   },
   "history": [
     {
@@ -500,6 +551,78 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-04-28T01:06:38.408Z"
+    },
+    {
+      "feature": "loadrunner-observed-jsonl",
+      "action": "archive",
+      "phase": "archived",
+      "archivePath": "docs/archive/2026-04/loadrunner-observed-jsonl",
+      "timestamp": "2026-04-28T01:21:49Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-28T01:25:19.467Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-28T01:25:19.470Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-28T04:42:44.233Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-28T04:44:39.365Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-28T04:44:39.365Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-28T05:34:29.419Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-28T05:34:29.422Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-28T05:42:54.961Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-28T05:42:54.963Z"
+    },
+    {
+      "feature": "staged-load-validation",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-28T05:44:27.657Z"
     }
   ]
 }

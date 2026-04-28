@@ -16,6 +16,7 @@ obj/
 
 ./BenchmarkDotNet.Artifacts
 *.log
+artifacts/load-validation/
 
 # Local agent instructions/notes
 GEMINI.md
