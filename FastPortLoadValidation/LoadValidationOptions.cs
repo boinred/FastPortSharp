@@ -8,6 +8,8 @@ internal sealed record LoadValidationOptions(
     string? StageId,
     string RunnerProject,
     string Configuration,
+    string? ServerMetricsPath,
+    TimeSpan MergeTolerance,
     bool DryRun,
     bool ContinueOnFailure)
 {
@@ -20,6 +22,8 @@ internal sealed record LoadValidationOptions(
         string? stageId = null;
         string runnerProject = "FastPortLoadRunner";
         string configuration = "Release";
+        string? serverMetricsPath = null;
+        TimeSpan mergeTolerance = TimeSpan.FromMilliseconds(1500);
         bool dryRun = false;
         bool continueOnFailure = false;
 
@@ -87,6 +91,19 @@ internal sealed record LoadValidationOptions(
                 case "--configuration":
                     configuration = value;
                     break;
+                case "--server-metrics":
+                    serverMetricsPath = value;
+                    break;
+                case "--merge-tolerance-ms":
+                    if (!int.TryParse(value, out int mergeToleranceMs) || mergeToleranceMs <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--merge-tolerance-ms must be greater than zero.";
+                        return false;
+                    }
+
+                    mergeTolerance = TimeSpan.FromMilliseconds(mergeToleranceMs);
+                    break;
                 default:
                     options = default!;
                     errorMessage = $"Unknown option '{arg}'.";
@@ -103,6 +120,8 @@ internal sealed record LoadValidationOptions(
             stageId,
             runnerProject,
             configuration,
+            serverMetricsPath,
+            mergeTolerance,
             dryRun,
             continueOnFailure);
         errorMessage = string.Empty;
@@ -129,6 +148,8 @@ internal sealed record LoadValidationOptions(
           --stage <id>                   Run only one stage from the profile.
           --runner-project <path>        FastPortLoadRunner project path. Default: FastPortLoadRunner
           --configuration <name>         dotnet configuration. Default: Release
+          --server-metrics <path>        Optional server observed JSONL path to merge into stage summaries.
+          --merge-tolerance-ms <ms>      Timestamp merge tolerance for client/server samples. Default: 1500
           --dry-run                      Print stage commands without running them.
           --continue-on-failure          Continue after a failed stage.
           --help                         Show help.

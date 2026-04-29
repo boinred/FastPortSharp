@@ -34,22 +34,28 @@ internal sealed class LoadSession(
             metricsCollector.RecordSessionConnected();
 
             await using NetworkStream stream = client.GetStream();
-            var sendTask = SendLoopAsync(stream, cancellationToken);
-            var receiveTask = ReceiveLoopAsync(stream, cancellationToken);
+            var sendTask = RunPhaseAsync("send", () => SendLoopAsync(stream, cancellationToken));
+            var receiveTask = RunPhaseAsync("receive", () => ReceiveLoopAsync(stream, cancellationToken));
 
             await Task.WhenAll(sendTask, receiveTask);
         }
         catch (OperationCanceledException)
         {
         }
-        catch (Exception)
+        catch (LoadSessionPhaseException)
+        {
+        }
+        catch (Exception ex)
         {
             if (!connected)
             {
                 metricsCollector.RecordConnectFailure();
+                metricsCollector.RecordSocketError("connect", ex);
             }
-
-            metricsCollector.RecordSocketError();
+            else
+            {
+                metricsCollector.RecordSocketError("unknown", ex);
+            }
         }
         finally
         {
@@ -57,6 +63,22 @@ internal sealed class LoadSession(
             {
                 metricsCollector.RecordSessionDisconnected();
             }
+        }
+    }
+
+    private async Task RunPhaseAsync(string phase, Func<Task> runAsync)
+    {
+        try
+        {
+            await runAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            metricsCollector.RecordSocketError(phase, ex);
+            throw new LoadSessionPhaseException(phase, ex);
         }
     }
 
@@ -96,7 +118,7 @@ internal sealed class LoadSession(
             int packetSize = BinaryPrimitives.ReadUInt16LittleEndian(header);
             if (packetSize < PacketHeaderSize + ProtocolHeaderSize)
             {
-                metricsCollector.RecordSocketError();
+                metricsCollector.RecordProtocolError("invalid-packet-size");
                 return;
             }
 
@@ -107,7 +129,10 @@ internal sealed class LoadSession(
             }
 
             metricsCollector.RecordReceivedPacket(packetSize);
-            ParseEchoResponse(body);
+            if (!ParseEchoResponse(body))
+            {
+                return;
+            }
         }
     }
 
@@ -141,20 +166,30 @@ internal sealed class LoadSession(
         return packet;
     }
 
-    private void ParseEchoResponse(byte[] body)
+    private bool ParseEchoResponse(byte[] body)
     {
         int packetId = BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(0, ProtocolHeaderSize));
         if (packetId != (int)ProtocolId.Tests)
         {
-            metricsCollector.RecordSocketError();
-            return;
+            metricsCollector.RecordProtocolError("unexpected-protocol-id");
+            return false;
         }
 
-        var response = EchoResponse.Parser.ParseFrom(body.AsSpan(ProtocolHeaderSize).ToArray());
-        if (response.Header?.ClientSendTs > 0)
+        try
         {
-            metricsCollector.RecordRtt((long)response.Header.ClientSendTs, Stopwatch.GetTimestamp());
+            var response = EchoResponse.Parser.ParseFrom(body.AsSpan(ProtocolHeaderSize).ToArray());
+            if (response.Header?.ClientSendTs > 0)
+            {
+                metricsCollector.RecordRtt((long)response.Header.ClientSendTs, Stopwatch.GetTimestamp());
+            }
         }
+        catch (Exception ex)
+        {
+            metricsCollector.RecordSocketError("protocol", ex);
+            return false;
+        }
+
+        return true;
     }
 
     private static async Task<bool> ReadExactAsync(NetworkStream stream, Memory<byte> buffer, CancellationToken cancellationToken)
@@ -172,5 +207,13 @@ internal sealed class LoadSession(
         }
 
         return true;
+    }
+}
+
+internal sealed class LoadSessionPhaseException : Exception
+{
+    public LoadSessionPhaseException(string phase, Exception innerException)
+        : base($"Load session phase failed: {phase}", innerException)
+    {
     }
 }

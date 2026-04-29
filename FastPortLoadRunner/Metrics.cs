@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Net.Sockets;
 using LibNetworks.Telemetry;
 
 namespace FastPortLoadRunner;
@@ -9,6 +10,10 @@ internal sealed class MetricsCollector(int targetSessions)
     private const int MaxRttSamples = 100_000;
 
     private readonly ConcurrentQueue<double> _rttSamplesMs = new();
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByPhase = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByType = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByCode = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByClass = new(StringComparer.Ordinal);
     private long _connectedSessions;
     private long _totalSentPackets;
     private long _totalReceivedPackets;
@@ -74,7 +79,19 @@ internal sealed class MetricsCollector(int targetSessions)
 
     public void RecordSocketError()
     {
+        RecordSocketError("unknown");
+    }
+
+    public void RecordSocketError(string phase, Exception? exception = null)
+    {
         Interlocked.Increment(ref _socketErrorCount);
+        RecordSocketErrorClassification(phase, GetExceptionType(exception), GetSocketErrorCode(exception));
+    }
+
+    public void RecordProtocolError(string reason)
+    {
+        Interlocked.Increment(ref _socketErrorCount);
+        RecordSocketErrorClassification("protocol", NormalizeKey(reason), "none");
     }
 
     public void RecordSchedulerDrift(double driftMs)
@@ -155,7 +172,73 @@ internal sealed class MetricsCollector(int targetSessions)
             Interlocked.Read(ref _maxPendingRequestCount),
             targetSessions <= 0 ? 0 : connectedSessions / (double)targetSessions,
             schedulerDriftSampleCount <= 0 ? 0 : Interlocked.Read(ref _schedulerDriftTotalMicroseconds) / (double)schedulerDriftSampleCount / 1000,
-            Interlocked.Read(ref _schedulerDriftMaxMicroseconds) / 1000.0);
+            Interlocked.Read(ref _schedulerDriftMaxMicroseconds) / 1000.0,
+            CopyCounters(_socketErrorCountsByPhase),
+            CopyCounters(_socketErrorCountsByType),
+            CopyCounters(_socketErrorCountsByCode),
+            CopyCounters(_socketErrorCountsByClass));
+    }
+
+    private void RecordSocketErrorClassification(string phase, string exceptionType, string socketErrorCode)
+    {
+        string normalizedPhase = NormalizeKey(phase);
+        string normalizedType = NormalizeKey(exceptionType);
+        string normalizedCode = NormalizeKey(socketErrorCode);
+        string classKey = $"{normalizedPhase}|{normalizedType}|{normalizedCode}";
+
+        IncrementCounter(_socketErrorCountsByPhase, normalizedPhase);
+        IncrementCounter(_socketErrorCountsByType, normalizedType);
+        IncrementCounter(_socketErrorCountsByCode, normalizedCode);
+        IncrementCounter(_socketErrorCountsByClass, classKey);
+    }
+
+    private static void IncrementCounter(ConcurrentDictionary<string, long> counters, string key)
+    {
+        counters.AddOrUpdate(key, 1, (_, current) => current + 1);
+    }
+
+    private static IReadOnlyDictionary<string, long> CopyCounters(ConcurrentDictionary<string, long> counters)
+    {
+        return counters
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    private static string GetExceptionType(Exception? exception)
+    {
+        if (exception is null)
+        {
+            return "none";
+        }
+
+        return exception.GetType().Name;
+    }
+
+    private static string GetSocketErrorCode(Exception? exception)
+    {
+        SocketException? socketException = FindSocketException(exception);
+        return socketException?.SocketErrorCode.ToString() ?? "none";
+    }
+
+    private static SocketException? FindSocketException(Exception? exception)
+    {
+        Exception? current = exception;
+        while (current is not null)
+        {
+            if (current is SocketException socketException)
+            {
+                return socketException;
+            }
+
+            current = current.InnerException;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeKey(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
     }
 
     private static void UpdateMax(ref long target, long value)
@@ -251,7 +334,11 @@ internal sealed record MetricsSnapshot(
     long MaxPendingRequestCount = 0,
     double ActiveSessionRatio = 0,
     double SchedulerDriftAverageMs = 0,
-    double SchedulerDriftMaxMs = 0);
+    double SchedulerDriftMaxMs = 0,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 
 internal interface IMetricsReporter
 {

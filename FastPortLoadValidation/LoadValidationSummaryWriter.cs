@@ -35,6 +35,25 @@ internal sealed class LoadValidationSummaryWriter
         await File.WriteAllTextAsync(markdownPath, ToMarkdown(summary), cancellationToken);
     }
 
+    public async Task WriteObservedMetricsJsonlAsync(
+        string path,
+        IReadOnlyList<ObservedMetricsSnapshot> samples,
+        CancellationToken cancellationToken = default)
+    {
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await using var writer = new StreamWriter(File.Open(path, FileMode.Create, FileAccess.Write, FileShare.Read));
+        foreach (ObservedMetricsSnapshot sample in samples)
+        {
+            string json = ObservedMetricsJson.Serialize(sample);
+            await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
+        }
+    }
+
     private static string ToMarkdown(LoadValidationRunSummary summary)
     {
         var lines = new List<string>
@@ -45,8 +64,8 @@ internal sealed class LoadValidationSummaryWriter
             $"Started: {summary.StartedAt:O}",
             $"Completed: {summary.CompletedAt:O}",
             string.Empty,
-            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
-            "|-------|--------|--------|------|------------|---------|-----------------|-----------|---------|---------|---------------|---------|"
+            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
+            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|-------|-----------|---------|---------|---------------|---------|"
         };
 
         foreach (LoadValidationStageSummary stage in summary.Stages)
@@ -61,6 +80,9 @@ internal sealed class LoadValidationSummaryWriter
                 stage.PeakSessionRatio.ToString("P2"),
                 stage.MaxTps.ToString("F2"),
                 stage.MaxPendingRequestCount.ToString(),
+                stage.MaxPendingSendRequests.ToString(),
+                stage.MaxSendBackpressureEvents.ToString(),
+                $"{stage.MergedSamples}/{stage.UnmatchedClientSamples}",
                 $"{stage.MaxSchedulerDriftMs:F2}ms",
                 $"{stage.MaxRttP95Ms:F2}ms",
                 $"{stage.MaxRttP99Ms:F2}ms",
@@ -71,6 +93,17 @@ internal sealed class LoadValidationSummaryWriter
             foreach (string failure in stage.Failures)
             {
                 lines.Add($"- {stage.StageId}: {failure}");
+            }
+
+            if (stage.SocketErrorCountsByClass is { Count: > 0 })
+            {
+                foreach (KeyValuePair<string, long> pair in stage.SocketErrorCountsByClass
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(5))
+                {
+                    lines.Add($"- {stage.StageId}: socket {pair.Key} = {pair.Value}");
+                }
             }
         }
 

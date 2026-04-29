@@ -33,6 +33,10 @@ internal static class ObservedMetricsExtensions
             snapshot.MaxPendingRequestCount,
             snapshot.ActiveSessionRatio,
             snapshot.SchedulerDriftAverageMs,
-            snapshot.SchedulerDriftMaxMs);
+            snapshot.SchedulerDriftMaxMs,
+            snapshot.SocketErrorCountsByPhase,
+            snapshot.SocketErrorCountsByType,
+            snapshot.SocketErrorCountsByCode,
+            snapshot.SocketErrorCountsByClass);
     }
 }

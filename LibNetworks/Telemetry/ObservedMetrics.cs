@@ -56,7 +56,11 @@ public sealed record ClientObservedMetricsSnapshot(
     long MaxPendingRequestCount = 0,
     double ActiveSessionRatio = 0,
     double SchedulerDriftAverageMs = 0,
-    double SchedulerDriftMaxMs = 0);
+    double SchedulerDriftMaxMs = 0,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,

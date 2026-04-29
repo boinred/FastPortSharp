@@ -18,6 +18,8 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(6628, options.Port);
         Assert.AreEqual("FastPortLoadRunner", options.RunnerProject);
         Assert.AreEqual("Release", options.Configuration);
+        Assert.IsNull(options.ServerMetricsPath);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.MergeTolerance);
         Assert.IsFalse(options.DryRun);
         Assert.IsFalse(options.ContinueOnFailure);
         StringAssert.Contains(options.OutputDirectory, Path.Combine("artifacts", "load-validation"));
@@ -35,6 +37,8 @@ public sealed class FastPortLoadValidationTests
             "--stage", "s5-random-10k",
             "--runner-project", "runner",
             "--configuration", "Debug",
+            "--server-metrics", "server.metrics.jsonl",
+            "--merge-tolerance-ms", "2500",
             "--dry-run",
             "--continue-on-failure"
         ];
@@ -49,6 +53,8 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual("s5-random-10k", options.StageId);
         Assert.AreEqual("runner", options.RunnerProject);
         Assert.AreEqual("Debug", options.Configuration);
+        Assert.AreEqual("server.metrics.jsonl", options.ServerMetricsPath);
+        Assert.AreEqual(TimeSpan.FromMilliseconds(2500), options.MergeTolerance);
         Assert.IsTrue(options.DryRun);
         Assert.IsTrue(options.ContinueOnFailure);
     }
@@ -79,6 +85,8 @@ public sealed class FastPortLoadValidationTests
             StageId: null,
             RunnerProject: "FastPortLoadRunner",
             Configuration: "Release",
+            ServerMetricsPath: null,
+            MergeTolerance: TimeSpan.FromMilliseconds(1500),
             DryRun: false,
             ContinueOnFailure: false);
         LoadValidationStage stage = LoadValidationProfiles.Get("staged").Stages[^1];
@@ -120,6 +128,67 @@ public sealed class FastPortLoadValidationTests
     }
 
     [TestMethod]
+    public async Task JsonlObservedMetricsReader_ReadsServerObservedSamples()
+    {
+        string directory = CreateTempDirectory();
+        string path = Path.Combine(directory, "server.metrics.jsonl");
+        ServerObservedMetricsSnapshot serverSample = CreateServerSample(
+            new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            pendingSendRequests: 12,
+            sendBackpressureEvents: 3);
+        await File.WriteAllLinesAsync(path, [ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromServer(serverSample))]);
+        var reader = new JsonlObservedMetricsReader();
+
+        JsonlObservedMetricsReadResult result = await reader.ReadServerSamplesAsync(path);
+
+        Assert.AreEqual(0, result.Errors.Count);
+        Assert.AreEqual(1, result.Samples.Count);
+        Assert.AreEqual(0, result.ClientSamples.Count);
+        Assert.AreEqual(1, result.ServerSamples.Count);
+        Assert.AreEqual(12, result.ServerSamples[0].PendingSendRequests);
+        Assert.AreEqual(3, result.ServerSamples[0].SendBackpressureEvents);
+    }
+
+    [TestMethod]
+    public void ObservedMetricsMerger_MatchesNearestServerSampleWithinTolerance()
+    {
+        DateTimeOffset timestamp = new(2026, 4, 28, 9, 0, 0, TimeSpan.Zero);
+        ClientObservedMetricsSnapshot client = CreateSample(
+            currentSessions: 10,
+            targetSessions: 10,
+            timestamp: timestamp);
+        ServerObservedMetricsSnapshot server = CreateServerSample(timestamp.AddMilliseconds(250), pendingSendRequests: 9);
+        var merger = new ObservedMetricsMerger();
+
+        ObservedMetricsMergeResult result = merger.Merge([client], [server], TimeSpan.FromMilliseconds(500));
+
+        Assert.AreEqual(1, result.CombinedSamples.Count);
+        Assert.AreEqual(1, result.MatchedSamples);
+        Assert.AreEqual(0, result.UnmatchedClientSamples);
+        Assert.AreEqual(250, result.MaxSkewMs);
+        Assert.IsNotNull(result.CombinedSamples[0].ServerObserved);
+        Assert.AreEqual(9, result.CombinedSamples[0].ServerObserved!.PendingSendRequests);
+    }
+
+    [TestMethod]
+    public void ObservedMetricsMerger_RecordsUnmatchedClientSampleOutsideTolerance()
+    {
+        DateTimeOffset timestamp = new(2026, 4, 28, 9, 0, 0, TimeSpan.Zero);
+        ClientObservedMetricsSnapshot client = CreateSample(
+            currentSessions: 10,
+            targetSessions: 10,
+            timestamp: timestamp);
+        ServerObservedMetricsSnapshot server = CreateServerSample(timestamp.AddSeconds(5));
+        var merger = new ObservedMetricsMerger();
+
+        ObservedMetricsMergeResult result = merger.Merge([client], [server], TimeSpan.FromMilliseconds(500));
+
+        Assert.AreEqual(0, result.MatchedSamples);
+        Assert.AreEqual(1, result.UnmatchedClientSamples);
+        Assert.IsNull(result.CombinedSamples[0].ServerObserved);
+    }
+
+    [TestMethod]
     public void LoadValidationEvaluator_PassesHealthySamples()
     {
         LoadValidationStage stage = CreateStage(targetSessions: 10);
@@ -144,6 +213,58 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(1.0, summary.MaxActiveSessionRatio);
         Assert.AreEqual(10, summary.FinalConnectAttemptCount);
         Assert.AreEqual(0, summary.FinalConnectFailureCount);
+    }
+
+    [TestMethod]
+    public void LoadValidationEvaluator_IncludesMergedServerAndSocketClassifications()
+    {
+        LoadValidationStage stage = CreateStage(targetSessions: 10);
+        DateTimeOffset timestamp = new(2026, 4, 28, 9, 0, 0, TimeSpan.Zero);
+        ClientObservedMetricsSnapshot client = CreateSample(
+            currentSessions: 10,
+            targetSessions: 10,
+            totalReceivedPackets: 20,
+            tps: 10,
+            timestamp: timestamp,
+            socketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
+            socketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 });
+        ServerObservedMetricsSnapshot server = CreateServerSample(
+            timestamp.AddMilliseconds(100),
+            pendingSendRequests: 12,
+            sendBackpressureEvents: 4,
+            maxSendBufferBytes: 4096);
+        JsonlReadResult readResult = new([client, client, client], []);
+        JsonlObservedMetricsReadResult serverReadResult = new(
+            [ObservedMetricsSnapshot.FromServer(server)],
+            [],
+            [server],
+            []);
+        ObservedMetricsMergeResult mergeResult = new(
+            [new ObservedMetricsSnapshot(timestamp, client, server)],
+            MatchedSamples: 1,
+            UnmatchedClientSamples: 0,
+            MaxSkewMs: 100);
+        var evaluator = new LoadValidationEvaluator();
+
+        LoadValidationStageSummary summary = evaluator.Evaluate(
+            stage,
+            "metrics.jsonl",
+            readResult,
+            serverMetricsPath: "server.metrics.jsonl",
+            serverReadResult: serverReadResult,
+            mergeResult: mergeResult,
+            combinedMetricsPath: "combined.metrics.jsonl");
+
+        Assert.IsTrue(summary.Passed, string.Join(Environment.NewLine, summary.Failures));
+        Assert.AreEqual("server.metrics.jsonl", summary.ServerMetricsPath);
+        Assert.AreEqual("combined.metrics.jsonl", summary.CombinedMetricsPath);
+        Assert.AreEqual(1, summary.ServerJsonSamples);
+        Assert.AreEqual(1, summary.MergedSamples);
+        Assert.AreEqual(12, summary.MaxPendingSendRequests);
+        Assert.AreEqual(4, summary.MaxSendBackpressureEvents);
+        Assert.AreEqual(4096, summary.MaxSendBufferBytes);
+        Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
+        Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
     }
 
     [TestMethod]
@@ -226,6 +347,7 @@ public sealed class FastPortLoadValidationTests
 
         string markdown = await File.ReadAllTextAsync(Path.Combine(directory, "summary.md"));
         StringAssert.Contains(markdown, "Max Pending Req");
+        StringAssert.Contains(markdown, "Max Pending Send");
         StringAssert.Contains(markdown, "RTT P99");
     }
 
@@ -250,10 +372,13 @@ public sealed class FastPortLoadValidationTests
         double socketErrorRate = 0,
         long maxPendingRequestCount = 0,
         double schedulerDriftMaxMs = 0,
-        long connectFailureCount = 0)
+        long connectFailureCount = 0,
+        DateTimeOffset? timestamp = null,
+        IReadOnlyDictionary<string, long>? socketErrorCountsByPhase = null,
+        IReadOnlyDictionary<string, long>? socketErrorCountsByClass = null)
     {
         return new ClientObservedMetricsSnapshot(
-            Timestamp: new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            Timestamp: timestamp ?? new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
             TargetSessions: targetSessions,
             CurrentSessions: currentSessions,
             TotalSentPackets: totalReceivedPackets,
@@ -279,7 +404,45 @@ public sealed class FastPortLoadValidationTests
             MaxPendingRequestCount: maxPendingRequestCount,
             ActiveSessionRatio: targetSessions <= 0 ? 0 : currentSessions / (double)targetSessions,
             SchedulerDriftAverageMs: schedulerDriftMaxMs,
-            SchedulerDriftMaxMs: schedulerDriftMaxMs);
+            SchedulerDriftMaxMs: schedulerDriftMaxMs,
+            SocketErrorCountsByPhase: socketErrorCountsByPhase,
+            SocketErrorCountsByClass: socketErrorCountsByClass);
+    }
+
+    private static ServerObservedMetricsSnapshot CreateServerSample(
+        DateTimeOffset timestamp,
+        long pendingSendRequests = 0,
+        long sendBackpressureEvents = 0,
+        long maxSendBufferBytes = 0)
+    {
+        return new ServerObservedMetricsSnapshot(
+            Timestamp: timestamp,
+            CurrentSessions: 10,
+            TotalAcceptedSessions: 10,
+            TotalDisconnectedSessions: 0,
+            TotalReceivedPackets: 20,
+            TotalSendCompletions: 20,
+            TotalParsedPacketBytes: 1024,
+            TotalSentBytes: 1024,
+            ReceivedPacketsPerSecond: 10,
+            SendCompletionsPerSecond: 11,
+            ParsedPacketBytesPerSecond: 1024,
+            SentBytesPerSecond: 1024,
+            AcceptedSessionsPerSecond: 0,
+            DisconnectedSessionsPerSecond: 0,
+            AcceptErrorCount: 0,
+            SocketErrorCount: 0,
+            ParseErrorCount: 0,
+            ProtocolErrorCount: 0,
+            SocketErrorRate: 0,
+            TotalSendRequests: 25,
+            PendingSendRequests: pendingSendRequests,
+            MaxPendingSendRequests: pendingSendRequests,
+            SendRequestsPerSecond: 12,
+            SendBackpressureEvents: sendBackpressureEvents,
+            SendBackpressureEventsPerSecond: 2,
+            SendBufferBytes: maxSendBufferBytes,
+            MaxSendBufferBytes: maxSendBufferBytes);
     }
 
     private static string CreateTempDirectory()

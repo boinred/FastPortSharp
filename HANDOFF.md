@@ -2,14 +2,15 @@
 
 > Last updated: 2026-04-29
 > Branch: `main`
-> Remote baseline before this handoff update: `7e61767 Archive staged load validation docs`
+> Remote baseline before this handoff update: `e524ab4 Checkpoint 10K telemetry and next PDCA plan`
 
 ## Current State
 
-- Latest pushed commit before current local work: `7e61767 Archive staged load validation docs`
+- Latest pushed commit before current local work: `e524ab4 Checkpoint 10K telemetry and next PDCA plan`
 - Completed and archived PDCA feature: `10k-load-bottleneck-telemetry`
-- Active PDCA feature: `server-telemetry-export-merge-socket-error-classification`
-- Active PDCA phase: `design`
+- Completed PDCA feature: `server-telemetry-export-merge-socket-error-classification`
+- Match rate: 96%
+- Current recommended action: run focused 10K with server telemetry export enabled
 - Project level detected by bkit: `Starter`
 
 ## Completed Since Previous Handoff
@@ -36,6 +37,32 @@
 - Ran focused `s5-random-10k` validation with logging reduced.
 - Archived PDCA docs under:
   - `docs/archive/2026-04/10k-load-bottleneck-telemetry/`
+
+### Server Telemetry Export/Merge + Socket Error Classification
+
+- Added `FastPortSmokeServer` server observed JSONL export:
+  - `--Telemetry:Output`
+  - `--Telemetry:IntervalSeconds`
+  - `ServerTelemetryExportBackgroundService`
+- Added client socket error classification in `FastPortLoadRunner`:
+  - phase counters
+  - exception type counters
+  - socket error code counters
+  - combined class key counters
+- Extended `ClientObservedMetricsSnapshot` with optional socket classification dictionaries.
+- Extended `FastPortLoadValidation`:
+  - `--server-metrics`
+  - `--merge-tolerance-ms`
+  - server-only observed JSONL reader
+  - client/server nearest timestamp merge
+  - `{stageId}.combined.metrics.jsonl`
+  - server backlog fields in summary JSON/Markdown
+- Added tests for export, reader, merger, evaluator, summary, and socket classification counters.
+- Completed PDCA docs:
+  - `docs/01-plan/features/server-telemetry-export-merge-socket-error-classification.plan.md`
+  - `docs/02-design/features/server-telemetry-export-merge-socket-error-classification.design.md`
+  - `docs/03-analysis/server-telemetry-export-merge-socket-error-classification.analysis.md`
+  - `docs/04-report/server-telemetry-export-merge-socket-error-classification.report.md`
 
 ## 10K Focused Run Result
 
@@ -67,33 +94,31 @@ Interpretation:
 - The problem appears after successful connections: disconnect/socket-error pressure plus request backlog accumulation.
 - Client-only JSONL is insufficient for the next diagnosis because `serverObserved` is still `null` in LoadRunner output.
 
-## Active Next Work
+## Next Work
 
-Current active feature:
+Recommended focused run:
 
-```text
-server-telemetry-export-merge-socket-error-classification
+```bash
+./FastPortSmokeServer/bin/Release/net10.0/FastPortSmokeServer \
+  --Logging:LogLevel:Default Warning \
+  --Logging:LogLevel:Microsoft Warning \
+  --Telemetry:Output artifacts/load-validation/s5-server-merged/server.metrics.jsonl \
+  --Telemetry:IntervalSeconds 1
 ```
 
-Plan document:
-
-```text
-docs/01-plan/features/server-telemetry-export-merge-socket-error-classification.plan.md
+```bash
+./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation \
+  --profile staged \
+  --stage s5-random-10k \
+  --output artifacts/load-validation/s5-server-merged \
+  --server-metrics artifacts/load-validation/s5-server-merged/server.metrics.jsonl
 ```
 
-Recommended next command:
+Optional PDCA cleanup after review:
 
 ```text
-$pdca design server-telemetry-export-merge-socket-error-classification
+$pdca archive server-telemetry-export-merge-socket-error-classification
 ```
-
-Primary scope:
-
-- Export `FastPortSmokeServer` server observed telemetry to JSONL.
-- Merge client and server metrics in `FastPortLoadValidation`.
-- Include server backlog fields in validation summaries.
-- Classify client socket errors by phase/type/code.
-- Preserve client-only metrics compatibility.
 
 ## Important Architecture Decisions
 
@@ -113,14 +138,20 @@ dotnet build FastPortCharp.sln
 dotnet test FastPortCharp.sln --no-build
 dotnet build FastPortCharp.sln -c Release
 ./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation --profile staged --stage s5-random-10k --output artifacts/load-validation/s5-logging-off
+./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation --profile smoke --output artifacts/load-validation/server-merge-smoke --server-metrics artifacts/load-validation/server-merge-smoke/server.metrics.jsonl
 ```
 
 Results:
 
 - Debug build passed with 0 warnings and 0 errors.
-- Test suite passed: 72 passed, 0 failed.
+- Test suite passed: 78 passed, 0 failed.
 - Release build passed with 0 warnings and 0 errors.
 - Focused 10K validation produced artifacts but failed thresholds, as expected for the bottleneck investigation.
+- Reduced smoke export/merge passed.
+- Reduced smoke artifacts:
+  - `artifacts/load-validation/server-merge-smoke/server.metrics.jsonl` (45 lines)
+  - `artifacts/load-validation/server-merge-smoke/smoke-fixed-10.combined.metrics.jsonl` (11 lines)
+  - `artifacts/load-validation/server-merge-smoke/smoke-random-25.combined.metrics.jsonl` (19 lines)
 
 ## Suggested Commands
 
@@ -151,7 +182,7 @@ $pdca status
 ## Notes For Next Session
 
 - Start by checking `docs/.pdca-status.json`.
-- Continue with the design phase for `server-telemetry-export-merge-socket-error-classification`.
 - Do not move echo/smoke protocol behavior back into `FastPortServer`.
-- Add server telemetry export at the application layer, not as protocol-specific logic inside `LibNetworks`.
-- Keep socket error classification useful for 10K diagnosis but avoid making it a production monitoring framework in this feature.
+- Server telemetry export is intentionally application-layer code in `FastPortSmokeServer`.
+- Socket classification is intentionally diagnosis-oriented, not a production monitoring framework.
+- Next useful data point is a focused `s5-random-10k` run with `--server-metrics`.

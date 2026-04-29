@@ -8,14 +8,45 @@ internal sealed class LoadValidationEvaluator
         LoadValidationStage stage,
         string metricsPath,
         JsonlReadResult readResult,
-        int exitCode = 0)
+        int exitCode = 0,
+        string? serverMetricsPath = null,
+        JsonlObservedMetricsReadResult? serverReadResult = null,
+        ObservedMetricsMergeResult? mergeResult = null,
+        string? combinedMetricsPath = null)
     {
         var failures = new List<string>(readResult.Errors);
         IReadOnlyList<ClientObservedMetricsSnapshot> samples = readResult.Samples;
+        IReadOnlyList<ServerObservedMetricsSnapshot> mergedServerSamples = mergeResult?.CombinedSamples
+            .Select(sample => sample.ServerObserved)
+            .Where(sample => sample is not null)
+            .Cast<ServerObservedMetricsSnapshot>()
+            .ToArray()
+            ?? Array.Empty<ServerObservedMetricsSnapshot>();
 
         if (exitCode != 0)
         {
             failures.Add($"LoadRunner exited with code {exitCode}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(serverMetricsPath))
+        {
+            if (serverReadResult is null)
+            {
+                failures.Add($"Server metrics were requested but not read: {serverMetricsPath}");
+            }
+            else
+            {
+                failures.AddRange(serverReadResult.Errors);
+                if (serverReadResult.ServerSamples.Count == 0)
+                {
+                    failures.Add($"Expected server metrics samples, but got 0 from {serverMetricsPath}.");
+                }
+            }
+
+            if (samples.Count > 0 && mergeResult is not null && mergeResult.MatchedSamples == 0)
+            {
+                failures.Add("No client samples matched server samples within merge tolerance.");
+            }
         }
 
         if (samples.Count < stage.Thresholds.MinJsonSamples)
@@ -82,6 +113,31 @@ internal sealed class LoadValidationEvaluator
             FinalConnectFailureCount: finalConnectFailureCount,
             MaxPendingRequestCount: samples.Count == 0 ? 0 : samples.Max(sample => sample.MaxPendingRequestCount),
             MaxSchedulerDriftMs: samples.Count == 0 ? 0 : samples.Max(sample => sample.SchedulerDriftMaxMs),
-            MaxActiveSessionRatio: samples.Count == 0 ? 0 : samples.Max(sample => sample.ActiveSessionRatio));
+            MaxActiveSessionRatio: samples.Count == 0 ? 0 : samples.Max(sample => sample.ActiveSessionRatio),
+            ServerMetricsPath: serverMetricsPath,
+            CombinedMetricsPath: combinedMetricsPath,
+            ServerJsonSamples: serverReadResult?.ServerSamples.Count ?? 0,
+            MergedSamples: mergeResult?.MatchedSamples ?? 0,
+            UnmatchedClientSamples: mergeResult?.UnmatchedClientSamples ?? 0,
+            MaxMergeSkewMs: mergeResult?.MaxSkewMs ?? 0,
+            MaxPendingSendRequests: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxPendingSendRequests),
+            MaxSendBackpressureEvents: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendBackpressureEvents),
+            MaxSendBufferBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxSendBufferBytes),
+            MaxSendRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRequestsPerSecond),
+            MaxSendCompletionsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendCompletionsPerSecond),
+            SocketErrorCountsByPhase: CopyCounters(finalSample?.SocketErrorCountsByPhase),
+            SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass));
+    }
+
+    private static IReadOnlyDictionary<string, long>? CopyCounters(IReadOnlyDictionary<string, long>? counters)
+    {
+        if (counters is null || counters.Count == 0)
+        {
+            return counters;
+        }
+
+        return counters
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 }

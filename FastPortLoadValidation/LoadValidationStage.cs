@@ -53,7 +53,20 @@ internal sealed record LoadValidationStageSummary(
     long FinalConnectFailureCount = 0,
     long MaxPendingRequestCount = 0,
     double MaxSchedulerDriftMs = 0,
-    double MaxActiveSessionRatio = 0);
+    double MaxActiveSessionRatio = 0,
+    string? ServerMetricsPath = null,
+    string? CombinedMetricsPath = null,
+    int ServerJsonSamples = 0,
+    int MergedSamples = 0,
+    int UnmatchedClientSamples = 0,
+    double MaxMergeSkewMs = 0,
+    long MaxPendingSendRequests = 0,
+    long MaxSendBackpressureEvents = 0,
+    long MaxSendBufferBytes = 0,
+    double MaxSendRequestsPerSecond = 0,
+    double MaxSendCompletionsPerSecond = 0,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 
 internal sealed record LoadValidationRunSummary(
     string RunId,

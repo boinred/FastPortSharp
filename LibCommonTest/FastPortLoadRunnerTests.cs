@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Net.Sockets;
 using FastPortLoadRunner;
 
 namespace LibCommonTest;
@@ -164,6 +165,26 @@ public sealed class FastPortLoadRunnerTests
     }
 
     [TestMethod]
+    public void MetricsCollector_CreateSnapshot_TracksSocketErrorClassifications()
+    {
+        var collector = new MetricsCollector(targetSessions: 10);
+
+        collector.RecordSocketError("receive", new SocketException((int)SocketError.ConnectionReset));
+        collector.RecordProtocolError("unexpected-protocol-id");
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.AreEqual(2, snapshot.SocketErrorCount);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByPhase!["receive"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByPhase!["protocol"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByType!["SocketException"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByType!["unexpected-protocol-id"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByCode!["ConnectionReset"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByClass!["protocol|unexpected-protocol-id|none"]);
+    }
+
+    [TestMethod]
     public void JsonMetricsReporter_SerializeSnapshot_WritesObservedClientEnvelope()
     {
         var snapshot = new MetricsSnapshot(
@@ -193,7 +214,11 @@ public sealed class FastPortLoadRunnerTests
             MaxPendingRequestCount: 20,
             ActiveSessionRatio: 0.9,
             SchedulerDriftAverageMs: 1.5,
-            SchedulerDriftMaxMs: 3.5);
+            SchedulerDriftMaxMs: 3.5,
+            SocketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
+            SocketErrorCountsByType: new Dictionary<string, long> { ["SocketException"] = 2 },
+            SocketErrorCountsByCode: new Dictionary<string, long> { ["ConnectionReset"] = 2 },
+            SocketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 });
 
         string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
 
@@ -216,5 +241,7 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(0.9, clientObserved.GetProperty("activeSessionRatio").GetDouble(), 0.0001);
         Assert.AreEqual(3.5, clientObserved.GetProperty("schedulerDriftMaxMs").GetDouble(), 0.0001);
         Assert.AreEqual(990, clientObserved.GetProperty("totalReceivedPackets").GetInt64());
+        Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByPhase").GetProperty("receive").GetInt64());
+        Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByClass").GetProperty("receive|SocketException|ConnectionReset").GetInt64());
     }
 }

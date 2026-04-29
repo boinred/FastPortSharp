@@ -1,4 +1,6 @@
+using System.Text.Json;
 using LibNetworks.Telemetry;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LibCommonTest;
 
@@ -107,5 +109,45 @@ public sealed class ServerTelemetryTests
 
         Assert.AreEqual("0.0.0.0", options.Host);
         Assert.AreEqual(6628, options.Port);
+    }
+
+    [TestMethod]
+    public async Task ServerTelemetryExportBackgroundService_WritesServerObservedJsonl()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"fastport-server-telemetry-{Guid.NewGuid():N}");
+        string path = Path.Combine(directory, "server.metrics.jsonl");
+        var telemetry = new ServerTelemetryCollector();
+        telemetry.RecordAccept();
+        telemetry.RecordSendRequested(128, queuedBytes: 256);
+        var exporter = new ServerTelemetryExporter(telemetry);
+        var options = new FastPortSmokeServer.FastPortSmokeServerTelemetryOptions
+        {
+            Output = path,
+            IntervalSeconds = 1
+        };
+        var service = new FastPortSmokeServer.ServerTelemetryExportBackgroundService(
+            NullLogger<FastPortSmokeServer.ServerTelemetryExportBackgroundService>.Instance,
+            exporter,
+            options);
+
+        await service.StartAsync(CancellationToken.None);
+        await Task.Delay(1200);
+        await service.StopAsync(CancellationToken.None);
+
+        Assert.IsTrue(File.Exists(path));
+        string[] lines = await File.ReadAllLinesAsync(path);
+        Assert.IsTrue(lines.Length >= 1);
+
+        ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
+            lines[0],
+            ObservedMetricsJson.SerializerOptions);
+
+        Assert.IsNotNull(snapshot);
+        Assert.IsNull(snapshot.ClientObserved);
+        Assert.IsNotNull(snapshot.ServerObserved);
+        Assert.AreEqual(1, snapshot.ServerObserved!.TotalAcceptedSessions);
+        Assert.AreEqual(1, snapshot.ServerObserved.TotalSendRequests);
+        Assert.AreEqual(1, snapshot.ServerObserved.PendingSendRequests);
+        Assert.AreEqual(256, snapshot.ServerObserved.SendBufferBytes);
     }
 }

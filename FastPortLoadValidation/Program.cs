@@ -54,6 +54,7 @@ internal static class Program
 
         var processRunner = new ProcessRunner();
         var reader = new JsonlObservedMetricsReader();
+        var merger = new ObservedMetricsMerger();
         var evaluator = new LoadValidationEvaluator();
         var summaries = new List<LoadValidationStageSummary>();
 
@@ -70,11 +71,34 @@ internal static class Program
             string stdoutPath = Path.Combine(options.OutputDirectory, $"{stage.Id}.stdout.log");
             string stderrPath = Path.Combine(options.OutputDirectory, $"{stage.Id}.stderr.log");
             string metricsPath = LoadRunnerCommandBuilder.GetMetricsPath(options.OutputDirectory, stage);
+            string? combinedMetricsPath = null;
 
             Console.WriteLine($"Running {stage.Id}: {command.ToDisplayString()}");
             int exitCode = await processRunner.RunAsync(command, stdoutPath, stderrPath, cancellationTokenSource.Token);
             JsonlReadResult readResult = await reader.ReadClientSamplesAsync(metricsPath, cancellationTokenSource.Token);
-            LoadValidationStageSummary summary = evaluator.Evaluate(stage, metricsPath, readResult, exitCode);
+            JsonlObservedMetricsReadResult? serverReadResult = null;
+            ObservedMetricsMergeResult? mergeResult = null;
+
+            if (!string.IsNullOrWhiteSpace(options.ServerMetricsPath))
+            {
+                serverReadResult = await reader.ReadServerSamplesAsync(options.ServerMetricsPath, cancellationTokenSource.Token);
+                mergeResult = merger.Merge(readResult.Samples, serverReadResult.ServerSamples, options.MergeTolerance);
+                combinedMetricsPath = Path.Combine(options.OutputDirectory, $"{stage.Id}.combined.metrics.jsonl");
+                await writer.WriteObservedMetricsJsonlAsync(
+                    combinedMetricsPath,
+                    mergeResult.CombinedSamples,
+                    cancellationTokenSource.Token);
+            }
+
+            LoadValidationStageSummary summary = evaluator.Evaluate(
+                stage,
+                metricsPath,
+                readResult,
+                exitCode,
+                options.ServerMetricsPath,
+                serverReadResult,
+                mergeResult,
+                combinedMetricsPath);
             summaries.Add(summary);
 
             if (!summary.Passed && !options.ContinueOnFailure)

@@ -6,3 +6,10 @@ public sealed class FastPortSmokeServerOptions
 
     public int Port { get; init; } = 6628;
 }
+
+public sealed class FastPortSmokeServerTelemetryOptions
+{
+    public string? Output { get; init; }
+
+    public int IntervalSeconds { get; init; } = 1;
+}
