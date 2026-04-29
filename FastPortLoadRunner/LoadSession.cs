@@ -24,10 +24,13 @@ internal sealed class LoadSession(
         {
             NoDelay = true
         };
+        bool connected = false;
 
         try
         {
+            metricsCollector.RecordConnectAttempt();
             await client.ConnectAsync(scenario.Host, scenario.Port, cancellationToken);
+            connected = true;
             metricsCollector.RecordSessionConnected();
 
             await using NetworkStream stream = client.GetStream();
@@ -41,11 +44,19 @@ internal sealed class LoadSession(
         }
         catch (Exception)
         {
+            if (!connected)
+            {
+                metricsCollector.RecordConnectFailure();
+            }
+
             metricsCollector.RecordSocketError();
         }
         finally
         {
-            metricsCollector.RecordSessionDisconnected();
+            if (connected)
+            {
+                metricsCollector.RecordSessionDisconnected();
+            }
         }
     }
 

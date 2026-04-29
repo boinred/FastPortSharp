@@ -90,6 +90,9 @@ public sealed class FastPortSmokeServerTests
         Assert.IsTrue(snapshot.SentPackets > 0, "Server should send echo responses.");
         Assert.IsTrue(snapshot.ReceivedBytes > 0, "Server should record received bytes.");
         Assert.IsTrue(snapshot.SentBytes > 0, "Server should record sent bytes.");
+        Assert.IsTrue(snapshot.SendRequests > 0, "Server should record send requests.");
+        Assert.IsTrue(snapshot.MaxPendingSendRequests > 0, "Server should record max pending send requests.");
+        Assert.IsTrue(snapshot.MaxSendBufferBytes > 0, "Server should record send buffer depth samples.");
         Assert.AreEqual(0, snapshot.ParseErrors, "Smoke run should not record parse errors.");
         Assert.AreEqual(0, snapshot.ProtocolErrors, "Smoke run should not record protocol errors.");
         Assert.AreEqual(0, snapshot.AcceptErrors, "Smoke run should not record accept errors.");
@@ -106,6 +109,9 @@ public sealed class FastPortSmokeServerTests
         Assert.IsTrue(snapshot.TotalSendCompletions > 0, "Server observed metrics should expose send completions.");
         Assert.IsTrue(snapshot.TotalParsedPacketBytes > 0, "Server observed metrics should expose parsed packet bytes.");
         Assert.IsTrue(snapshot.TotalSentBytes > 0, "Server observed metrics should expose sent bytes.");
+        Assert.IsTrue(snapshot.TotalSendRequests > 0, "Server observed metrics should expose send requests.");
+        Assert.IsTrue(snapshot.MaxPendingSendRequests > 0, "Server observed metrics should expose max pending send requests.");
+        Assert.IsTrue(snapshot.MaxSendBufferBytes > 0, "Server observed metrics should expose send buffer samples.");
         Assert.AreEqual(0, snapshot.SocketErrorCount, "Server observed metrics should expose socket error count.");
         Assert.AreEqual(0, snapshot.ParseErrorCount, "Server observed metrics should expose parse error count.");
         Assert.AreEqual(0, snapshot.ProtocolErrorCount, "Server observed metrics should expose protocol error count.");

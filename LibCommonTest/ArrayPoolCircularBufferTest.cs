@@ -94,19 +94,19 @@ public sealed class ArrayPoolCircularBufferTest
     [TestMethod]
     public void TestArrayPoolCircular_BufferExpansion_Success()
     {
-        // Arrange: 작은 버퍼로 시작
+        // Arrange: start with a small buffer.
         using var buffer = new ArrayPoolCircularBuffers(10);
         byte[] data = new byte[50];
         Random.Shared.NextBytes(data);
 
-        // Act: 버퍼 크기보다 큰 데이터 쓰기 (확장 발생)
+        // Act: write more data than the initial capacity so expansion occurs.
         int written = buffer.Write(data, 0, data.Length);
 
         // Assert
         Assert.AreEqual(50, written);
         Assert.AreEqual(50, buffer.CanReadSize);
 
-        // 데이터 검증
+        // Verify that the copied data survived expansion.
         byte[] readBuffer = new byte[50];
         buffer.Peek(ref readBuffer);
         CollectionAssert.AreEqual(data, readBuffer);
@@ -120,10 +120,10 @@ public sealed class ArrayPoolCircularBufferTest
         byte[] data1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         byte[] data2 = [11, 12, 13, 14, 15];
 
-        // Act: 첫 번째 쓰기 후 일부 제거, 다시 쓰기 (순환 발생)
+        // Act: write, drain part of the buffer, then write again to wrap.
         buffer.Write(data1, 0, data1.Length);
-        buffer.Drain(8); // 8바이트 제거, Head 이동
-        buffer.Write(data2, 0, data2.Length); // 순환 쓰기 발생
+        buffer.Drain(8); // Remove 8 bytes and move Head.
+        buffer.Write(data2, 0, data2.Length); // Trigger circular write.
 
         // Assert
         Assert.AreEqual(7, buffer.CanReadSize); // 10 - 8 + 5 = 7
@@ -131,9 +131,9 @@ public sealed class ArrayPoolCircularBufferTest
         byte[] readBuffer = new byte[10];
         int read = buffer.Peek(ref readBuffer);
         Assert.AreEqual(7, read);
-        Assert.AreEqual(9, readBuffer[0]);  // data1의 마지막 2바이트
+        Assert.AreEqual(9, readBuffer[0]);  // Last 2 bytes from data1.
         Assert.AreEqual(10, readBuffer[1]);
-        Assert.AreEqual(11, readBuffer[2]); // data2의 5바이트
+        Assert.AreEqual(11, readBuffer[2]); // 5 bytes from data2.
         Assert.AreEqual(12, readBuffer[3]);
         Assert.AreEqual(13, readBuffer[4]);
         Assert.AreEqual(14, readBuffer[5]);
@@ -159,9 +159,9 @@ public sealed class ArrayPoolCircularBufferTest
         Assert.AreEqual(3, packetBuffer[2]);
         Assert.AreEqual(4, packetBuffer[3]);
         Assert.AreEqual(5, packetBuffer[4]);
-        Assert.AreEqual(5, buffer.CanReadSize); // Drain 호출됨
+        Assert.AreEqual(5, buffer.CanReadSize); // Drain was called.
 
-        // 버퍼 반환 (메모리 누수 방지)
+        // Return rented buffer to avoid retaining pooled memory.
         ArrayPoolCircularBuffers.ReturnBuffer(packetBuffer);
     }
 
@@ -170,7 +170,7 @@ public sealed class ArrayPoolCircularBufferTest
     {
         // Arrange
         using var buffer = new ArrayPoolCircularBuffers(100);
-        // 패킷 형식: [2바이트 크기=100][데이터...]
+        // Packet format: [2 byte size=100][data...].
         byte[] header = BitConverter.GetBytes((ushort)100);
         buffer.Write(header, 0, header.Length);
 
@@ -187,7 +187,7 @@ public sealed class ArrayPoolCircularBufferTest
         // Arrange
         using var buffer = new ArrayPoolCircularBuffers(100);
         
-        // 패킷 생성: [2바이트 크기=10][8바이트 데이터]
+        // Packet format: [2 byte size=10][8 byte data].
         byte[] packet = new byte[10];
         BitConverter.GetBytes((ushort)10).CopyTo(packet, 0);
         for (int i = 2; i < 10; i++) packet[i] = (byte)i;
@@ -210,7 +210,7 @@ public sealed class ArrayPoolCircularBufferTest
         // Arrange
         using var buffer = new ArrayPoolCircularBuffers(200);
         
-        // 3개의 패킷 생성
+        // Create 3 packets.
         for (int p = 0; p < 3; p++)
         {
             byte[] packet = new byte[10];
@@ -237,10 +237,10 @@ public sealed class ArrayPoolCircularBufferTest
         // Arrange
         using var buffer = new ArrayPoolCircularBuffers(100);
         
-        // 불완전한 패킷: 크기는 100이지만 데이터는 10바이트만
+        // Incomplete packet: declared size is 100, but only 10 bytes are present.
         byte[] header = BitConverter.GetBytes((ushort)100);
         buffer.Write(header, 0, header.Length);
-        buffer.Write(new byte[8], 0, 8); // 총 10바이트, 100바이트 필요
+        buffer.Write(new byte[8], 0, 8); // 10 bytes total, 100 bytes required.
 
         // Act
         bool result = buffer.TryGetBasePackets(out var packets);

@@ -111,9 +111,11 @@ public sealed class FastPortLoadRunnerTests
     public void MetricsCollector_CreateSnapshot_TracksTotalsAndRates()
     {
         var collector = new MetricsCollector(targetSessions: 10);
+        collector.RecordConnectAttempt();
         collector.RecordSessionConnected();
         collector.RecordSentPacket(100);
         collector.RecordReceivedPacket(80);
+        collector.RecordSchedulerDrift(5.25);
         collector.RecordSocketError();
 
         var previous = new MetricsSnapshot(
@@ -146,6 +148,13 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(1, snapshot.TotalReceivedPackets);
         Assert.AreEqual(100, snapshot.TotalSentBytes);
         Assert.AreEqual(80, snapshot.TotalReceivedBytes);
+        Assert.AreEqual(1, snapshot.ConnectAttemptCount);
+        Assert.AreEqual(0, snapshot.ConnectFailureCount);
+        Assert.AreEqual(0, snapshot.PendingRequestCount);
+        Assert.AreEqual(1, snapshot.MaxPendingRequestCount);
+        Assert.AreEqual(0.1, snapshot.ActiveSessionRatio, 0.0001);
+        Assert.AreEqual(5.25, snapshot.SchedulerDriftAverageMs, 0.001);
+        Assert.AreEqual(5.25, snapshot.SchedulerDriftMaxMs, 0.001);
         Assert.AreEqual(1, snapshot.SocketErrorCount);
         Assert.IsTrue(snapshot.SentPacketsPerSecond > 0);
         Assert.IsTrue(snapshot.ReceivedPacketsPerSecond > 0);
@@ -177,7 +186,14 @@ public sealed class FastPortLoadRunnerTests
             AcceptCount: 100,
             DisconnectCount: 10,
             SocketErrorCount: 1,
-            SocketErrorRate: 0.001);
+            SocketErrorRate: 0.001,
+            ConnectAttemptCount: 105,
+            ConnectFailureCount: 5,
+            PendingRequestCount: 10,
+            MaxPendingRequestCount: 20,
+            ActiveSessionRatio: 0.9,
+            SchedulerDriftAverageMs: 1.5,
+            SchedulerDriftMaxMs: 3.5);
 
         string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
 
@@ -193,6 +209,12 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsFalse(root.TryGetProperty("connectedSessions", out _));
         Assert.AreEqual(90, clientObserved.GetProperty("currentSessions").GetInt32());
         Assert.AreEqual(100, clientObserved.GetProperty("connectCount").GetInt64());
+        Assert.AreEqual(105, clientObserved.GetProperty("connectAttemptCount").GetInt64());
+        Assert.AreEqual(5, clientObserved.GetProperty("connectFailureCount").GetInt64());
+        Assert.AreEqual(10, clientObserved.GetProperty("pendingRequestCount").GetInt64());
+        Assert.AreEqual(20, clientObserved.GetProperty("maxPendingRequestCount").GetInt64());
+        Assert.AreEqual(0.9, clientObserved.GetProperty("activeSessionRatio").GetDouble(), 0.0001);
+        Assert.AreEqual(3.5, clientObserved.GetProperty("schedulerDriftMaxMs").GetDouble(), 0.0001);
         Assert.AreEqual(990, clientObserved.GetProperty("totalReceivedPackets").GetInt64());
     }
 }

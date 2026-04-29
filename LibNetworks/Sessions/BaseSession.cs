@@ -12,6 +12,7 @@ namespace LibNetworks.Sessions;
 
 public abstract class BaseSession
 {
+    private const int SendBufferBackpressureThresholdBytes = 1024 * 1024;
 
     protected ILogger m_Logger;
     private System.Net.Sockets.Socket? m_Socket;
@@ -309,7 +310,13 @@ public abstract class BaseSession
 
         m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {sendBuffers.Length}");
 
-        m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
+        int writtenSize = m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
+        int queuedBytes = m_SendBuffers.CanReadSize;
+        ServerTelemetry.RecordSendRequested(writtenSize, queuedBytes);
+        if (queuedBytes > SendBufferBackpressureThresholdBytes)
+        {
+            ServerTelemetry.RecordSendBackpressure();
+        }
     }
 
     protected void RequestSendString(string message)
@@ -421,7 +428,10 @@ public abstract class BaseSession
                     break;
                 }
 
-                byte[] sendBuffers = new byte[m_SendBuffers.CanReadSize];
+                int queuedBytes = m_SendBuffers.CanReadSize;
+                ServerTelemetry.RecordSendBufferSample(queuedBytes);
+
+                byte[] sendBuffers = new byte[queuedBytes];
                 m_SendBuffers.Peek(ref sendBuffers);
 
                 m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);

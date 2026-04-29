@@ -1,107 +1,126 @@
 # FastPortSharp Handoff
 
-> Last updated: 2026-04-28  
-> Branch: `main`  
-> Remote status at handoff: `main...origin/main` clean/synced before this file was added
+> Last updated: 2026-04-29
+> Branch: `main`
+> Remote baseline before this handoff update: `7e61767 Archive staged load validation docs`
 
 ## Current State
 
-- Latest pushed commit: `fbc00cb Add FastPort smoke server telemetry`
-- Working feature just completed and archived: `fastport-smoke-server`
-- PDCA active features: none
-- `FastPortBenchmark` has been replaced by `FastPortLoadRunner`
-- `FastPortSmokeServer` now owns echo/protocol smoke behavior
-- `FastPortServer` has been simplified back toward a basic network engine host/sample
+- Latest pushed commit before current local work: `7e61767 Archive staged load validation docs`
+- Completed and archived PDCA feature: `10k-load-bottleneck-telemetry`
+- Active PDCA feature: `server-telemetry-export-merge-socket-error-classification`
+- Active PDCA phase: `design`
+- Project level detected by bkit: `Starter`
 
-## Completed Work
+## Completed Since Previous Handoff
 
-### FastPortLoadRunner
+### 10K Bottleneck Telemetry
 
-- Replaced old benchmark-oriented flow with a real TCP load runner.
-- Supports fixed payload and random payload profiles.
-- Uses `EchoRequest` / `EchoResponse` framing.
-- Emits client-side metrics and JSONL output.
+- Added server send-path telemetry counters:
+  - send requests
+  - pending send requests
+  - max pending send requests
+  - send backpressure events
+  - send buffer byte sample
+  - max send buffer bytes
+- Added client bottleneck telemetry:
+  - connect attempts
+  - connect failures
+  - pending request count
+  - max pending request count
+  - active session ratio
+  - scheduler drift average/max
+- Extended observed DTOs and JSONL output while keeping the existing `ObservedMetricsSnapshot` envelope.
+- Extended load validation summaries with bottleneck fields.
+- Added focused tests for server telemetry, observed metrics, load runner metrics, load validation summaries, and smoke server telemetry.
+- Ran focused `s5-random-10k` validation with logging reduced.
 - Archived PDCA docs under:
-  - `docs/archive/2026-04/fastport-loadrunner/`
+  - `docs/archive/2026-04/10k-load-bottleneck-telemetry/`
 
-### FastPortSmokeServer + Telemetry
+## 10K Focused Run Result
 
-- Added generic telemetry primitives in `LibNetworks.Telemetry`.
-- Instrumented:
-  - accept success/failure
-  - disconnects
-  - connected sessions
-  - received/sent packets and bytes
-  - socket errors
-  - parse/protocol errors
-- Added `FastPortSmokeServer` as a dedicated smoke/test server.
-- Moved echo/protocol smoke responsibility out of `FastPortServer`.
-- Added integration smoke tests:
-  - fixed 1K payload
-  - random 4K-16K payload
-- Latest verified result before commit:
-  - `dotnet build FastPortCharp.sln` passed
-  - `dotnet test FastPortCharp.sln --no-build` passed, 56 tests
-- Archived PDCA docs under:
-  - `docs/archive/2026-04/fastport-smoke-server/`
+Focused run artifact path:
+
+- `artifacts/load-validation/s5-logging-off/summary.md`
+- `artifacts/load-validation/s5-logging-off/summary.json`
+- `artifacts/load-validation/s5-logging-off/s5-random-10k.metrics.jsonl`
+
+Important result:
+
+| Metric | Value |
+|--------|------:|
+| Target sessions | 10,000 |
+| Peak current sessions | 8,624 |
+| Peak session ratio | 86.24% |
+| Final disconnect count | 1,782 |
+| Max socket error rate | 0.19% |
+| Max pending request count | 55,695 |
+| Max scheduler drift | 28.21 ms |
+| Max RTT P95 | 43,268.80 ms |
+| Max RTT P99 | 44,895.97 ms |
+| Connect attempts | 10,000 |
+| Connect failures | 0 |
+
+Interpretation:
+
+- Connect establishment was not the primary failure point in this focused run.
+- The problem appears after successful connections: disconnect/socket-error pressure plus request backlog accumulation.
+- Client-only JSONL is insufficient for the next diagnosis because `serverObserved` is still `null` in LoadRunner output.
+
+## Active Next Work
+
+Current active feature:
+
+```text
+server-telemetry-export-merge-socket-error-classification
+```
+
+Plan document:
+
+```text
+docs/01-plan/features/server-telemetry-export-merge-socket-error-classification.plan.md
+```
+
+Recommended next command:
+
+```text
+$pdca design server-telemetry-export-merge-socket-error-classification
+```
+
+Primary scope:
+
+- Export `FastPortSmokeServer` server observed telemetry to JSONL.
+- Merge client and server metrics in `FastPortLoadValidation`.
+- Include server backlog fields in validation summaries.
+- Classify client socket errors by phase/type/code.
+- Preserve client-only metrics compatibility.
 
 ## Important Architecture Decisions
 
-- `FastPortServer` should remain a basic, ready-to-use network engine host/sample.
-- Test protocol behavior, telemetry smoke logic, and LoadRunner compatibility checks belong in `FastPortSmokeServer`.
-- `LibNetworks` may expose protocol-neutral telemetry primitives, but it should not know game protocol details.
-- Future game servers should be able to use the engine without inheriting smoke-specific echo logic.
+- `LibNetworks` should stay protocol-neutral.
+- Smoke/load-test behavior belongs in `FastPortSmokeServer`, `FastPortLoadRunner`, and `FastPortLoadValidation`.
+- `FastPortServer` should remain a basic network engine host/sample.
+- The observed metrics envelope should remain:
+  - root `timestamp`
+  - `clientObserved`
+  - `serverObserved`
+- High-load generated artifacts remain under `artifacts/load-validation/` and should not be committed.
 
-## Key Files
+## Verification Recently Run
 
-- `FastPortLoadRunner/`
-- `FastPortSmokeServer/`
-- `FastPortServer/`
-- `LibNetworks/Telemetry/ServerTelemetry.cs`
-- `LibCommonTest/FastPortSmokeServerTests.cs`
-- `LibCommonTest/ServerTelemetryTests.cs`
-- `docs/.pdca-status.json`
-- `docs/archive/2026-04/fastport-loadrunner/`
-- `docs/archive/2026-04/fastport-smoke-server/`
-
-## Remaining Known Limits
-
-- `sentPackets` currently means socket send completion count, not exact FastPort packet count.
-- `receivedBytes` currently uses parsed packet size, not raw socket receive bytes.
-- Negative smoke tests for malformed packet / wrong protocol id are not implemented.
-- 1,000 / 3,000 / 5,000 / 10,000 staged load validation has not been run.
-- There is no telemetry export API yet for MAUI dashboard consumption.
-
-## Recommended Next Work
-
-Recommended next PDCA:
-
-```text
-$pdca pm telemetry-export-metric-contract
+```bash
+dotnet build FastPortCharp.sln
+dotnet test FastPortCharp.sln --no-build
+dotnet build FastPortCharp.sln -c Release
+./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation --profile staged --stage s5-random-10k --output artifacts/load-validation/s5-logging-off
 ```
 
-Rationale:
+Results:
 
-- MAUI dashboard and staged load validation both need stable metric names and exact semantics first.
-- The current telemetry fields are useful, but some names need a clear contract:
-  - packet count vs socket completion count
-  - parsed packet bytes vs raw socket bytes
-  - client-observed vs server-observed metrics
-
-Suggested scope:
-
-- Define a server/client metric contract.
-- Decide exact field names and units.
-- Add a telemetry snapshot/export surface usable by dashboard clients.
-- Add focused tests for metric semantics.
-
-Alternative next PDCA options:
-
-```text
-$pdca pm staged-load-validation
-$pdca pm maui-dashboard
-$pdca pm game-server-template
-```
+- Debug build passed with 0 warnings and 0 errors.
+- Test suite passed: 72 passed, 0 failed.
+- Release build passed with 0 warnings and 0 errors.
+- Focused 10K validation produced artifacts but failed thresholds, as expected for the bottleneck investigation.
 
 ## Suggested Commands
 
@@ -123,17 +142,16 @@ Build:
 dotnet build FastPortCharp.sln
 ```
 
-Inspect recent commits:
+Inspect active PDCA:
 
-```bash
-git log --oneline -5
+```text
+$pdca status
 ```
 
 ## Notes For Next Session
 
-- If continuing with PDCA, start by checking:
-  - `docs/.pdca-status.json`
-  - latest archive docs under `docs/archive/2026-04/`
-- Do not move telemetry-specific echo behavior back into `FastPortServer`.
-- Keep new telemetry export work protocol-neutral unless it belongs explicitly to `FastPortSmokeServer`.
-- Commit `HANDOFF.md` separately if it should be preserved in repo history.
+- Start by checking `docs/.pdca-status.json`.
+- Continue with the design phase for `server-telemetry-export-merge-socket-error-classification`.
+- Do not move echo/smoke protocol behavior back into `FastPortServer`.
+- Add server telemetry export at the application layer, not as protocol-specific logic inside `LibNetworks`.
+- Keep socket error classification useful for 10K diagnosis but avoid making it a production monitoring framework in this feature.

@@ -126,8 +126,8 @@ public sealed class FastPortLoadValidationTests
         JsonlReadResult readResult = new(
             [
                 CreateSample(currentSessions: 9, targetSessions: 10, totalReceivedPackets: 10, tps: 10),
-                CreateSample(currentSessions: 10, targetSessions: 10, totalReceivedPackets: 20, tps: 12),
-                CreateSample(currentSessions: 10, targetSessions: 10, totalReceivedPackets: 30, tps: 15)
+                CreateSample(currentSessions: 10, targetSessions: 10, totalReceivedPackets: 20, tps: 12, maxPendingRequestCount: 7, schedulerDriftMaxMs: 2.5),
+                CreateSample(currentSessions: 10, targetSessions: 10, totalReceivedPackets: 30, tps: 15, maxPendingRequestCount: 3, schedulerDriftMaxMs: 1.5)
             ],
             []);
         var evaluator = new LoadValidationEvaluator();
@@ -139,6 +139,11 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(1.0, summary.PeakSessionRatio);
         Assert.AreEqual(30, summary.TotalReceivedPackets);
         Assert.AreEqual(15, summary.MaxTps);
+        Assert.AreEqual(7, summary.MaxPendingRequestCount);
+        Assert.AreEqual(2.5, summary.MaxSchedulerDriftMs);
+        Assert.AreEqual(1.0, summary.MaxActiveSessionRatio);
+        Assert.AreEqual(10, summary.FinalConnectAttemptCount);
+        Assert.AreEqual(0, summary.FinalConnectFailureCount);
     }
 
     [TestMethod]
@@ -218,6 +223,10 @@ public sealed class FastPortLoadValidationTests
         string json = await File.ReadAllTextAsync(Path.Combine(directory, "summary.json"));
         using JsonDocument document = JsonDocument.Parse(json);
         Assert.IsTrue(document.RootElement.GetProperty("passed").GetBoolean());
+
+        string markdown = await File.ReadAllTextAsync(Path.Combine(directory, "summary.md"));
+        StringAssert.Contains(markdown, "Max Pending Req");
+        StringAssert.Contains(markdown, "RTT P99");
     }
 
     private static LoadValidationStage CreateStage(int targetSessions)
@@ -238,7 +247,10 @@ public sealed class FastPortLoadValidationTests
         int targetSessions,
         long totalReceivedPackets = 1,
         double tps = 1,
-        double socketErrorRate = 0)
+        double socketErrorRate = 0,
+        long maxPendingRequestCount = 0,
+        double schedulerDriftMaxMs = 0,
+        long connectFailureCount = 0)
     {
         return new ClientObservedMetricsSnapshot(
             Timestamp: new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
@@ -260,7 +272,14 @@ public sealed class FastPortLoadValidationTests
             ConnectCount: currentSessions,
             DisconnectCount: 0,
             SocketErrorCount: socketErrorRate > 0 ? 1 : 0,
-            SocketErrorRate: socketErrorRate);
+            SocketErrorRate: socketErrorRate,
+            ConnectAttemptCount: currentSessions + connectFailureCount,
+            ConnectFailureCount: connectFailureCount,
+            PendingRequestCount: 0,
+            MaxPendingRequestCount: maxPendingRequestCount,
+            ActiveSessionRatio: targetSessions <= 0 ? 0 : currentSessions / (double)targetSessions,
+            SchedulerDriftAverageMs: schedulerDriftMaxMs,
+            SchedulerDriftMaxMs: schedulerDriftMaxMs);
     }
 
     private static string CreateTempDirectory()

@@ -1,8 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-28T06:57:09Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
+  "lastUpdated": "2026-04-29T02:16:19.356Z",
+  "activeFeatures": [
+    "server-telemetry-export-merge-socket-error-classification"
+  ],
+  "primaryFeature": "server-telemetry-export-merge-socket-error-classification",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -264,6 +266,95 @@
       "completedAt": "2026-04-28T05:44:27.654Z",
       "archivedAt": "2026-04-28T06:57:09Z",
       "archivePath": "docs/archive/2026-04/staged-load-validation"
+    },
+    "10k-load-bottleneck-telemetry": {
+      "phase": "archived",
+      "matchRate": 100,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-04/10k-load-bottleneck-telemetry/10k-load-bottleneck-telemetry.plan.md",
+        "design": "docs/archive/2026-04/10k-load-bottleneck-telemetry/10k-load-bottleneck-telemetry.design.md",
+        "do": "docs/archive/2026-04/10k-load-bottleneck-telemetry/10k-load-bottleneck-telemetry.do.md",
+        "analysis": "docs/archive/2026-04/10k-load-bottleneck-telemetry/10k-load-bottleneck-telemetry.analysis.md",
+        "report": "docs/archive/2026-04/10k-load-bottleneck-telemetry/10k-load-bottleneck-telemetry.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-28T08:50:55.698Z",
+          "completedAt": "2026-04-28T08:52:18.030Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-28T08:50:55.698Z",
+          "completedAt": "2026-04-28T08:58:29.379Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-28T08:50:55.698Z",
+          "completedAt": "2026-04-29T01:23:21.464Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-28T08:50:55.698Z",
+          "completedAt": "2026-04-29T01:31:57.369Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-28T08:50:55.698Z",
+          "completedAt": "2026-04-29T02:08:56.241Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-28T08:50:55.700Z",
+        "lastUpdated": "2026-04-29T02:11:19Z"
+      },
+      "completedAt": "2026-04-29T02:08:56.240Z",
+      "archivedAt": "2026-04-29T02:11:19Z",
+      "archivePath": "docs/archive/2026-04/10k-load-bottleneck-telemetry"
+    },
+    "server-telemetry-export-merge-socket-error-classification": {
+      "phase": "design",
+      "matchRate": null,
+      "iterationCount": 0,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-29T02:15:02.660Z",
+          "completedAt": "2026-04-29T02:16:19.356Z"
+        },
+        {
+          "phase": "design",
+          "status": "active",
+          "createdAt": "2026-04-29T02:15:02.660Z"
+        },
+        {
+          "phase": "do",
+          "status": "pending",
+          "createdAt": "2026-04-29T02:15:02.660Z"
+        },
+        {
+          "phase": "check",
+          "status": "pending",
+          "createdAt": "2026-04-29T02:15:02.660Z"
+        },
+        {
+          "phase": "report",
+          "status": "pending",
+          "createdAt": "2026-04-29T02:15:02.660Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-29T02:15:02.662Z",
+        "lastUpdated": "2026-04-29T02:16:19.356Z"
+      }
     }
   },
   "pipeline": {
@@ -274,7 +365,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-28T06:57:09Z"
+    "lastActivity": "2026-04-29T02:16:19.356Z"
   },
   "history": [
     {
@@ -636,6 +727,110 @@
       "phase": "archived",
       "archivePath": "docs/archive/2026-04/staged-load-validation",
       "timestamp": "2026-04-28T06:57:09Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-28T08:52:18.024Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-28T08:52:18.026Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-28T08:55:10.858Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-28T08:56:54.997Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-28T08:58:29.376Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-28T08:58:29.377Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-29T01:23:21.457Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-29T01:23:21.462Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-29T01:31:57.364Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-29T01:31:57.368Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "from": "act",
+      "to": "report",
+      "timestamp": "2026-04-29T02:07:46.074Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-29T02:07:46.081Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-29T02:08:56.240Z"
+    },
+    {
+      "feature": "10k-load-bottleneck-telemetry",
+      "action": "archive",
+      "phase": "archived",
+      "archivePath": "docs/archive/2026-04/10k-load-bottleneck-telemetry",
+      "timestamp": "2026-04-29T02:11:19Z"
+    },
+    {
+      "feature": "server-telemetry-export-merge-socket-error-classification",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-29T02:16:19.355Z"
+    },
+    {
+      "feature": "server-telemetry-export-merge-socket-error-classification",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-29T02:16:19.355Z"
     }
   ]
 }

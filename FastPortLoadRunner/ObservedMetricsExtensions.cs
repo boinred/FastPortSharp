@@ -26,6 +26,13 @@ internal static class ObservedMetricsExtensions
             snapshot.AcceptCount,
             snapshot.DisconnectCount,
             snapshot.SocketErrorCount,
-            snapshot.SocketErrorRate);
+            snapshot.SocketErrorRate,
+            snapshot.ConnectAttemptCount,
+            snapshot.ConnectFailureCount,
+            snapshot.PendingRequestCount,
+            snapshot.MaxPendingRequestCount,
+            snapshot.ActiveSessionRatio,
+            snapshot.SchedulerDriftAverageMs,
+            snapshot.SchedulerDriftMaxMs);
     }
 }

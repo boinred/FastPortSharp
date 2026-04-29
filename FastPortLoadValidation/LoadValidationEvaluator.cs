@@ -46,6 +46,8 @@ internal sealed class LoadValidationEvaluator
 
         long totalSentPackets = finalSample?.TotalSentPackets ?? 0;
         long totalReceivedPackets = finalSample?.TotalReceivedPackets ?? 0;
+        long finalConnectAttemptCount = finalSample?.ConnectAttemptCount ?? 0;
+        long finalConnectFailureCount = finalSample?.ConnectFailureCount ?? 0;
         double maxTps = samples.Count == 0 ? 0 : samples.Max(sample => sample.Tps);
 
         if (totalReceivedPackets <= 0)
@@ -75,6 +77,11 @@ internal sealed class LoadValidationEvaluator
             samples.Count == 0 ? 0 : samples.Max(sample => sample.RttP99Ms),
             samples.Count,
             metricsPath,
-            failures);
+            failures,
+            FinalConnectAttemptCount: finalConnectAttemptCount,
+            FinalConnectFailureCount: finalConnectFailureCount,
+            MaxPendingRequestCount: samples.Count == 0 ? 0 : samples.Max(sample => sample.MaxPendingRequestCount),
+            MaxSchedulerDriftMs: samples.Count == 0 ? 0 : samples.Max(sample => sample.SchedulerDriftMaxMs),
+            MaxActiveSessionRatio: samples.Count == 0 ? 0 : samples.Max(sample => sample.ActiveSessionRatio));
     }
 }

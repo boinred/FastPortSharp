@@ -48,7 +48,12 @@ internal sealed record LoadValidationStageSummary(
     double MaxRttP99Ms,
     int JsonSamples,
     string MetricsPath,
-    IReadOnlyList<string> Failures);
+    IReadOnlyList<string> Failures,
+    long FinalConnectAttemptCount = 0,
+    long FinalConnectFailureCount = 0,
+    long MaxPendingRequestCount = 0,
+    double MaxSchedulerDriftMs = 0,
+    double MaxActiveSessionRatio = 0);
 
 internal sealed record LoadValidationRunSummary(
     string RunId,

@@ -17,6 +17,23 @@ internal sealed class MetricsCollector(int targetSessions)
     private long _acceptCount;
     private long _disconnectCount;
     private long _socketErrorCount;
+    private long _connectAttemptCount;
+    private long _connectFailureCount;
+    private long _pendingRequestCount;
+    private long _maxPendingRequestCount;
+    private long _schedulerDriftSampleCount;
+    private long _schedulerDriftTotalMicroseconds;
+    private long _schedulerDriftMaxMicroseconds;
+
+    public void RecordConnectAttempt()
+    {
+        Interlocked.Increment(ref _connectAttemptCount);
+    }
+
+    public void RecordConnectFailure()
+    {
+        Interlocked.Increment(ref _connectFailureCount);
+    }
 
     public void RecordSessionConnected()
     {
@@ -44,17 +61,33 @@ internal sealed class MetricsCollector(int targetSessions)
     {
         Interlocked.Increment(ref _totalSentPackets);
         Interlocked.Add(ref _totalSentBytes, bytes);
+        long pending = Interlocked.Increment(ref _pendingRequestCount);
+        UpdateMax(ref _maxPendingRequestCount, pending);
     }
 
     public void RecordReceivedPacket(int bytes)
     {
         Interlocked.Increment(ref _totalReceivedPackets);
         Interlocked.Add(ref _totalReceivedBytes, bytes);
+        DecrementIfPositive(ref _pendingRequestCount);
     }
 
     public void RecordSocketError()
     {
         Interlocked.Increment(ref _socketErrorCount);
+    }
+
+    public void RecordSchedulerDrift(double driftMs)
+    {
+        if (driftMs <= 0)
+        {
+            return;
+        }
+
+        long driftMicroseconds = (long)Math.Round(driftMs * 1000, MidpointRounding.AwayFromZero);
+        Interlocked.Increment(ref _schedulerDriftSampleCount);
+        Interlocked.Add(ref _schedulerDriftTotalMicroseconds, driftMicroseconds);
+        UpdateMax(ref _schedulerDriftMaxMicroseconds, driftMicroseconds);
     }
 
     public void RecordRtt(long clientSendTimestamp, long clientReceiveTimestamp)
@@ -84,6 +117,7 @@ internal sealed class MetricsCollector(int targetSessions)
         long acceptCount = Interlocked.Read(ref _acceptCount);
         long disconnectCount = Interlocked.Read(ref _disconnectCount);
         long connectedSessions = Interlocked.Read(ref _connectedSessions);
+        long schedulerDriftSampleCount = Interlocked.Read(ref _schedulerDriftSampleCount);
 
         double elapsedSeconds = previous is null
             ? 0
@@ -114,7 +148,42 @@ internal sealed class MetricsCollector(int targetSessions)
             acceptCount,
             disconnectCount,
             socketErrors,
-            errorRate);
+            errorRate,
+            Interlocked.Read(ref _connectAttemptCount),
+            Interlocked.Read(ref _connectFailureCount),
+            Interlocked.Read(ref _pendingRequestCount),
+            Interlocked.Read(ref _maxPendingRequestCount),
+            targetSessions <= 0 ? 0 : connectedSessions / (double)targetSessions,
+            schedulerDriftSampleCount <= 0 ? 0 : Interlocked.Read(ref _schedulerDriftTotalMicroseconds) / (double)schedulerDriftSampleCount / 1000,
+            Interlocked.Read(ref _schedulerDriftMaxMicroseconds) / 1000.0);
+    }
+
+    private static void UpdateMax(ref long target, long value)
+    {
+        long current;
+        do
+        {
+            current = Interlocked.Read(ref target);
+            if (value <= current)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref target, value, current) != current);
+    }
+
+    private static void DecrementIfPositive(ref long target)
+    {
+        long current;
+        do
+        {
+            current = Interlocked.Read(ref target);
+            if (current <= 0)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref target, current - 1, current) != current);
     }
 
     private RttStats CalculateRtt()
@@ -175,7 +244,14 @@ internal sealed record MetricsSnapshot(
     long AcceptCount,
     long DisconnectCount,
     long SocketErrorCount,
-    double SocketErrorRate);
+    double SocketErrorRate,
+    long ConnectAttemptCount = 0,
+    long ConnectFailureCount = 0,
+    long PendingRequestCount = 0,
+    long MaxPendingRequestCount = 0,
+    double ActiveSessionRatio = 0,
+    double SchedulerDriftAverageMs = 0,
+    double SchedulerDriftMaxMs = 0);
 
 internal interface IMetricsReporter
 {
@@ -190,7 +266,9 @@ internal sealed class ConsoleMetricsReporter : IMetricsReporter
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            long expectedTimestamp = MetricsReporterClock.GetExpectedTimestamp(interval);
             await Task.Delay(interval, cancellationToken);
+            MetricsReporterClock.RecordDrift(metricsCollector, expectedTimestamp);
             MetricsSnapshot snapshot = metricsCollector.CreateSnapshot(previous);
             previous = snapshot;
             Console.WriteLine(Format(snapshot));
@@ -246,7 +324,9 @@ internal sealed class JsonMetricsReporter : IMetricsReporter, IDisposable
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            long expectedTimestamp = MetricsReporterClock.GetExpectedTimestamp(interval);
             await Task.Delay(interval, cancellationToken);
+            MetricsReporterClock.RecordDrift(metricsCollector, expectedTimestamp);
             MetricsSnapshot snapshot = metricsCollector.CreateSnapshot(previous);
             previous = snapshot;
 
@@ -266,5 +346,30 @@ internal sealed class JsonMetricsReporter : IMetricsReporter, IDisposable
     public void Dispose()
     {
         _writer.Dispose();
+    }
+}
+
+internal static class MetricsReporterClock
+{
+    public static long GetExpectedTimestamp(TimeSpan interval)
+    {
+        return Stopwatch.GetTimestamp() + ToStopwatchTicks(interval);
+    }
+
+    public static void RecordDrift(MetricsCollector metricsCollector, long expectedTimestamp)
+    {
+        long actualTimestamp = Stopwatch.GetTimestamp();
+        long driftTicks = actualTimestamp - expectedTimestamp;
+        if (driftTicks <= 0)
+        {
+            return;
+        }
+
+        metricsCollector.RecordSchedulerDrift(driftTicks * 1000.0 / Stopwatch.Frequency);
+    }
+
+    private static long ToStopwatchTicks(TimeSpan interval)
+    {
+        return Math.Max(0, (long)(interval.TotalSeconds * Stopwatch.Frequency));
     }
 }

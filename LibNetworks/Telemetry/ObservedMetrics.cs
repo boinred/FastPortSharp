@@ -49,7 +49,14 @@ public sealed record ClientObservedMetricsSnapshot(
     long ConnectCount,
     long DisconnectCount,
     long SocketErrorCount,
-    double SocketErrorRate);
+    double SocketErrorRate,
+    long ConnectAttemptCount = 0,
+    long ConnectFailureCount = 0,
+    long PendingRequestCount = 0,
+    long MaxPendingRequestCount = 0,
+    double ActiveSessionRatio = 0,
+    double SchedulerDriftAverageMs = 0,
+    double SchedulerDriftMaxMs = 0);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,
@@ -70,7 +77,15 @@ public sealed record ServerObservedMetricsSnapshot(
     long SocketErrorCount,
     long ParseErrorCount,
     long ProtocolErrorCount,
-    double SocketErrorRate)
+    double SocketErrorRate,
+    long TotalSendRequests = 0,
+    long PendingSendRequests = 0,
+    long MaxPendingSendRequests = 0,
+    double SendRequestsPerSecond = 0,
+    long SendBackpressureEvents = 0,
+    double SendBackpressureEventsPerSecond = 0,
+    long SendBufferBytes = 0,
+    long MaxSendBufferBytes = 0)
 {
     public static ServerObservedMetricsSnapshot FromTelemetry(
         ServerTelemetrySnapshot current,
@@ -99,7 +114,15 @@ public sealed record ServerObservedMetricsSnapshot(
             current.SocketErrors,
             current.ParseErrors,
             current.ProtocolErrors,
-            current.SocketErrorRate);
+            current.SocketErrorRate,
+            TotalSendRequests: current.SendRequests,
+            PendingSendRequests: current.PendingSendRequests,
+            MaxPendingSendRequests: current.MaxPendingSendRequests,
+            SendRequestsPerSecond: Rate(current.SendRequests, previous?.TotalSendRequests, elapsedSeconds),
+            SendBackpressureEvents: current.SendBackpressureEvents,
+            SendBackpressureEventsPerSecond: Rate(current.SendBackpressureEvents, previous?.SendBackpressureEvents, elapsedSeconds),
+            SendBufferBytes: current.SendBufferBytes,
+            MaxSendBufferBytes: current.MaxSendBufferBytes);
     }
 
     private static double Rate(long current, long? previous, double elapsedSeconds)

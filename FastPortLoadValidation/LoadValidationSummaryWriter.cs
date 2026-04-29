@@ -45,8 +45,8 @@ internal sealed class LoadValidationSummaryWriter
             $"Started: {summary.StartedAt:O}",
             $"Completed: {summary.CompletedAt:O}",
             string.Empty,
-            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Socket Errors | Samples |",
-            "|-------|--------|--------|------|------------|---------|---------------|---------|"
+            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
+            "|-------|--------|--------|------|------------|---------|-----------------|-----------|---------|---------|---------------|---------|"
         };
 
         foreach (LoadValidationStageSummary stage in summary.Stages)
@@ -60,6 +60,10 @@ internal sealed class LoadValidationSummaryWriter
                 stage.PeakCurrentSessions.ToString(),
                 stage.PeakSessionRatio.ToString("P2"),
                 stage.MaxTps.ToString("F2"),
+                stage.MaxPendingRequestCount.ToString(),
+                $"{stage.MaxSchedulerDriftMs:F2}ms",
+                $"{stage.MaxRttP95Ms:F2}ms",
+                $"{stage.MaxRttP99Ms:F2}ms",
                 stage.MaxSocketErrorRate.ToString("P2"),
                 stage.JsonSamples.ToString(),
                 string.Empty));
