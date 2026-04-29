@@ -17,6 +17,7 @@ internal sealed class LoadSession(
     private const int ProtocolHeaderSize = 4;
 
     private long _requestId;
+    private long _outstandingRequests;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -89,10 +90,13 @@ internal sealed class LoadSession(
         while (!cancellationToken.IsCancellationRequested)
         {
             long startedAt = Stopwatch.GetTimestamp();
+            await WaitForPendingRequestBudgetAsync(interval, cancellationToken);
+
             byte[] packet = CreateEchoRequestPacket();
 
             await stream.WriteAsync(packet, cancellationToken);
             await stream.FlushAsync(cancellationToken);
+            IncrementOutstandingRequests();
             metricsCollector.RecordSentPacket(packet.Length);
 
             TimeSpan elapsed = Stopwatch.GetElapsedTime(startedAt);
@@ -166,7 +170,7 @@ internal sealed class LoadSession(
         return packet;
     }
 
-    private bool ParseEchoResponse(byte[] body)
+    internal bool ParseEchoResponse(byte[] body)
     {
         int packetId = BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(0, ProtocolHeaderSize));
         if (packetId != (int)ProtocolId.Tests)
@@ -182,6 +186,8 @@ internal sealed class LoadSession(
             {
                 metricsCollector.RecordRtt((long)response.Header.ClientSendTs, Stopwatch.GetTimestamp());
             }
+
+            DecrementOutstandingRequests();
         }
         catch (Exception ex)
         {
@@ -207,6 +213,46 @@ internal sealed class LoadSession(
         }
 
         return true;
+    }
+
+    internal long OutstandingRequests => Interlocked.Read(ref _outstandingRequests);
+
+    internal async Task WaitForPendingRequestBudgetAsync(TimeSpan interval, CancellationToken cancellationToken)
+    {
+        int? maxPendingRequestsPerSession = scenario.MaxPendingRequestsPerSession;
+        if (maxPendingRequestsPerSession is null)
+        {
+            return;
+        }
+
+        TimeSpan delay = interval < TimeSpan.FromMilliseconds(1)
+            ? interval
+            : TimeSpan.FromMilliseconds(1);
+
+        while (!cancellationToken.IsCancellationRequested
+            && Interlocked.Read(ref _outstandingRequests) >= maxPendingRequestsPerSession.Value)
+        {
+            await Task.Delay(delay, cancellationToken);
+        }
+    }
+
+    internal void IncrementOutstandingRequests()
+    {
+        Interlocked.Increment(ref _outstandingRequests);
+    }
+
+    internal void DecrementOutstandingRequests()
+    {
+        long current;
+        do
+        {
+            current = Interlocked.Read(ref _outstandingRequests);
+            if (current <= 0)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref _outstandingRequests, current - 1, current) != current);
     }
 }
 

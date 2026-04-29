@@ -20,6 +20,8 @@ public interface IServerTelemetry
 
     void RecordSendRejected(int bytes, int queuedBytes);
 
+    void RecordSendDrainYield(int queuedBytes);
+
     void RecordSendBufferSample(int queuedBytes);
 
     void RecordSocketError();
@@ -49,6 +51,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     private long _sendBackpressureEvents;
     private long _sendRejectedRequests;
     private long _sendRejectedBytes;
+    private long _sendDrainYieldCount;
+    private long _maxSendDrainYieldQueuedBytes;
     private long _sendBufferBytes;
     private long _maxSendBufferBytes;
     private long _acceptErrors;
@@ -133,6 +137,16 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         RecordSendBufferSample(queuedBytes);
     }
 
+    public void RecordSendDrainYield(int queuedBytes)
+    {
+        Interlocked.Increment(ref _sendDrainYieldCount);
+        if (queuedBytes >= 0)
+        {
+            UpdateMax(ref _maxSendDrainYieldQueuedBytes, queuedBytes);
+            RecordSendBufferSample(queuedBytes);
+        }
+    }
+
     public void RecordSendBufferSample(int queuedBytes)
     {
         if (queuedBytes < 0)
@@ -192,6 +206,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             SendBackpressureEvents: Interlocked.Read(ref _sendBackpressureEvents),
             SendRejectedRequests: Interlocked.Read(ref _sendRejectedRequests),
             SendRejectedBytes: Interlocked.Read(ref _sendRejectedBytes),
+            SendDrainYieldCount: Interlocked.Read(ref _sendDrainYieldCount),
+            MaxSendDrainYieldQueuedBytes: Interlocked.Read(ref _maxSendDrainYieldQueuedBytes),
             SendBufferBytes: Interlocked.Read(ref _sendBufferBytes),
             MaxSendBufferBytes: Interlocked.Read(ref _maxSendBufferBytes));
     }
@@ -210,6 +226,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         Interlocked.Exchange(ref _sendBackpressureEvents, 0);
         Interlocked.Exchange(ref _sendRejectedRequests, 0);
         Interlocked.Exchange(ref _sendRejectedBytes, 0);
+        Interlocked.Exchange(ref _sendDrainYieldCount, 0);
+        Interlocked.Exchange(ref _maxSendDrainYieldQueuedBytes, 0);
         Interlocked.Exchange(ref _sendBufferBytes, 0);
         Interlocked.Exchange(ref _maxSendBufferBytes, 0);
         Interlocked.Exchange(ref _acceptErrors, 0);
@@ -291,6 +309,10 @@ public sealed class NullServerTelemetry : IServerTelemetry
     {
     }
 
+    public void RecordSendDrainYield(int queuedBytes)
+    {
+    }
+
     public void RecordSendBufferSample(int queuedBytes)
     {
     }
@@ -337,5 +359,7 @@ public sealed record ServerTelemetrySnapshot(
     long SendBackpressureEvents = 0,
     long SendRejectedRequests = 0,
     long SendRejectedBytes = 0,
+    long SendDrainYieldCount = 0,
+    long MaxSendDrainYieldQueuedBytes = 0,
     long SendBufferBytes = 0,
     long MaxSendBufferBytes = 0);

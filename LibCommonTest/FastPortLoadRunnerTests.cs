@@ -1,6 +1,11 @@
+using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Net.Sockets;
+using FastPort.Protocols.Commons;
+using FastPort.Protocols.Tests;
 using FastPortLoadRunner;
+using Google.Protobuf;
 
 namespace LibCommonTest;
 
@@ -23,6 +28,7 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(1), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(1), options.MetricsInterval);
         Assert.IsNull(options.OutputPath);
+        Assert.IsNull(options.MaxPendingRequestsPerSession);
     }
 
     [TestMethod]
@@ -38,7 +44,8 @@ public sealed class FastPortLoadRunnerTests
             "--ramp-up", "60s",
             "--duration", "5m",
             "--metrics-interval", "2s",
-            "--output", "metrics.jsonl"
+            "--output", "metrics.jsonl",
+            "--max-pending-requests-per-session", "4"
         ];
 
         bool result = LoadRunnerOptions.TryParse(args, out var options, out var errorMessage);
@@ -55,6 +62,7 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(5), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(2), options.MetricsInterval);
         Assert.AreEqual("metrics.jsonl", options.OutputPath);
+        Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
     }
 
     [TestMethod]
@@ -65,6 +73,7 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--rate", "0"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--duration", "5x"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--payload", "random:16384-4096"], out _, out _));
+        Assert.IsFalse(LoadRunnerOptions.TryParse(["--max-pending-requests-per-session", "0"], out _, out _));
     }
 
     [TestMethod]
@@ -106,6 +115,54 @@ public sealed class FastPortLoadRunnerTests
         byte[] payload = generator.CreatePayload();
 
         Assert.AreEqual(128, payload.Length);
+    }
+
+    [TestMethod]
+    public async Task LoadSession_WaitForPendingRequestBudget_BlocksUntilOutstandingDrops()
+    {
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
+        session.IncrementOutstandingRequests();
+
+        Task waitTask = session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            CancellationToken.None);
+
+        await Task.Delay(50);
+        Assert.IsFalse(waitTask.IsCompleted);
+
+        session.DecrementOutstandingRequests();
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.AreEqual(0, session.OutstandingRequests);
+    }
+
+    [TestMethod]
+    public async Task LoadSession_WaitForPendingRequestBudget_CancellationExitsGate()
+    {
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
+        session.IncrementOutstandingRequests();
+        using var cancellationSource = new CancellationTokenSource();
+
+        Task waitTask = session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            cancellationSource.Token);
+
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await waitTask);
+    }
+
+    [TestMethod]
+    public void LoadSession_ParseEchoResponse_DecrementsOutstandingRequestsOnValidResponse()
+    {
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
+        session.IncrementOutstandingRequests();
+        byte[] body = CreateEchoResponseBody();
+
+        bool parsed = session.ParseEchoResponse(body);
+
+        Assert.IsTrue(parsed);
+        Assert.AreEqual(0, session.OutstandingRequests);
     }
 
     [TestMethod]
@@ -162,6 +219,45 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsTrue(snapshot.SentBytesPerSecond > 0);
         Assert.IsTrue(snapshot.ReceivedBytesPerSecond > 0);
         Assert.IsTrue(snapshot.SocketErrorRate > 0);
+    }
+
+    private static LoadSession CreateLoadSession(int? maxPendingRequestsPerSession)
+    {
+        var scenario = new LoadScenario(
+            Host: "127.0.0.1",
+            Port: 1,
+            Sessions: 1,
+            Payload: PayloadProfile.Fixed(1),
+            SendRatePerSession: 1,
+            RampUp: TimeSpan.Zero,
+            Duration: TimeSpan.FromSeconds(1),
+            MetricsInterval: TimeSpan.FromSeconds(1),
+            OutputPath: null,
+            MaxPendingRequestsPerSession: maxPendingRequestsPerSession);
+
+        return new LoadSession(
+            sessionId: 1,
+            scenario,
+            new PayloadGenerator(PayloadProfile.Fixed(1), seed: 1),
+            new MetricsCollector(targetSessions: 1));
+    }
+
+    private static byte[] CreateEchoResponseBody()
+    {
+        var response = new EchoResponse
+        {
+            Header = new Header
+            {
+                RequestId = 1,
+                ClientSendTs = (ulong)Stopwatch.GetTimestamp()
+            },
+            Data = ByteString.CopyFrom([1])
+        };
+        byte[] message = response.ToByteArray();
+        byte[] body = new byte[4 + message.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(body.AsSpan(0, 4), (int)ProtocolId.Tests);
+        message.CopyTo(body.AsSpan(4));
+        return body;
     }
 
     [TestMethod]

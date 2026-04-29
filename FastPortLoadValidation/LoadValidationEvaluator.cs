@@ -124,10 +124,13 @@ internal sealed class LoadValidationEvaluator
             MaxSendBackpressureEvents: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendBackpressureEvents),
             MaxSendRejectedRequests: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedRequests),
             MaxSendRejectedBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedBytes),
+            MaxSendDrainYieldCount: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendDrainYieldCount),
+            MaxSendDrainYieldQueuedBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxSendDrainYieldQueuedBytes),
             MaxSendBufferBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxSendBufferBytes),
             MaxSendRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRequestsPerSecond),
             MaxSendCompletionsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendCompletionsPerSecond),
             MaxSendRejectedRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedRequestsPerSecond),
+            MaxSendDrainYieldCountPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendDrainYieldCountPerSecond),
             SocketErrorCountsByPhase: CopyCounters(finalSample?.SocketErrorCountsByPhase),
             SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass));
     }

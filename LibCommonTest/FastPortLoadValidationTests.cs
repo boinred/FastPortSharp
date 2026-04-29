@@ -20,6 +20,7 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual("Release", options.Configuration);
         Assert.IsNull(options.ServerMetricsPath);
         Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.MergeTolerance);
+        Assert.IsNull(options.MaxPendingRequestsPerSession);
         Assert.IsFalse(options.DryRun);
         Assert.IsFalse(options.ContinueOnFailure);
         StringAssert.Contains(options.OutputDirectory, Path.Combine("artifacts", "load-validation"));
@@ -39,6 +40,7 @@ public sealed class FastPortLoadValidationTests
             "--configuration", "Debug",
             "--server-metrics", "server.metrics.jsonl",
             "--merge-tolerance-ms", "2500",
+            "--max-pending-requests-per-session", "4",
             "--dry-run",
             "--continue-on-failure"
         ];
@@ -55,6 +57,7 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual("Debug", options.Configuration);
         Assert.AreEqual("server.metrics.jsonl", options.ServerMetricsPath);
         Assert.AreEqual(TimeSpan.FromMilliseconds(2500), options.MergeTolerance);
+        Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
         Assert.IsTrue(options.DryRun);
         Assert.IsTrue(options.ContinueOnFailure);
     }
@@ -87,6 +90,7 @@ public sealed class FastPortLoadValidationTests
             Configuration: "Release",
             ServerMetricsPath: null,
             MergeTolerance: TimeSpan.FromMilliseconds(1500),
+            MaxPendingRequestsPerSession: 4,
             DryRun: false,
             ContinueOnFailure: false);
         LoadValidationStage stage = LoadValidationProfiles.Get("staged").Stages[^1];
@@ -100,7 +104,9 @@ public sealed class FastPortLoadValidationTests
         CollectionAssert.Contains(command.Arguments.ToArray(), "random:4096-16384");
         CollectionAssert.Contains(command.Arguments.ToArray(), "120s");
         CollectionAssert.Contains(command.Arguments.ToArray(), "5m");
-        StringAssert.EndsWith(command.Arguments[^1], Path.Combine("out", "s5-random-10k.metrics.jsonl"));
+        CollectionAssert.Contains(command.Arguments.ToArray(), Path.Combine("out", "s5-random-10k.metrics.jsonl"));
+        CollectionAssert.Contains(command.Arguments.ToArray(), "--max-pending-requests-per-session");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "4");
     }
 
     [TestMethod]
@@ -239,6 +245,9 @@ public sealed class FastPortLoadValidationTests
             sendRejectedRequests: 5,
             sendRejectedBytes: 8192,
             sendRejectedRequestsPerSecond: 2.5,
+            sendDrainYieldCount: 7,
+            maxSendDrainYieldQueuedBytes: 2048,
+            sendDrainYieldCountPerSecond: 3.5,
             maxSendBufferBytes: 4096);
         JsonlReadResult readResult = new([client, client, client], []);
         JsonlObservedMetricsReadResult serverReadResult = new(
@@ -272,6 +281,9 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(5, summary.MaxSendRejectedRequests);
         Assert.AreEqual(8192, summary.MaxSendRejectedBytes);
         Assert.AreEqual(2.5, summary.MaxSendRejectedRequestsPerSecond);
+        Assert.AreEqual(7, summary.MaxSendDrainYieldCount);
+        Assert.AreEqual(2048, summary.MaxSendDrainYieldQueuedBytes);
+        Assert.AreEqual(3.5, summary.MaxSendDrainYieldCountPerSecond);
         Assert.AreEqual(4096, summary.MaxSendBufferBytes);
         Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
         Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
@@ -359,6 +371,7 @@ public sealed class FastPortLoadValidationTests
         StringAssert.Contains(markdown, "Max Pending Req");
         StringAssert.Contains(markdown, "Max Pending Send");
         StringAssert.Contains(markdown, "Rejected Send");
+        StringAssert.Contains(markdown, "Drain Yield");
         StringAssert.Contains(markdown, "RTT P99");
     }
 
@@ -427,6 +440,9 @@ public sealed class FastPortLoadValidationTests
         long sendRejectedRequests = 0,
         long sendRejectedBytes = 0,
         double sendRejectedRequestsPerSecond = 0,
+        long sendDrainYieldCount = 0,
+        long maxSendDrainYieldQueuedBytes = 0,
+        double sendDrainYieldCountPerSecond = 0,
         long maxSendBufferBytes = 0)
     {
         return new ServerObservedMetricsSnapshot(
@@ -459,6 +475,9 @@ public sealed class FastPortLoadValidationTests
             SendRejectedRequestsPerSecond: sendRejectedRequestsPerSecond,
             SendRejectedBytes: sendRejectedBytes,
             SendRejectedBytesPerSecond: 0,
+            SendDrainYieldCount: sendDrainYieldCount,
+            SendDrainYieldCountPerSecond: sendDrainYieldCountPerSecond,
+            MaxSendDrainYieldQueuedBytes: maxSendDrainYieldQueuedBytes,
             SendBufferBytes: maxSendBufferBytes,
             MaxSendBufferBytes: maxSendBufferBytes);
     }

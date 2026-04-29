@@ -8,34 +8,43 @@ internal sealed class LoadRunnerCommandBuilder
     public LoadRunnerCommand Build(LoadValidationOptions options, LoadValidationStage stage)
     {
         string metricsPath = GetMetricsPath(options.OutputDirectory, stage);
+        var arguments = new List<string>
+        {
+            "run",
+            "-c",
+            options.Configuration,
+            "--project",
+            options.RunnerProject,
+            "--",
+            "--host",
+            options.Host,
+            "--port",
+            options.Port.ToString(CultureInfo.InvariantCulture),
+            "--sessions",
+            stage.Sessions.ToString(CultureInfo.InvariantCulture),
+            "--payload",
+            stage.Payload,
+            "--rate",
+            stage.SendRatePerSession.ToString(CultureInfo.InvariantCulture),
+            "--ramp-up",
+            FormatSeconds(stage.RampUp),
+            "--duration",
+            FormatDuration(stage.Duration),
+            "--metrics-interval",
+            FormatDuration(stage.MetricsInterval),
+            "--output",
+            metricsPath
+        };
+
+        if (options.MaxPendingRequestsPerSession is int maxPendingRequestsPerSession)
+        {
+            arguments.Add("--max-pending-requests-per-session");
+            arguments.Add(maxPendingRequestsPerSession.ToString(CultureInfo.InvariantCulture));
+        }
+
         return new LoadRunnerCommand(
             "dotnet",
-            [
-                "run",
-                "-c",
-                options.Configuration,
-                "--project",
-                options.RunnerProject,
-                "--",
-                "--host",
-                options.Host,
-                "--port",
-                options.Port.ToString(CultureInfo.InvariantCulture),
-                "--sessions",
-                stage.Sessions.ToString(CultureInfo.InvariantCulture),
-                "--payload",
-                stage.Payload,
-                "--rate",
-                stage.SendRatePerSession.ToString(CultureInfo.InvariantCulture),
-                "--ramp-up",
-                FormatSeconds(stage.RampUp),
-                "--duration",
-                FormatDuration(stage.Duration),
-                "--metrics-interval",
-                FormatDuration(stage.MetricsInterval),
-                "--output",
-                metricsPath
-            ]);
+            arguments);
     }
 
     public static string GetMetricsPath(string outputDirectory, LoadValidationStage stage)

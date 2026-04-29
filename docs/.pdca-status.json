@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-29T05:37:41Z",
+  "lastUpdated": "2026-04-29T08:13:46Z",
   "activeFeatures": [
     "server-telemetry-export-merge-socket-error-classification"
   ],
@@ -416,6 +416,62 @@
       "completedAt": "2026-04-29T05:32:19.920Z",
       "archivedAt": "2026-04-29T05:37:41Z",
       "archivePath": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization"
+    },
+    "client-send-buffer-pressure-receive-flow-control": {
+      "phase": "archived",
+      "matchRate": 100,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control/client-send-buffer-pressure-receive-flow-control.plan.md",
+        "design": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control/client-send-buffer-pressure-receive-flow-control.design.md",
+        "analysis": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control/client-send-buffer-pressure-receive-flow-control.analysis.md",
+        "report": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control/client-send-buffer-pressure-receive-flow-control.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T05:58:50.994Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T06:08:29.868Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T06:29:07.448Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T06:33:39.884Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T06:42:20.970Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-29T05:56:57.445Z",
+          "completedAt": "2026-04-29T07:45:40.296Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-29T05:56:57.447Z",
+        "lastUpdated": "2026-04-29T08:13:46Z"
+      },
+      "completedAt": "2026-04-29T07:45:40.295Z",
+      "archivedAt": "2026-04-29T08:13:46Z",
+      "archivePath": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control"
     }
   },
   "pipeline": {
@@ -426,7 +482,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-29T05:37:41Z"
+    "lastActivity": "2026-04-29T08:13:46Z"
   },
   "history": [
     {
@@ -1002,6 +1058,84 @@
       "action": "archive",
       "archivePath": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization",
       "timestamp": "2026-04-29T05:37:41Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-29T05:58:50.990Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-29T05:58:50.992Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-29T06:05:27.806Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-29T06:08:29.865Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-29T06:08:29.866Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-29T06:29:07.442Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-29T06:29:07.447Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-29T06:33:39.870Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-29T06:33:39.882Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "from": "act",
+      "to": "report",
+      "timestamp": "2026-04-29T06:42:20.968Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-29T06:42:20.969Z"
+    },
+    {
+      "feature": "client-send-buffer-pressure-receive-flow-control",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-29T07:45:40.296Z"
     }
   ]
 }

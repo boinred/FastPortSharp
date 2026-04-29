@@ -9,7 +9,8 @@ internal sealed record LoadRunnerOptions(
     TimeSpan RampUp,
     TimeSpan Duration,
     TimeSpan MetricsInterval,
-    string? OutputPath)
+    string? OutputPath,
+    int? MaxPendingRequestsPerSession)
 {
     public LoadScenario ToScenario()
     {
@@ -22,7 +23,8 @@ internal sealed record LoadRunnerOptions(
             RampUp,
             Duration,
             MetricsInterval,
-            OutputPath);
+            OutputPath,
+            MaxPendingRequestsPerSession);
     }
 
     public static bool TryParse(string[] args, out LoadRunnerOptions options, out string errorMessage)
@@ -36,6 +38,7 @@ internal sealed record LoadRunnerOptions(
         TimeSpan duration = TimeSpan.FromMinutes(1);
         TimeSpan metricsInterval = TimeSpan.FromSeconds(1);
         string? outputPath = null;
+        int? maxPendingRequestsPerSession = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -119,6 +122,16 @@ internal sealed record LoadRunnerOptions(
                 case "--output":
                     outputPath = value;
                     break;
+                case "--max-pending-requests-per-session":
+                    if (!int.TryParse(value, out int parsedMaxPendingRequestsPerSession) || parsedMaxPendingRequestsPerSession <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--max-pending-requests-per-session must be greater than zero.";
+                        return false;
+                    }
+
+                    maxPendingRequestsPerSession = parsedMaxPendingRequestsPerSession;
+                    break;
                 default:
                     options = default!;
                     errorMessage = $"Unknown option '{arg}'.";
@@ -126,7 +139,17 @@ internal sealed record LoadRunnerOptions(
             }
         }
 
-        options = new LoadRunnerOptions(host, port, sessions, payload, sendRatePerSession, rampUp, duration, metricsInterval, outputPath);
+        options = new LoadRunnerOptions(
+            host,
+            port,
+            sessions,
+            payload,
+            sendRatePerSession,
+            rampUp,
+            duration,
+            metricsInterval,
+            outputPath,
+            maxPendingRequestsPerSession);
         errorMessage = string.Empty;
         return true;
     }
@@ -148,6 +171,8 @@ internal sealed record LoadRunnerOptions(
           --duration <duration>          Test duration. Examples: 5m, 1h. Default: 1m
           --metrics-interval <duration>  Metrics reporting interval. Default: 1s
           --output <path>                Optional JSONL metrics output file.
+          --max-pending-requests-per-session <count>
+                                          Optional per-session outstanding request cap.
           --help                         Show help.
 
         Examples:
@@ -166,7 +191,8 @@ internal sealed record LoadScenario(
     TimeSpan RampUp,
     TimeSpan Duration,
     TimeSpan MetricsInterval,
-    string? OutputPath);
+    string? OutputPath,
+    int? MaxPendingRequestsPerSession);
 
 internal enum PayloadMode
 {

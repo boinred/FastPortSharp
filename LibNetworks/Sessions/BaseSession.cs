@@ -431,8 +431,18 @@ public abstract class BaseSession
                 await m_SendSignal.WaitAsync(cancellationToken);
                 Interlocked.Exchange(ref m_SendSignalPosted, 0);
 
+                int drainedBytesThisWake = 0;
+                int sendOperationsThisWake = 0;
+
                 while (!cancellationToken.IsCancellationRequested && m_SendBuffers.CanReadSize > 0)
                 {
+                    if (IsSendDrainBudgetExhausted(drainedBytesThisWake, sendOperationsThisWake))
+                    {
+                        RecordSendDrainYieldAndResignal();
+                        await Task.Yield();
+                        break;
+                    }
+
                     var socket = m_Socket;
                     if (socket == null || !socket.Connected)
                     {
@@ -442,7 +452,8 @@ public abstract class BaseSession
                     int queuedBytes = m_SendBuffers.CanReadSize;
                     ServerTelemetry.RecordSendBufferSample(queuedBytes);
 
-                    int readSize = Math.Min(queuedBytes, m_SendOptions.NormalizedSendChunkBytes);
+                    int remainingBudgetBytes = m_SendOptions.NormalizedMaxDrainBytesPerSignal - drainedBytesThisWake;
+                    int readSize = Math.Min(Math.Min(queuedBytes, m_SendOptions.NormalizedSendChunkBytes), remainingBudgetBytes);
                     byte[] sendBuffers = new byte[readSize];
                     int peekedSize = m_SendBuffers.Peek(ref sendBuffers);
                     if (peekedSize <= 0)
@@ -455,14 +466,14 @@ public abstract class BaseSession
                     int sentSize;
                     try
                     {
-                        sentSize = await socket.SendAsync(sendBuffers.AsMemory(0, peekedSize), SocketFlags.None, cancellationToken);
+                        sentSize = await SendSocketAsync(socket, sendBuffers.AsMemory(0, peekedSize), cancellationToken);
                     }
                     catch (SocketException ex) when (IsTransientSendBackpressure(ex.SocketErrorCode))
                     {
                         ServerTelemetry.RecordSocketError();
                         ServerTelemetry.RecordSendBackpressure();
                         m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Transient SocketException : {ex.SocketErrorCode}, {ex.Message}");
-                        await Task.Delay(1, cancellationToken);
+                        await WaitTransientSendBackoffAsync(cancellationToken);
                         continue;
                     }
                     catch (SocketException ex)
@@ -484,6 +495,8 @@ public abstract class BaseSession
                     CompletePendingSendRequests(drainedSize);
                     ServerTelemetry.RecordSent(drainedSize);
                     ServerTelemetry.RecordSendBufferSample(m_SendBuffers.CanReadSize);
+                    drainedBytesThisWake += drainedSize;
+                    sendOperationsThisWake++;
                 }
             }
         }
@@ -507,6 +520,44 @@ public abstract class BaseSession
     {
         return socketError == SocketError.NoBufferSpaceAvailable
             || socketError == SocketError.WouldBlock;
+    }
+
+    protected virtual ValueTask<int> SendSocketAsync(
+        Socket socket,
+        ReadOnlyMemory<byte> sendBuffers,
+        CancellationToken cancellationToken)
+    {
+        return socket.SendAsync(sendBuffers, SocketFlags.None, cancellationToken);
+    }
+
+    private bool IsSendDrainBudgetExhausted(int drainedBytesThisWake, int sendOperationsThisWake)
+    {
+        return drainedBytesThisWake >= m_SendOptions.NormalizedMaxDrainBytesPerSignal
+            || sendOperationsThisWake >= m_SendOptions.NormalizedMaxDrainOperationsPerSignal;
+    }
+
+    private void RecordSendDrainYieldAndResignal()
+    {
+        int queuedBytes = m_SendBuffers.CanReadSize;
+        if (queuedBytes <= 0)
+        {
+            return;
+        }
+
+        ServerTelemetry.RecordSendDrainYield(queuedBytes);
+        SignalSendLoop();
+    }
+
+    private async Task WaitTransientSendBackoffAsync(CancellationToken cancellationToken)
+    {
+        int backoffMs = m_SendOptions.NormalizedTransientSendBackoffMs;
+        if (backoffMs <= 0)
+        {
+            await Task.Yield();
+            return;
+        }
+
+        await Task.Delay(backoffMs, cancellationToken);
     }
 
     private void SignalSendLoop()

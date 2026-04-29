@@ -39,6 +39,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSent(100);
         telemetry.RecordSendCompleted();
         telemetry.RecordSendBackpressure();
+        telemetry.RecordSendDrainYield(700);
         telemetry.RecordSendRejected(300, queuedBytes: 900);
 
         ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
@@ -49,6 +50,8 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(1, snapshot.SendBackpressureEvents);
         Assert.AreEqual(1, snapshot.SendRejectedRequests);
         Assert.AreEqual(300, snapshot.SendRejectedBytes);
+        Assert.AreEqual(1, snapshot.SendDrainYieldCount);
+        Assert.AreEqual(700, snapshot.MaxSendDrainYieldQueuedBytes);
         Assert.AreEqual(900, snapshot.SendBufferBytes);
         Assert.AreEqual(900, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(1, snapshot.SentPackets);
@@ -66,6 +69,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSent(256);
         telemetry.RecordSendBackpressure();
         telemetry.RecordSendRejected(512, queuedBytes: 1024);
+        telemetry.RecordSendDrainYield(256);
         telemetry.RecordSocketError();
         telemetry.RecordParseError();
         telemetry.RecordProtocolError();
@@ -87,6 +91,8 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.SendBackpressureEvents);
         Assert.AreEqual(0, snapshot.SendRejectedRequests);
         Assert.AreEqual(0, snapshot.SendRejectedBytes);
+        Assert.AreEqual(0, snapshot.SendDrainYieldCount);
+        Assert.AreEqual(0, snapshot.MaxSendDrainYieldQueuedBytes);
         Assert.AreEqual(0, snapshot.SendBufferBytes);
         Assert.AreEqual(0, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(0, snapshot.SocketErrors);

@@ -92,6 +92,9 @@ public sealed record ServerObservedMetricsSnapshot(
     double SendRejectedRequestsPerSecond = 0,
     long SendRejectedBytes = 0,
     double SendRejectedBytesPerSecond = 0,
+    long SendDrainYieldCount = 0,
+    double SendDrainYieldCountPerSecond = 0,
+    long MaxSendDrainYieldQueuedBytes = 0,
     long SendBufferBytes = 0,
     long MaxSendBufferBytes = 0)
 {
@@ -133,6 +136,9 @@ public sealed record ServerObservedMetricsSnapshot(
             SendRejectedRequestsPerSecond: Rate(current.SendRejectedRequests, previous?.SendRejectedRequests, elapsedSeconds),
             SendRejectedBytes: current.SendRejectedBytes,
             SendRejectedBytesPerSecond: Rate(current.SendRejectedBytes, previous?.SendRejectedBytes, elapsedSeconds),
+            SendDrainYieldCount: current.SendDrainYieldCount,
+            SendDrainYieldCountPerSecond: Rate(current.SendDrainYieldCount, previous?.SendDrainYieldCount, elapsedSeconds),
+            MaxSendDrainYieldQueuedBytes: current.MaxSendDrainYieldQueuedBytes,
             SendBufferBytes: current.SendBufferBytes,
             MaxSendBufferBytes: current.MaxSendBufferBytes);
     }

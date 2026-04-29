@@ -64,10 +64,13 @@ internal sealed record LoadValidationStageSummary(
     long MaxSendBackpressureEvents = 0,
     long MaxSendRejectedRequests = 0,
     long MaxSendRejectedBytes = 0,
+    long MaxSendDrainYieldCount = 0,
+    long MaxSendDrainYieldQueuedBytes = 0,
     long MaxSendBufferBytes = 0,
     double MaxSendRequestsPerSecond = 0,
     double MaxSendCompletionsPerSecond = 0,
     double MaxSendRejectedRequestsPerSecond = 0,
+    double MaxSendDrainYieldCountPerSecond = 0,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 

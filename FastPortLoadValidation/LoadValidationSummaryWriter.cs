@@ -64,8 +64,8 @@ internal sealed class LoadValidationSummaryWriter
             $"Started: {summary.StartedAt:O}",
             $"Completed: {summary.CompletedAt:O}",
             string.Empty,
-            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
-            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------|-----------|---------|---------|---------------|---------|"
+            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Drain Yield | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
+            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------------|-------|-----------|---------|---------|---------------|---------|"
         };
 
         foreach (LoadValidationStageSummary stage in summary.Stages)
@@ -83,6 +83,7 @@ internal sealed class LoadValidationSummaryWriter
                 stage.MaxPendingSendRequests.ToString(),
                 stage.MaxSendBackpressureEvents.ToString(),
                 $"{stage.MaxSendRejectedRequests}/{stage.MaxSendRejectedBytes}",
+                $"{stage.MaxSendDrainYieldCount}/{stage.MaxSendDrainYieldQueuedBytes}",
                 $"{stage.MergedSamples}/{stage.UnmatchedClientSamples}",
                 $"{stage.MaxSchedulerDriftMs:F2}ms",
                 $"{stage.MaxRttP95Ms:F2}ms",
