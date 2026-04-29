@@ -10,7 +10,7 @@
 - Completed and archived PDCA feature: `10k-load-bottleneck-telemetry`
 - Completed PDCA feature: `server-telemetry-export-merge-socket-error-classification`
 - Match rate: 96%
-- Current recommended action: run focused 10K with server telemetry export enabled
+- Current recommended action: analyze server-merged 10K result and tune send/backpressure path
 - Project level detected by bkit: `Starter`
 
 ## Completed Since Previous Handoff
@@ -94,25 +94,67 @@ Interpretation:
 - The problem appears after successful connections: disconnect/socket-error pressure plus request backlog accumulation.
 - Client-only JSONL is insufficient for the next diagnosis because `serverObserved` is still `null` in LoadRunner output.
 
+## 10K Server-Merged Run Result
+
+Focused server-merged run artifact path:
+
+- `artifacts/load-validation/s5-server-merged/summary.md`
+- `artifacts/load-validation/s5-server-merged/summary.json`
+- `artifacts/load-validation/s5-server-merged/server.metrics.jsonl`
+- `artifacts/load-validation/s5-server-merged/s5-random-10k.metrics.jsonl`
+- `artifacts/load-validation/s5-server-merged/s5-random-10k.combined.metrics.jsonl`
+
+Important result:
+
+| Metric | Value |
+|--------|------:|
+| Target sessions | 10,000 |
+| Peak current sessions | 8,611 |
+| Peak session ratio | 86.11% |
+| Final disconnect count | 1,855 |
+| Max socket error rate | 0.70% |
+| Connect attempts | 10,000 |
+| Connect failures | 0 |
+| Max pending request count | 52,820 |
+| Max pending send requests | 180,466 |
+| Server send backpressure events | 878,503 |
+| Max send buffer bytes | 2,649,731 |
+| Server samples | 422 |
+| Merged samples | 421 |
+| Unmatched client samples | 0 |
+| Max merge skew | 793.683 ms |
+| Max RTT P95 | 28,754.76 ms |
+| Max RTT P99 | 29,912.06 ms |
+
+Socket classification:
+
+| Class | Count |
+|-------|------:|
+| `send|IOException|NoBufferSpaceAvailable` | 6,586 |
+| `send|IOException|Shutdown` | 1,314 |
+| `receive|IOException|ConnectionReset` | 149 |
+
+Interpretation:
+
+- Connect establishment is still not the primary failure point.
+- The server-merged run confirms severe server send backlog: max pending send requests reached 180,466.
+- Client socket errors are dominated by send-side `NoBufferSpaceAvailable`, which points to socket/send buffer pressure rather than protocol parse failures.
+- Next optimization should target send queue/backpressure behavior before changing protocol or connect logic.
+
 ## Next Work
 
-Recommended focused run:
+Recommended next feature:
 
-```bash
-./FastPortSmokeServer/bin/Release/net10.0/FastPortSmokeServer \
-  --Logging:LogLevel:Default Warning \
-  --Logging:LogLevel:Microsoft Warning \
-  --Telemetry:Output artifacts/load-validation/s5-server-merged/server.metrics.jsonl \
-  --Telemetry:IntervalSeconds 1
+```text
+server-send-backpressure-queue-drain-optimization
 ```
 
-```bash
-./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation \
-  --profile staged \
-  --stage s5-random-10k \
-  --output artifacts/load-validation/s5-server-merged \
-  --server-metrics artifacts/load-validation/s5-server-merged/server.metrics.jsonl
-```
+Primary investigation targets:
+
+- avoid unbounded send request accumulation
+- reduce server send queue copies and large queued buffer growth
+- introduce explicit send backpressure/drop/defer policy for load-test echo responses
+- compare send requests per second vs send completions per second during 10K
 
 Optional PDCA cleanup after review:
 
@@ -148,6 +190,7 @@ Results:
 - Release build passed with 0 warnings and 0 errors.
 - Focused 10K validation produced artifacts but failed thresholds, as expected for the bottleneck investigation.
 - Reduced smoke export/merge passed.
+- Focused server-merged 10K produced complete server/client combined artifacts and failed expected thresholds.
 - Reduced smoke artifacts:
   - `artifacts/load-validation/server-merge-smoke/server.metrics.jsonl` (45 lines)
   - `artifacts/load-validation/server-merge-smoke/smoke-fixed-10.combined.metrics.jsonl` (11 lines)
@@ -185,4 +228,4 @@ $pdca status
 - Do not move echo/smoke protocol behavior back into `FastPortServer`.
 - Server telemetry export is intentionally application-layer code in `FastPortSmokeServer`.
 - Socket classification is intentionally diagnosis-oriented, not a production monitoring framework.
-- Next useful data point is a focused `s5-random-10k` run with `--server-metrics`.
+- Next useful work is send/backpressure optimization based on the server-merged 10K result.

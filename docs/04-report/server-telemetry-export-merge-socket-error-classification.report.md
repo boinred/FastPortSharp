@@ -118,3 +118,51 @@ Run the focused 10K stage with server export enabled:
 ```
 
 Use the resulting `summary.json` and combined JSONL to decide whether the next optimization should target server send backlog, client receive/send path, or OS/socket pressure.
+
+## Post-Report Focused 10K Result
+
+The focused run was executed with server telemetry export enabled.
+
+Artifacts:
+
+- `artifacts/load-validation/s5-server-merged/summary.md`
+- `artifacts/load-validation/s5-server-merged/summary.json`
+- `artifacts/load-validation/s5-server-merged/server.metrics.jsonl`
+- `artifacts/load-validation/s5-server-merged/s5-random-10k.metrics.jsonl`
+- `artifacts/load-validation/s5-server-merged/s5-random-10k.combined.metrics.jsonl`
+
+Result:
+
+| Metric | Value |
+|--------|------:|
+| Status | Failed |
+| Peak current sessions | 8,611 / 10,000 |
+| Peak session ratio | 86.11% |
+| Final disconnect count | 1,855 |
+| Connect attempts | 10,000 |
+| Connect failures | 0 |
+| Max socket error rate | 0.70% |
+| Max pending request count | 52,820 |
+| Max pending send requests | 180,466 |
+| Server send backpressure events | 878,503 |
+| Max send buffer bytes | 2,649,731 |
+| Server samples | 422 |
+| Merged samples | 421 |
+| Unmatched client samples | 0 |
+| Max merge skew | 793.683 ms |
+| Max RTT P95 | 28,754.76 ms |
+| Max RTT P99 | 29,912.06 ms |
+
+Socket error classification:
+
+| Class | Count |
+|-------|------:|
+| `send|IOException|NoBufferSpaceAvailable` | 6,586 |
+| `send|IOException|Shutdown` | 1,314 |
+| `receive|IOException|ConnectionReset` | 149 |
+
+Conclusion:
+
+- Connection establishment is not the primary failure point.
+- The bottleneck is strongly aligned with server send backlog and socket/send buffer pressure.
+- The next PDCA should target send queue/backpressure behavior before protocol or connect-path changes.
