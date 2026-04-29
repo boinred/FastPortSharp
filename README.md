@@ -80,6 +80,8 @@ FastPortSharp is a framework for high-performance network communication. It achi
 
 👉 **[View Full Benchmark Results](docs/baseline-benchmark-results.md)**
 
+👉 **[View 10K Load Validation Results](docs/load-validation-benchmark-results.md)**
+
 ### Running Load Tests
 
 ```bash
@@ -98,6 +100,7 @@ dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload
 | **Lock-optimized Performance Report** | Performance test after applying ArrayPool + .NET 10 Lock | [📄 View](docs/latency-performance-report-after-lock.md) |
 | **Channel-optimized Performance Report** | Performance test after applying full optimizations | [📄 View](docs/latency-performance-report-after-channel.md) |
 | **Historical Benchmark Results** | Component-specific micro benchmark results captured before the load runner migration | [📄 View](docs/baseline-benchmark-results.md) |
+| **10K Load Validation Results** | Same-machine 10K load validation comparison for server send backpressure optimization | [📄 View](docs/load-validation-benchmark-results.md) |
 
 ### Optimization Summary
 

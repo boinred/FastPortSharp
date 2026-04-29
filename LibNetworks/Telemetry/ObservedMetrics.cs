@@ -88,6 +88,10 @@ public sealed record ServerObservedMetricsSnapshot(
     double SendRequestsPerSecond = 0,
     long SendBackpressureEvents = 0,
     double SendBackpressureEventsPerSecond = 0,
+    long SendRejectedRequests = 0,
+    double SendRejectedRequestsPerSecond = 0,
+    long SendRejectedBytes = 0,
+    double SendRejectedBytesPerSecond = 0,
     long SendBufferBytes = 0,
     long MaxSendBufferBytes = 0)
 {
@@ -125,6 +129,10 @@ public sealed record ServerObservedMetricsSnapshot(
             SendRequestsPerSecond: Rate(current.SendRequests, previous?.TotalSendRequests, elapsedSeconds),
             SendBackpressureEvents: current.SendBackpressureEvents,
             SendBackpressureEventsPerSecond: Rate(current.SendBackpressureEvents, previous?.SendBackpressureEvents, elapsedSeconds),
+            SendRejectedRequests: current.SendRejectedRequests,
+            SendRejectedRequestsPerSecond: Rate(current.SendRejectedRequests, previous?.SendRejectedRequests, elapsedSeconds),
+            SendRejectedBytes: current.SendRejectedBytes,
+            SendRejectedBytesPerSecond: Rate(current.SendRejectedBytes, previous?.SendRejectedBytes, elapsedSeconds),
             SendBufferBytes: current.SendBufferBytes,
             MaxSendBufferBytes: current.MaxSendBufferBytes);
     }

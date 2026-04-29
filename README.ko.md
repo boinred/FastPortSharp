@@ -80,6 +80,8 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 
 👉 **[전체 벤치마크 결과 보기](docs/baseline-benchmark-results.md)**
 
+👉 **[10K 부하 검증 결과 보기](docs/load-validation-benchmark-results.md)**
+
 ### 부하 테스트 실행
 
 ```bash
@@ -98,6 +100,7 @@ dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload
 | **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-lock.md) |
 | **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-channel.md) |
 | **기존 벤치마크 결과** | LoadRunner 전환 전에 측정한 컴포넌트별 micro benchmark 결과 | [📄 보기](docs/baseline-benchmark-results.md) |
+| **10K 부하 검증 결과** | server send backpressure 최적화 전후 same-machine 10K 비교 | [📄 보기](docs/load-validation-benchmark-results.md) |
 
 ### 최적화 효과 요약
 

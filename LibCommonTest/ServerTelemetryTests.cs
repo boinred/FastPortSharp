@@ -37,7 +37,9 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSendRequested(100, queuedBytes: 512);
         telemetry.RecordSendRequested(200, queuedBytes: 768);
         telemetry.RecordSent(100);
+        telemetry.RecordSendCompleted();
         telemetry.RecordSendBackpressure();
+        telemetry.RecordSendRejected(300, queuedBytes: 900);
 
         ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
 
@@ -45,8 +47,10 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(1, snapshot.PendingSendRequests);
         Assert.AreEqual(2, snapshot.MaxPendingSendRequests);
         Assert.AreEqual(1, snapshot.SendBackpressureEvents);
-        Assert.AreEqual(768, snapshot.SendBufferBytes);
-        Assert.AreEqual(768, snapshot.MaxSendBufferBytes);
+        Assert.AreEqual(1, snapshot.SendRejectedRequests);
+        Assert.AreEqual(300, snapshot.SendRejectedBytes);
+        Assert.AreEqual(900, snapshot.SendBufferBytes);
+        Assert.AreEqual(900, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(1, snapshot.SentPackets);
         Assert.AreEqual(100, snapshot.SentBytes);
     }
@@ -61,6 +65,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSendRequested(256, queuedBytes: 512);
         telemetry.RecordSent(256);
         telemetry.RecordSendBackpressure();
+        telemetry.RecordSendRejected(512, queuedBytes: 1024);
         telemetry.RecordSocketError();
         telemetry.RecordParseError();
         telemetry.RecordProtocolError();
@@ -80,6 +85,8 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.PendingSendRequests);
         Assert.AreEqual(0, snapshot.MaxPendingSendRequests);
         Assert.AreEqual(0, snapshot.SendBackpressureEvents);
+        Assert.AreEqual(0, snapshot.SendRejectedRequests);
+        Assert.AreEqual(0, snapshot.SendRejectedBytes);
         Assert.AreEqual(0, snapshot.SendBufferBytes);
         Assert.AreEqual(0, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(0, snapshot.SocketErrors);

@@ -20,7 +20,6 @@ public abstract class BaseSession
     private readonly byte[] m_ReceivedSocketBuffers = new byte[1024 * 8]; // 8KB
 
     private readonly SocketAsyncEventArgs m_SocketEventsReceived = new SocketAsyncEventArgs();
-    private readonly SocketAsyncEventArgs m_SockenEventsSent = new SocketAsyncEventArgs();
 
     // Session이 Disconnected 되었을 경우 호출 함수
     public Action? OnEventSessionDisconnected;
@@ -29,6 +28,10 @@ public abstract class BaseSession
 
     private readonly LibCommons.IBuffers m_ReceivedBuffers;
     private readonly LibCommons.IBuffers m_SendBuffers;
+    private readonly SessionSendOptions m_SendOptions;
+    private readonly SemaphoreSlim m_SendSignal = new SemaphoreSlim(0, 1);
+    private readonly SendCompletionTracker m_SendCompletionTracker = new SendCompletionTracker();
+    private int m_SendSignalPosted;
     protected IServerTelemetry ServerTelemetry { get; }
 
     private readonly Task m_TaskReceivedBuffers;
@@ -46,15 +49,27 @@ public abstract class BaseSession
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
-        : this(logger, socket, receivedBuffers, sendbuffers, NullServerTelemetry.Instance)
+        : this(logger, socket, receivedBuffers, sendbuffers, NullServerTelemetry.Instance, SessionSendOptions.Default)
     {
     }
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers, IServerTelemetry serverTelemetry)
+        : this(logger, socket, receivedBuffers, sendbuffers, serverTelemetry, SessionSendOptions.Default)
+    {
+    }
+
+    public BaseSession(
+        ILogger<BaseSession> logger,
+        System.Net.Sockets.Socket socket,
+        LibCommons.IBuffers receivedBuffers,
+        LibCommons.IBuffers sendbuffers,
+        IServerTelemetry serverTelemetry,
+        SessionSendOptions? sendOptions)
     {
         m_Logger = logger;
         m_Socket = socket;
         ServerTelemetry = serverTelemetry;
+        m_SendOptions = sendOptions ?? SessionSendOptions.Default;
 
         // 10초마다 KeepAlive 신호를 보내도록 설정 (Windows에서는 레지스트리 수정 필요)
         m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
@@ -71,9 +86,6 @@ public abstract class BaseSession
         m_SocketEventsReceived.SetBuffer(m_ReceivedSocketBuffers, 0, m_ReceivedSocketBuffers.Length);
         m_SocketEventsReceived.Completed += OnSocketEventsReceivedCompleted;
         m_SocketEventsReceived.UserToken = this;
-
-        m_SockenEventsSent.Completed += OnSocketEventsSentCompleted;
-        m_SockenEventsSent.UserToken = this;
 
         // Bounded Channel 생성 (용량 제한으로 메모리 사용 제어)
         m_ReceivedPackets = Channel.CreateBounded<LibCommons.BasePacket>(new BoundedChannelOptions(1000)
@@ -161,38 +173,6 @@ public abstract class BaseSession
 
         RequestReceived();
     }
-
-    private void OnSocketEventsSentCompleted(object? sender, SocketAsyncEventArgs e)
-    {
-        if (e.SocketError == SocketError.IOPending)
-        {
-            m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Socket IOPeding.");
-            return;
-        }
-
-        if (e.BytesTransferred <= 0)
-        {
-            m_Logger.LogInformation($"BaseSession, OnSocketEventsSentCompleted, Disconnected. BytesTransferred is zero.");
-            RequestDisconnect();
-
-            return;
-        }
-
-        if (e.SocketError != SocketError.Success)
-        {
-            ServerTelemetry.RecordSocketError();
-            m_Logger.LogInformation($"BaseSession, OnSocketEventsSentCompleted, Disconnected. SocketError : {e.SocketError}");
-
-            RequestDisconnect();
-
-            return;
-        }
-
-        m_Logger.LogDebug($"BaseSession, OnSocketEventsSentCompleted, Dran Buffer Length : {e.BytesTransferred}");
-        ServerTelemetry.RecordSent(e.BytesTransferred);
-        m_SendBuffers.Drain(e.BytesTransferred);
-    }
-
 
     public void RequestDisconnect()
     {
@@ -292,13 +272,36 @@ public abstract class BaseSession
 
     protected void RequestSendBuffers(ReadOnlySpan<byte> buffers)
     {
+        _ = TryRequestSendBuffers(buffers);
+    }
+
+    protected bool TryRequestSendBuffers(ReadOnlySpan<byte> buffers)
+    {
         if (buffers.Length <= 0)
         {
             m_Logger.LogError($"BaseSession, RequestSendBuffers, Buffers is zero.");
-            return;
+            return false;
         }
 
-        ushort buffersSize = (ushort)(buffers.Length + BasePacket.HeaderSize);
+        int buffersSize = buffers.Length + BasePacket.HeaderSize;
+        if (buffersSize > ushort.MaxValue)
+        {
+            m_Logger.LogError("BaseSession, RequestSendBuffers, Packet is too large. Buffer Length:{BufferLength}", buffers.Length);
+            return false;
+        }
+
+        int queuedBefore = m_SendBuffers.CanReadSize;
+        if (queuedBefore + buffersSize > m_SendOptions.NormalizedMaxQueuedBytes)
+        {
+            ServerTelemetry.RecordSendBackpressure();
+            ServerTelemetry.RecordSendRejected(buffersSize, queuedBefore);
+            m_Logger.LogDebug(
+                "BaseSession, RequestSendBuffers, Send rejected. Buffer Length:{BufferLength}, QueuedBytes:{QueuedBytes}, MaxQueuedBytes:{MaxQueuedBytes}",
+                buffersSize,
+                queuedBefore,
+                m_SendOptions.NormalizedMaxQueuedBytes);
+            return false;
+        }
 
         // List로 바꾸는 것도 고려
         byte[] sendBuffers = new byte[buffersSize];
@@ -313,10 +316,14 @@ public abstract class BaseSession
         int writtenSize = m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
         int queuedBytes = m_SendBuffers.CanReadSize;
         ServerTelemetry.RecordSendRequested(writtenSize, queuedBytes);
+        TrackPendingSendRequest(writtenSize);
         if (queuedBytes > SendBufferBackpressureThresholdBytes)
         {
             ServerTelemetry.RecordSendBackpressure();
         }
+
+        SignalSendLoop();
+        return true;
     }
 
     protected void RequestSendString(string message)
@@ -330,6 +337,11 @@ public abstract class BaseSession
 
     protected void RequestSendMessage<T>(int packetId, Google.Protobuf.IMessage<T> message) where T : IMessage<T>
     {
+        _ = TryRequestSendMessage(packetId, message);
+    }
+
+    protected bool TryRequestSendMessage<T>(int packetId, Google.Protobuf.IMessage<T> message) where T : IMessage<T>
+    {
 
         Span<byte> packetIdBuffers = BitConverter.GetBytes(packetId);
         ReadOnlySpan<byte> messageBuffers = message.ToByteArray();
@@ -339,7 +351,7 @@ public abstract class BaseSession
         packetIdBuffers.CopyTo(packetBuffers);
         messageBuffers.CopyTo(packetBuffers.AsSpan(packetIdBuffers.Length));
 
-        RequestSendBuffers(packetBuffers);
+        return TryRequestSendBuffers(packetBuffers);
     }
 
 
@@ -416,31 +428,62 @@ public abstract class BaseSession
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                if (m_SendBuffers.CanReadSize <= 0)
+                await m_SendSignal.WaitAsync(cancellationToken);
+                Interlocked.Exchange(ref m_SendSignalPosted, 0);
+
+                while (!cancellationToken.IsCancellationRequested && m_SendBuffers.CanReadSize > 0)
                 {
-                    await Task.Delay(1, cancellationToken); // CPU 사용량 감소
-                    continue;
-                }
+                    var socket = m_Socket;
+                    if (socket == null || !socket.Connected)
+                    {
+                        return;
+                    }
 
-                var socket = m_Socket;
-                if (socket == null || !socket.Connected)
-                {
-                    break;
-                }
+                    int queuedBytes = m_SendBuffers.CanReadSize;
+                    ServerTelemetry.RecordSendBufferSample(queuedBytes);
 
-                int queuedBytes = m_SendBuffers.CanReadSize;
-                ServerTelemetry.RecordSendBufferSample(queuedBytes);
+                    int readSize = Math.Min(queuedBytes, m_SendOptions.NormalizedSendChunkBytes);
+                    byte[] sendBuffers = new byte[readSize];
+                    int peekedSize = m_SendBuffers.Peek(ref sendBuffers);
+                    if (peekedSize <= 0)
+                    {
+                        break;
+                    }
 
-                byte[] sendBuffers = new byte[queuedBytes];
-                m_SendBuffers.Peek(ref sendBuffers);
+                    m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {peekedSize}");
 
-                m_SockenEventsSent.SetBuffer(sendBuffers, 0, sendBuffers.Length);
+                    int sentSize;
+                    try
+                    {
+                        sentSize = await socket.SendAsync(sendBuffers.AsMemory(0, peekedSize), SocketFlags.None, cancellationToken);
+                    }
+                    catch (SocketException ex) when (IsTransientSendBackpressure(ex.SocketErrorCode))
+                    {
+                        ServerTelemetry.RecordSocketError();
+                        ServerTelemetry.RecordSendBackpressure();
+                        m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Transient SocketException : {ex.SocketErrorCode}, {ex.Message}");
+                        await Task.Delay(1, cancellationToken);
+                        continue;
+                    }
+                    catch (SocketException ex)
+                    {
+                        ServerTelemetry.RecordSocketError();
+                        m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
+                        RequestDisconnect();
+                        return;
+                    }
 
-                m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {sendBuffers.Length}");
+                    if (sentSize <= 0)
+                    {
+                        m_Logger.LogInformation("BaseSession, DoWorkSendBuffers, Disconnected. Sent size is zero.");
+                        RequestDisconnect();
+                        return;
+                    }
 
-                if (!socket.SendAsync(m_SockenEventsSent))
-                {
-                    OnSocketEventsSentCompleted(socket, m_SockenEventsSent);
+                    int drainedSize = m_SendBuffers.Drain(sentSize);
+                    CompletePendingSendRequests(drainedSize);
+                    ServerTelemetry.RecordSent(drainedSize);
+                    ServerTelemetry.RecordSendBufferSample(m_SendBuffers.CanReadSize);
                 }
             }
         }
@@ -456,6 +499,35 @@ public abstract class BaseSession
         {
             m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
             ServerTelemetry.RecordSocketError();
+            RequestDisconnect();
+        }
+    }
+
+    private static bool IsTransientSendBackpressure(SocketError socketError)
+    {
+        return socketError == SocketError.NoBufferSpaceAvailable
+            || socketError == SocketError.WouldBlock;
+    }
+
+    private void SignalSendLoop()
+    {
+        if (Interlocked.Exchange(ref m_SendSignalPosted, 1) == 0)
+        {
+            m_SendSignal.Release();
+        }
+    }
+
+    private void TrackPendingSendRequest(int bytes)
+    {
+        m_SendCompletionTracker.Enqueue(bytes);
+    }
+
+    private void CompletePendingSendRequests(int drainedBytes)
+    {
+        int completedRequests = m_SendCompletionTracker.Complete(drainedBytes);
+        for (int i = 0; i < completedRequests; i++)
+        {
+            ServerTelemetry.RecordSendCompleted();
         }
     }
 }

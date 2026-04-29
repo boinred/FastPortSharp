@@ -122,9 +122,12 @@ internal sealed class LoadValidationEvaluator
             MaxMergeSkewMs: mergeResult?.MaxSkewMs ?? 0,
             MaxPendingSendRequests: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxPendingSendRequests),
             MaxSendBackpressureEvents: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendBackpressureEvents),
+            MaxSendRejectedRequests: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedRequests),
+            MaxSendRejectedBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedBytes),
             MaxSendBufferBytes: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.MaxSendBufferBytes),
             MaxSendRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRequestsPerSecond),
             MaxSendCompletionsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendCompletionsPerSecond),
+            MaxSendRejectedRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedRequestsPerSecond),
             SocketErrorCountsByPhase: CopyCounters(finalSample?.SocketErrorCountsByPhase),
             SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass));
     }

@@ -28,6 +28,8 @@ public sealed class ObservedMetricsTests
             PendingSendRequests: 10,
             MaxPendingSendRequests: 12,
             SendBackpressureEvents: 5,
+            SendRejectedRequests: 6,
+            SendRejectedBytes: 512,
             SendBufferBytes: 1024,
             MaxSendBufferBytes: 2048);
 
@@ -45,6 +47,8 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(10, observed.PendingSendRequests);
         Assert.AreEqual(12, observed.MaxPendingSendRequests);
         Assert.AreEqual(5, observed.SendBackpressureEvents);
+        Assert.AreEqual(6, observed.SendRejectedRequests);
+        Assert.AreEqual(512, observed.SendRejectedBytes);
         Assert.AreEqual(1024, observed.SendBufferBytes);
         Assert.AreEqual(2048, observed.MaxSendBufferBytes);
         Assert.AreEqual(1, observed.AcceptErrorCount);
@@ -72,7 +76,9 @@ public sealed class ObservedMetricsTests
             ProtocolErrors: 0,
             SocketErrorRate: 0,
             SendRequests: 100,
-            SendBackpressureEvents: 2);
+            SendBackpressureEvents: 2,
+            SendRejectedRequests: 4,
+            SendRejectedBytes: 400);
 
         var currentRaw = previousRaw with
         {
@@ -85,7 +91,9 @@ public sealed class ObservedMetricsTests
             ReceivedBytes = 1800,
             SentBytes = 1400,
             SendRequests = 150,
-            SendBackpressureEvents = 6
+            SendBackpressureEvents = 6,
+            SendRejectedRequests = 14,
+            SendRejectedBytes = 1400
         };
 
         ServerObservedMetricsSnapshot previous = ServerObservedMetricsSnapshot.FromTelemetry(previousRaw);
@@ -99,6 +107,8 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(1, current.DisconnectedSessionsPerSecond);
         Assert.AreEqual(25, current.SendRequestsPerSecond);
         Assert.AreEqual(2, current.SendBackpressureEventsPerSecond);
+        Assert.AreEqual(5, current.SendRejectedRequestsPerSecond);
+        Assert.AreEqual(500, current.SendRejectedBytesPerSecond);
     }
 
     [TestMethod]
@@ -119,7 +129,9 @@ public sealed class ObservedMetricsTests
             ProtocolErrors: 0,
             SocketErrorRate: 0,
             SendRequests: 5,
-            SendBackpressureEvents: 1);
+            SendBackpressureEvents: 1,
+            SendRejectedRequests: 1,
+            SendRejectedBytes: 100);
 
         ServerObservedMetricsSnapshot observed = ServerObservedMetricsSnapshot.FromTelemetry(raw);
 
@@ -131,6 +143,8 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(0, observed.DisconnectedSessionsPerSecond);
         Assert.AreEqual(0, observed.SendRequestsPerSecond);
         Assert.AreEqual(0, observed.SendBackpressureEventsPerSecond);
+        Assert.AreEqual(0, observed.SendRejectedRequestsPerSecond);
+        Assert.AreEqual(0, observed.SendRejectedBytesPerSecond);
     }
 
     [TestMethod]
@@ -151,7 +165,9 @@ public sealed class ObservedMetricsTests
             ProtocolErrors: 0,
             SocketErrorRate: 0,
             SendRequests: 5,
-            SendBackpressureEvents: 1));
+            SendBackpressureEvents: 1,
+            SendRejectedRequests: 2,
+            SendRejectedBytes: 256));
 
         string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromServer(observed));
 
@@ -159,6 +175,7 @@ public sealed class ObservedMetricsTests
         Assert.IsTrue(json.Contains("\"totalSendCompletions\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"totalSendRequests\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"sendBackpressureEvents\"", StringComparison.Ordinal));
+        Assert.IsTrue(json.Contains("\"sendRejectedRequests\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"totalParsedPacketBytes\"", StringComparison.Ordinal));
         Assert.IsFalse(json.Contains("TotalSendCompletions", StringComparison.Ordinal));
 

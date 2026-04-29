@@ -135,7 +135,9 @@ public sealed class FastPortLoadValidationTests
         ServerObservedMetricsSnapshot serverSample = CreateServerSample(
             new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
             pendingSendRequests: 12,
-            sendBackpressureEvents: 3);
+            sendBackpressureEvents: 3,
+            sendRejectedRequests: 2,
+            sendRejectedBytes: 2048);
         await File.WriteAllLinesAsync(path, [ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromServer(serverSample))]);
         var reader = new JsonlObservedMetricsReader();
 
@@ -147,6 +149,8 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(1, result.ServerSamples.Count);
         Assert.AreEqual(12, result.ServerSamples[0].PendingSendRequests);
         Assert.AreEqual(3, result.ServerSamples[0].SendBackpressureEvents);
+        Assert.AreEqual(2, result.ServerSamples[0].SendRejectedRequests);
+        Assert.AreEqual(2048, result.ServerSamples[0].SendRejectedBytes);
     }
 
     [TestMethod]
@@ -232,6 +236,9 @@ public sealed class FastPortLoadValidationTests
             timestamp.AddMilliseconds(100),
             pendingSendRequests: 12,
             sendBackpressureEvents: 4,
+            sendRejectedRequests: 5,
+            sendRejectedBytes: 8192,
+            sendRejectedRequestsPerSecond: 2.5,
             maxSendBufferBytes: 4096);
         JsonlReadResult readResult = new([client, client, client], []);
         JsonlObservedMetricsReadResult serverReadResult = new(
@@ -262,6 +269,9 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(1, summary.MergedSamples);
         Assert.AreEqual(12, summary.MaxPendingSendRequests);
         Assert.AreEqual(4, summary.MaxSendBackpressureEvents);
+        Assert.AreEqual(5, summary.MaxSendRejectedRequests);
+        Assert.AreEqual(8192, summary.MaxSendRejectedBytes);
+        Assert.AreEqual(2.5, summary.MaxSendRejectedRequestsPerSecond);
         Assert.AreEqual(4096, summary.MaxSendBufferBytes);
         Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
         Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
@@ -348,6 +358,7 @@ public sealed class FastPortLoadValidationTests
         string markdown = await File.ReadAllTextAsync(Path.Combine(directory, "summary.md"));
         StringAssert.Contains(markdown, "Max Pending Req");
         StringAssert.Contains(markdown, "Max Pending Send");
+        StringAssert.Contains(markdown, "Rejected Send");
         StringAssert.Contains(markdown, "RTT P99");
     }
 
@@ -413,6 +424,9 @@ public sealed class FastPortLoadValidationTests
         DateTimeOffset timestamp,
         long pendingSendRequests = 0,
         long sendBackpressureEvents = 0,
+        long sendRejectedRequests = 0,
+        long sendRejectedBytes = 0,
+        double sendRejectedRequestsPerSecond = 0,
         long maxSendBufferBytes = 0)
     {
         return new ServerObservedMetricsSnapshot(
@@ -441,6 +455,10 @@ public sealed class FastPortLoadValidationTests
             SendRequestsPerSecond: 12,
             SendBackpressureEvents: sendBackpressureEvents,
             SendBackpressureEventsPerSecond: 2,
+            SendRejectedRequests: sendRejectedRequests,
+            SendRejectedRequestsPerSecond: sendRejectedRequestsPerSecond,
+            SendRejectedBytes: sendRejectedBytes,
+            SendRejectedBytesPerSecond: 0,
             SendBufferBytes: maxSendBufferBytes,
             MaxSendBufferBytes: maxSendBufferBytes);
     }

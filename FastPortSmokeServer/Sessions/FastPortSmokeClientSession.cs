@@ -35,8 +35,8 @@ public class FastPortSmokeClientSession : BaseSessionClient
     {
     }
 
-    public void SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message)
-        where T : IMessage<T> => RequestSendMessage((int)protocolId, message);
+    public bool SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message)
+        where T : IMessage<T> => TryRequestSendMessage((int)protocolId, message);
 
     protected override void OnReceived(BasePacket packet)
     {
@@ -76,7 +76,13 @@ public class FastPortSmokeClientSession : BaseSessionClient
             Data = request.Data
         };
 
-        SendMessage(FastPort.Protocols.Commons.ProtocolId.Tests, response);
+        if (!SendMessage(FastPort.Protocols.Commons.ProtocolId.Tests, response))
+        {
+            m_Logger.LogDebug(
+                "FastPortSmokeClientSession, OnReceived, Dropped echo response due to send backpressure. ReqId:{RequestId}",
+                requestHeader.RequestId);
+            return;
+        }
 
         m_Logger.LogDebug(
             "FastPortSmokeClientSession, OnReceived, ReqId:{RequestId}, PacketSize:{PacketSize}, DataSize:{DataSize}",

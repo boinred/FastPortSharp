@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-29T02:45:39.628Z",
+  "lastUpdated": "2026-04-29T05:37:41Z",
   "activeFeatures": [
     "server-telemetry-export-merge-socket-error-classification"
   ],
@@ -360,6 +360,62 @@
         "lastUpdated": "2026-04-29T02:45:39.628Z"
       },
       "completedAt": "2026-04-29T02:45:39.625Z"
+    },
+    "server-send-backpressure-queue-drain-optimization": {
+      "phase": "archived",
+      "matchRate": 93,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization/server-send-backpressure-queue-drain-optimization.plan.md",
+        "design": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization/server-send-backpressure-queue-drain-optimization.design.md",
+        "analysis": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization/server-send-backpressure-queue-drain-optimization.analysis.md",
+        "report": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization/server-send-backpressure-queue-drain-optimization.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T03:20:38.321Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T03:26:45.921Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T04:10:20.000Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T04:35:00.000Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T04:35:52.064Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-29T03:19:24.655Z",
+          "completedAt": "2026-04-29T05:32:19.920Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-29T03:19:24.657Z",
+        "lastUpdated": "2026-04-29T05:37:41Z"
+      },
+      "completedAt": "2026-04-29T05:32:19.920Z",
+      "archivedAt": "2026-04-29T05:37:41Z",
+      "archivePath": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization"
     }
   },
   "pipeline": {
@@ -370,7 +426,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-29T02:45:39.628Z"
+    "lastActivity": "2026-04-29T05:37:41Z"
   },
   "history": [
     {
@@ -888,6 +944,64 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-04-29T02:45:39.627Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-29T03:20:38.319Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-29T03:20:38.320Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-29T03:23:36.914Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-29T03:26:45.917Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-29T03:26:45.918Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-04-29T04:35:52.059Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-29T04:35:52.063Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-29T05:32:19.923Z"
+    },
+    {
+      "feature": "server-send-backpressure-queue-drain-optimization",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-04/server-send-backpressure-queue-drain-optimization",
+      "timestamp": "2026-04-29T05:37:41Z"
     }
   ]
 }

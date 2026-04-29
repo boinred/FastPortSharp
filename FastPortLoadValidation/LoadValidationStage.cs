@@ -62,9 +62,12 @@ internal sealed record LoadValidationStageSummary(
     double MaxMergeSkewMs = 0,
     long MaxPendingSendRequests = 0,
     long MaxSendBackpressureEvents = 0,
+    long MaxSendRejectedRequests = 0,
+    long MaxSendRejectedBytes = 0,
     long MaxSendBufferBytes = 0,
     double MaxSendRequestsPerSecond = 0,
     double MaxSendCompletionsPerSecond = 0,
+    double MaxSendRejectedRequestsPerSecond = 0,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 

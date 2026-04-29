@@ -18,6 +18,8 @@ public interface IServerTelemetry
 
     void RecordSendBackpressure();
 
+    void RecordSendRejected(int bytes, int queuedBytes);
+
     void RecordSendBufferSample(int queuedBytes);
 
     void RecordSocketError();
@@ -45,6 +47,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     private long _pendingSendRequests;
     private long _maxPendingSendRequests;
     private long _sendBackpressureEvents;
+    private long _sendRejectedRequests;
+    private long _sendRejectedBytes;
     private long _sendBufferBytes;
     private long _maxSendBufferBytes;
     private long _acceptErrors;
@@ -87,7 +91,6 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
 
         Interlocked.Increment(ref _sentPackets);
         Interlocked.Add(ref _sentBytes, bytes);
-        RecordSendCompleted();
     }
 
     public void RecordSendRequested(int bytes, int queuedBytes)
@@ -116,6 +119,18 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     public void RecordSendBackpressure()
     {
         Interlocked.Increment(ref _sendBackpressureEvents);
+    }
+
+    public void RecordSendRejected(int bytes, int queuedBytes)
+    {
+        if (bytes <= 0)
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref _sendRejectedRequests);
+        Interlocked.Add(ref _sendRejectedBytes, bytes);
+        RecordSendBufferSample(queuedBytes);
     }
 
     public void RecordSendBufferSample(int queuedBytes)
@@ -175,6 +190,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             PendingSendRequests: Interlocked.Read(ref _pendingSendRequests),
             MaxPendingSendRequests: Interlocked.Read(ref _maxPendingSendRequests),
             SendBackpressureEvents: Interlocked.Read(ref _sendBackpressureEvents),
+            SendRejectedRequests: Interlocked.Read(ref _sendRejectedRequests),
+            SendRejectedBytes: Interlocked.Read(ref _sendRejectedBytes),
             SendBufferBytes: Interlocked.Read(ref _sendBufferBytes),
             MaxSendBufferBytes: Interlocked.Read(ref _maxSendBufferBytes));
     }
@@ -191,6 +208,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         Interlocked.Exchange(ref _pendingSendRequests, 0);
         Interlocked.Exchange(ref _maxPendingSendRequests, 0);
         Interlocked.Exchange(ref _sendBackpressureEvents, 0);
+        Interlocked.Exchange(ref _sendRejectedRequests, 0);
+        Interlocked.Exchange(ref _sendRejectedBytes, 0);
         Interlocked.Exchange(ref _sendBufferBytes, 0);
         Interlocked.Exchange(ref _maxSendBufferBytes, 0);
         Interlocked.Exchange(ref _acceptErrors, 0);
@@ -268,6 +287,10 @@ public sealed class NullServerTelemetry : IServerTelemetry
     {
     }
 
+    public void RecordSendRejected(int bytes, int queuedBytes)
+    {
+    }
+
     public void RecordSendBufferSample(int queuedBytes)
     {
     }
@@ -312,5 +335,7 @@ public sealed record ServerTelemetrySnapshot(
     long PendingSendRequests = 0,
     long MaxPendingSendRequests = 0,
     long SendBackpressureEvents = 0,
+    long SendRejectedRequests = 0,
+    long SendRejectedBytes = 0,
     long SendBufferBytes = 0,
     long MaxSendBufferBytes = 0);

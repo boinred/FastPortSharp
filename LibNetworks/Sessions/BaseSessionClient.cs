@@ -21,6 +21,17 @@ public abstract class BaseSessionClient : BaseSession
     {
     }
 
+    public BaseSessionClient(
+        ILogger<BaseSessionClient> logger,
+        System.Net.Sockets.Socket socket,
+        LibCommons.IBuffers receivedBuffers,
+        LibCommons.IBuffers sendBuffers,
+        IServerTelemetry serverTelemetry,
+        SessionSendOptions? sendOptions)
+        : base(logger, socket, receivedBuffers, sendBuffers, serverTelemetry, sendOptions)
+    {
+    }
+
     public virtual void OnAccepted()
     {
         m_Logger.LogInformation($"BaseSessionClient, OnAccepted. Id : {Id}, Remote End Point : {GetSessionAddress()}");
