@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-30T01:40:44Z",
+  "lastUpdated": "2026-04-30T05:04:54Z",
   "activeFeatures": [],
   "primaryFeature": null,
   "features": {
@@ -533,6 +533,63 @@
       "completedAt": "2026-04-30T01:37:53.150Z",
       "archivedAt": "2026-04-30T01:40:44Z",
       "archivePath": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability"
+    },
+    "basesession-send-channel-queue-lock-reduction": {
+      "phase": "archived",
+      "matchRate": 100,
+      "iterationCount": 5,
+      "documents": {
+        "plan": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction/basesession-send-channel-queue-lock-reduction.plan.md",
+        "design": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction/basesession-send-channel-queue-lock-reduction.design.md",
+        "do": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction/basesession-send-channel-queue-lock-reduction.do.md",
+        "analysis": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction/basesession-send-channel-queue-lock-reduction.analysis.md",
+        "report": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction/basesession-send-channel-queue-lock-reduction.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:04:12.843Z",
+          "completedAt": "2026-04-30T02:05:40.827Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:04:12.843Z",
+          "completedAt": "2026-04-30T02:12:16.978Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:04:12.843Z",
+          "completedAt": "2026-04-30T02:20:36.589Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:04:12.843Z",
+          "completedAt": "2026-04-30T02:25:47.979Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:25:47.979Z",
+          "completedAt": "2026-04-30T04:29:24.749Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-30T02:04:12.843Z",
+          "completedAt": "2026-04-30T05:01:59.732Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-30T02:04:12.844Z",
+        "lastUpdated": "2026-04-30T05:04:54Z"
+      },
+      "completedAt": "2026-04-30T05:01:59.721Z",
+      "archivedAt": "2026-04-30T05:04:54Z",
+      "archivePath": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction"
     }
   },
   "pipeline": {
@@ -543,7 +600,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-30T01:40:44Z"
+    "lastActivity": "2026-04-30T05:04:54Z"
   },
   "history": [
     {
@@ -1287,6 +1344,90 @@
       "action": "archive",
       "archivePath": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability",
       "timestamp": "2026-04-30T01:40:44Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-30T02:05:40.824Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-30T02:05:40.826Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-30T02:09:40.528Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-30T02:12:16.974Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-30T02:12:16.975Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-30T02:20:36.584Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-30T02:20:36.587Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-30T02:25:47.977Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-30T02:25:47.978Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-04-30T04:29:24.742Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-30T04:29:24.748Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-30T05:01:59.729Z"
+    },
+    {
+      "feature": "basesession-send-channel-queue-lock-reduction",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction",
+      "timestamp": "2026-04-30T05:04:54Z"
     }
   ]
 }

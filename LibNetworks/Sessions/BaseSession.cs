@@ -3,7 +3,7 @@ using LibCommons;
 using LibNetworks.Telemetry;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Diagnostics;
+using System.Buffers;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Channels;
@@ -13,6 +13,7 @@ namespace LibNetworks.Sessions;
 public abstract class BaseSession
 {
     private const int SendBufferBackpressureThresholdBytes = 1024 * 1024;
+    private const int MaxSendBatchSegments = 16;
 
     protected ILogger m_Logger;
     private System.Net.Sockets.Socket? m_Socket;
@@ -27,11 +28,9 @@ public abstract class BaseSession
     private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
     private readonly LibCommons.IBuffers m_ReceivedBuffers;
-    private readonly LibCommons.IBuffers m_SendBuffers;
     private readonly SessionSendOptions m_SendOptions;
-    private readonly SemaphoreSlim m_SendSignal = new SemaphoreSlim(0, 1);
-    private readonly SendCompletionTracker m_SendCompletionTracker = new SendCompletionTracker();
-    private int m_SendSignalPosted;
+    private readonly Channel<SendQueueItem> m_SendQueue;
+    private long m_QueuedSendBytes;
     protected IServerTelemetry ServerTelemetry { get; }
 
     private readonly Task m_TaskReceivedBuffers;
@@ -46,6 +45,30 @@ public abstract class BaseSession
 
     // Disconnect 중복 호출 방지를 위한 플래그
     private int m_DisconnectRequested = 0;
+
+    private sealed class SendQueueItem
+    {
+        public SendQueueItem(byte[] buffer)
+        {
+            Buffer = buffer;
+            Length = buffer.Length;
+        }
+
+        public byte[] Buffer { get; }
+
+        public int Offset { get; private set; }
+
+        public int Length { get; }
+
+        public int Remaining => Length - Offset;
+
+        public bool IsComplete => Offset >= Length;
+
+        public void Advance(int sentBytes)
+        {
+            Offset += sentBytes;
+        }
+    }
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
@@ -81,7 +104,12 @@ public abstract class BaseSession
         m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
         m_ReceivedBuffers = receivedBuffers;
-        m_SendBuffers = sendbuffers;
+        m_SendQueue = Channel.CreateUnbounded<SendQueueItem>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false
+        });
 
         m_SocketEventsReceived.SetBuffer(m_ReceivedSocketBuffers, 0, m_ReceivedSocketBuffers.Length);
         m_SocketEventsReceived.Completed += OnSocketEventsReceivedCompleted;
@@ -228,6 +256,7 @@ public abstract class BaseSession
         }
 
         // Channel 완료 (Writer 닫기)
+        m_SendQueue.Writer.TryComplete();
         m_ReceivedPackets.Writer.TryComplete();
 
         // 이벤트 호출 (한 번만 호출됨)
@@ -290,8 +319,7 @@ public abstract class BaseSession
             return false;
         }
 
-        int queuedBefore = m_SendBuffers.CanReadSize;
-        if (queuedBefore + buffersSize > m_SendOptions.NormalizedMaxQueuedBytes)
+        if (!TryReserveQueuedSendBytes(buffersSize, out int queuedBefore, out int queuedAfter))
         {
             ServerTelemetry.RecordSendBackpressure();
             ServerTelemetry.RecordSendRejected(buffersSize, queuedBefore);
@@ -313,16 +341,24 @@ public abstract class BaseSession
 
         m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {sendBuffers.Length}");
 
-        int writtenSize = m_SendBuffers.Write(sendBuffers, 0, sendBuffers.Length);
-        int queuedBytes = m_SendBuffers.CanReadSize;
-        ServerTelemetry.RecordSendRequested(writtenSize, queuedBytes);
-        TrackPendingSendRequest(writtenSize);
-        if (queuedBytes > SendBufferBackpressureThresholdBytes)
+        var sendItem = new SendQueueItem(sendBuffers);
+        if (!m_SendQueue.Writer.TryWrite(sendItem))
+        {
+            int queuedBytesAfterRollback = ReleaseQueuedSendBytes(buffersSize);
+            ServerTelemetry.RecordSendRejected(buffersSize, queuedBytesAfterRollback);
+            m_Logger.LogDebug(
+                "BaseSession, RequestSendBuffers, Send rejected because queue is closed. Buffer Length:{BufferLength}, QueuedBytes:{QueuedBytes}",
+                buffersSize,
+                queuedBytesAfterRollback);
+            return false;
+        }
+
+        ServerTelemetry.RecordSendRequested(buffersSize, queuedAfter);
+        if (queuedAfter > SendBufferBackpressureThresholdBytes)
         {
             ServerTelemetry.RecordSendBackpressure();
         }
 
-        SignalSendLoop();
         return true;
     }
 
@@ -424,23 +460,34 @@ public abstract class BaseSession
     /// </summary>
     private async Task DoWorkSendBuffers(CancellationToken cancellationToken)
     {
+        var pendingSendItems = new Queue<SendQueueItem>();
+        var sendSegments = new List<ArraySegment<byte>>(MaxSendBatchSegments);
+
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (await m_SendQueue.Reader.WaitToReadAsync(cancellationToken))
             {
-                await m_SendSignal.WaitAsync(cancellationToken);
-                Interlocked.Exchange(ref m_SendSignalPosted, 0);
+                int drainedBytesThisCycle = 0;
+                int sendOperationsThisCycle = 0;
 
-                int drainedBytesThisWake = 0;
-                int sendOperationsThisWake = 0;
-
-                while (!cancellationToken.IsCancellationRequested && m_SendBuffers.CanReadSize > 0)
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    if (IsSendDrainBudgetExhausted(drainedBytesThisWake, sendOperationsThisWake))
+                    if (pendingSendItems.Count == 0)
                     {
-                        RecordSendDrainYieldAndResignal();
+                        if (!m_SendQueue.Reader.TryRead(out SendQueueItem? sendItem))
+                        {
+                            break;
+                        }
+
+                        pendingSendItems.Enqueue(sendItem);
+                    }
+
+                    if (IsSendDrainBudgetExhausted(drainedBytesThisCycle, sendOperationsThisCycle))
+                    {
+                        RecordSendDrainYield();
                         await Task.Yield();
-                        break;
+                        drainedBytesThisCycle = 0;
+                        sendOperationsThisCycle = 0;
                     }
 
                     var socket = m_Socket;
@@ -449,24 +496,23 @@ public abstract class BaseSession
                         return;
                     }
 
-                    int queuedBytes = m_SendBuffers.CanReadSize;
+                    int queuedBytes = GetQueuedSendBytesSnapshot();
                     ServerTelemetry.RecordSendBufferSample(queuedBytes);
 
-                    int remainingBudgetBytes = m_SendOptions.NormalizedMaxDrainBytesPerSignal - drainedBytesThisWake;
-                    int readSize = Math.Min(Math.Min(queuedBytes, m_SendOptions.NormalizedSendChunkBytes), remainingBudgetBytes);
-                    byte[] sendBuffers = new byte[readSize];
-                    int peekedSize = m_SendBuffers.Peek(ref sendBuffers);
-                    if (peekedSize <= 0)
+                    int remainingBudgetBytes = m_SendOptions.NormalizedMaxDrainBytesPerSignal - drainedBytesThisCycle;
+                    int maxSendBytes = Math.Min(m_SendOptions.NormalizedSendChunkBytes, remainingBudgetBytes);
+                    int batchBytes = BuildSendSegments(pendingSendItems, maxSendBytes, sendSegments);
+                    if (batchBytes <= 0)
                     {
-                        break;
+                        continue;
                     }
 
-                    m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {peekedSize}");
+                    m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {batchBytes}, Segments : {sendSegments.Count}");
 
                     int sentSize;
                     try
                     {
-                        sentSize = await SendSocketAsync(socket, sendBuffers.AsMemory(0, peekedSize), cancellationToken);
+                        sentSize = await SendSocketAsync(socket, sendSegments, cancellationToken);
                     }
                     catch (SocketException ex) when (IsTransientSendBackpressure(ex.SocketErrorCode))
                     {
@@ -491,12 +537,18 @@ public abstract class BaseSession
                         return;
                     }
 
-                    int drainedSize = m_SendBuffers.Drain(sentSize);
-                    CompletePendingSendRequests(drainedSize);
-                    ServerTelemetry.RecordSent(drainedSize);
-                    ServerTelemetry.RecordSendBufferSample(m_SendBuffers.CanReadSize);
-                    drainedBytesThisWake += drainedSize;
-                    sendOperationsThisWake++;
+                    int advancedSize = Math.Min(sentSize, batchBytes);
+                    int completedItems = AdvanceSendItems(pendingSendItems, advancedSize);
+                    int queuedBytesAfterSend = ReleaseQueuedSendBytes(advancedSize);
+                    ServerTelemetry.RecordSent(advancedSize);
+                    ServerTelemetry.RecordSendBufferSample(queuedBytesAfterSend);
+                    drainedBytesThisCycle += advancedSize;
+                    sendOperationsThisCycle++;
+
+                    for (int i = 0; i < completedItems; i++)
+                    {
+                        ServerTelemetry.RecordSendCompleted();
+                    }
                 }
             }
         }
@@ -530,22 +582,137 @@ public abstract class BaseSession
         return socket.SendAsync(sendBuffers, SocketFlags.None, cancellationToken);
     }
 
+    protected virtual async ValueTask<int> SendSocketAsync(
+        Socket socket,
+        IList<ArraySegment<byte>> sendBuffers,
+        CancellationToken cancellationToken)
+    {
+        if (sendBuffers.Count == 1)
+        {
+            ArraySegment<byte> segment = sendBuffers[0];
+            return await SendSocketAsync(socket, segment.Array!.AsMemory(segment.Offset, segment.Count), cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        int totalBytes = 0;
+        for (int i = 0; i < sendBuffers.Count; i++)
+        {
+            totalBytes += sendBuffers[i].Count;
+        }
+
+        byte[] rentedBuffer = ArrayPool<byte>.Shared.Rent(totalBytes);
+        try
+        {
+            int offset = 0;
+            for (int i = 0; i < sendBuffers.Count; i++)
+            {
+                ArraySegment<byte> segment = sendBuffers[i];
+                Buffer.BlockCopy(segment.Array!, segment.Offset, rentedBuffer, offset, segment.Count);
+                offset += segment.Count;
+            }
+
+            return await SendSocketAsync(socket, rentedBuffer.AsMemory(0, totalBytes), cancellationToken);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(rentedBuffer);
+        }
+    }
+
     private bool IsSendDrainBudgetExhausted(int drainedBytesThisWake, int sendOperationsThisWake)
     {
         return drainedBytesThisWake >= m_SendOptions.NormalizedMaxDrainBytesPerSignal
             || sendOperationsThisWake >= m_SendOptions.NormalizedMaxDrainOperationsPerSignal;
     }
 
-    private void RecordSendDrainYieldAndResignal()
+    private int BuildSendSegments(
+        Queue<SendQueueItem> pendingSendItems,
+        int maxBytes,
+        List<ArraySegment<byte>> sendSegments)
     {
-        int queuedBytes = m_SendBuffers.CanReadSize;
+        sendSegments.Clear();
+        int totalBytes = 0;
+
+        foreach (SendQueueItem item in pendingSendItems)
+        {
+            if (!TryAppendSendSegment(item, maxBytes, sendSegments, ref totalBytes))
+            {
+                return totalBytes;
+            }
+        }
+
+        while (totalBytes < maxBytes
+            && sendSegments.Count < MaxSendBatchSegments
+            && m_SendQueue.Reader.TryRead(out SendQueueItem? item))
+        {
+            pendingSendItems.Enqueue(item);
+            if (!TryAppendSendSegment(item, maxBytes, sendSegments, ref totalBytes))
+            {
+                break;
+            }
+        }
+
+        return totalBytes;
+    }
+
+    private static bool TryAppendSendSegment(
+        SendQueueItem item,
+        int maxBytes,
+        List<ArraySegment<byte>> sendSegments,
+        ref int totalBytes)
+    {
+        int remainingBatchBytes = maxBytes - totalBytes;
+        if (remainingBatchBytes <= 0 || sendSegments.Count >= MaxSendBatchSegments)
+        {
+            return false;
+        }
+
+        int segmentBytes = Math.Min(item.Remaining, remainingBatchBytes);
+        if (segmentBytes <= 0)
+        {
+            return true;
+        }
+
+        sendSegments.Add(new ArraySegment<byte>(item.Buffer, item.Offset, segmentBytes));
+        totalBytes += segmentBytes;
+
+        return segmentBytes == item.Remaining
+            && totalBytes < maxBytes
+            && sendSegments.Count < MaxSendBatchSegments;
+    }
+
+    private static int AdvanceSendItems(Queue<SendQueueItem> pendingSendItems, int sentBytes)
+    {
+        int remainingBytes = sentBytes;
+        int completedItems = 0;
+
+        while (remainingBytes > 0 && pendingSendItems.Count > 0)
+        {
+            SendQueueItem item = pendingSendItems.Peek();
+            int advancedBytes = Math.Min(remainingBytes, item.Remaining);
+            item.Advance(advancedBytes);
+            remainingBytes -= advancedBytes;
+
+            if (item.IsComplete)
+            {
+                pendingSendItems.Dequeue();
+                completedItems++;
+            }
+        }
+
+        return completedItems;
+    }
+
+    private void RecordSendDrainYield()
+    {
+        int queuedBytes = GetQueuedSendBytesSnapshot();
         if (queuedBytes <= 0)
         {
             return;
         }
 
         ServerTelemetry.RecordSendDrainYield(queuedBytes);
-        SignalSendLoop();
     }
 
     private async Task WaitTransientSendBackoffAsync(CancellationToken cancellationToken)
@@ -560,25 +727,48 @@ public abstract class BaseSession
         await Task.Delay(backoffMs, cancellationToken);
     }
 
-    private void SignalSendLoop()
+    private bool TryReserveQueuedSendBytes(int bytes, out int queuedBefore, out int queuedAfter)
     {
-        if (Interlocked.Exchange(ref m_SendSignalPosted, 1) == 0)
+        while (true)
         {
-            m_SendSignal.Release();
+            long current = Volatile.Read(ref m_QueuedSendBytes);
+            long next = current + bytes;
+            queuedBefore = ToTelemetryQueuedBytes(current);
+            queuedAfter = ToTelemetryQueuedBytes(next);
+
+            if (next > m_SendOptions.NormalizedMaxQueuedBytes)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref m_QueuedSendBytes, next, current) == current)
+            {
+                return true;
+            }
         }
     }
 
-    private void TrackPendingSendRequest(int bytes)
+    private int ReleaseQueuedSendBytes(int bytes)
     {
-        m_SendCompletionTracker.Enqueue(bytes);
+        while (true)
+        {
+            long current = Volatile.Read(ref m_QueuedSendBytes);
+            long next = Math.Max(0, current - bytes);
+
+            if (Interlocked.CompareExchange(ref m_QueuedSendBytes, next, current) == current)
+            {
+                return ToTelemetryQueuedBytes(next);
+            }
+        }
     }
 
-    private void CompletePendingSendRequests(int drainedBytes)
+    private int GetQueuedSendBytesSnapshot()
     {
-        int completedRequests = m_SendCompletionTracker.Complete(drainedBytes);
-        for (int i = 0; i < completedRequests; i++)
-        {
-            ServerTelemetry.RecordSendCompleted();
-        }
+        return ToTelemetryQueuedBytes(Volatile.Read(ref m_QueuedSendBytes));
+    }
+
+    private static int ToTelemetryQueuedBytes(long queuedBytes)
+    {
+        return (int)Math.Min(int.MaxValue, Math.Max(0, queuedBytes));
     }
 }

@@ -162,15 +162,221 @@ public sealed class BaseSessionSendPolicyTests
         }
     }
 
+    [TestMethod]
+    public async Task BaseSession_DoWorkSendBuffers_CompletesOnlyAfterPartialSendFinishes()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var allowSecondSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int sendAttempts = 0;
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64),
+            async (_, sendBuffers, cancellationToken) =>
+            {
+                if (Interlocked.Increment(ref sendAttempts) == 1)
+                {
+                    return 2;
+                }
+
+                await allowSecondSend.Task.WaitAsync(cancellationToken);
+                return sendBuffers.Length;
+            });
+
+        try
+        {
+            Assert.IsTrue(session.TrySendBytes(new byte[4]));
+
+            ServerTelemetrySnapshot partialSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 2 && current.PendingSendRequests == 1 && current.SendBufferBytes == 4,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(1, partialSnapshot.SentPackets);
+            Assert.AreEqual(2, partialSnapshot.SentBytes);
+            Assert.AreEqual(1, partialSnapshot.PendingSendRequests);
+            Assert.AreEqual(4, partialSnapshot.SendBufferBytes);
+
+            allowSecondSend.SetResult();
+            ServerTelemetrySnapshot completedSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 6 && current.PendingSendRequests == 0 && current.SendBufferBytes == 0,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(2, completedSnapshot.SentPackets);
+            Assert.AreEqual(6, completedSnapshot.SentBytes);
+            Assert.AreEqual(0, completedSnapshot.PendingSendRequests);
+            Assert.AreEqual(0, completedSnapshot.SendBufferBytes);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
+    [TestMethod]
+    public async Task BaseSession_DoWorkSendBuffers_CompletesMultipleAcceptedItemsInFifoOrder()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var allowSecondSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int sendAttempts = 0;
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64),
+            sendBatchOverride: async (_, sendBuffers, cancellationToken) =>
+            {
+                int attempt = Interlocked.Increment(ref sendAttempts);
+                if (attempt == 1)
+                {
+                    Assert.IsTrue(sendBuffers.Count >= 2);
+                    AssertSegmentPayload(sendBuffers[0], new byte[] { 1, 2 });
+                    AssertSegmentPayload(sendBuffers[1], new byte[] { 9, 8, 7 });
+                    return sendBuffers[0].Count;
+                }
+
+                await allowSecondSend.Task.WaitAsync(cancellationToken);
+                Assert.IsTrue(sendBuffers.Count >= 1);
+                AssertSegmentPayload(sendBuffers[0], new byte[] { 9, 8, 7 });
+                return sendBuffers[0].Count;
+            });
+
+        try
+        {
+            Assert.IsTrue(session.TrySendBytes(new byte[] { 1, 2 }));
+            Assert.IsTrue(session.TrySendBytes(new byte[] { 9, 8, 7 }));
+
+            ServerTelemetrySnapshot firstCompletedSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 4 && current.PendingSendRequests == 1,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(1, firstCompletedSnapshot.SentPackets);
+            Assert.AreEqual(4, firstCompletedSnapshot.SentBytes);
+            Assert.AreEqual(1, firstCompletedSnapshot.PendingSendRequests);
+            Assert.AreEqual(5, firstCompletedSnapshot.SendBufferBytes);
+
+            allowSecondSend.SetResult();
+            ServerTelemetrySnapshot allCompletedSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 9 && current.PendingSendRequests == 0,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(2, allCompletedSnapshot.SentPackets);
+            Assert.AreEqual(9, allCompletedSnapshot.SentBytes);
+            Assert.AreEqual(0, allCompletedSnapshot.PendingSendRequests);
+            Assert.AreEqual(0, allCompletedSnapshot.SendBufferBytes);
+            Assert.AreEqual(2, sendAttempts);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
+    [TestMethod]
+    public async Task BaseSession_DoWorkSendBuffers_BatchedSendRespectsChunkLimit()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var allowSecondSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int sendAttempts = 0;
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(
+                MaxQueuedBytes: 1024,
+                SendChunkBytes: 6,
+                MaxDrainBytesPerSignal: 64),
+            sendBatchOverride: async (_, sendBuffers, cancellationToken) =>
+            {
+                int attempt = Interlocked.Increment(ref sendAttempts);
+                if (attempt == 1)
+                {
+                    Assert.AreEqual(2, sendBuffers.Count);
+                    Assert.AreEqual(4, sendBuffers[0].Count);
+                    Assert.AreEqual(2, sendBuffers[1].Count);
+                    return 6;
+                }
+
+                await allowSecondSend.Task.WaitAsync(cancellationToken);
+                Assert.AreEqual(1, sendBuffers.Count);
+                Assert.AreEqual(3, sendBuffers[0].Count);
+                return 3;
+            });
+
+        try
+        {
+            Assert.IsTrue(session.TrySendBytes(new byte[] { 1, 2 }));
+            Assert.IsTrue(session.TrySendBytes(new byte[] { 9, 8, 7 }));
+
+            ServerTelemetrySnapshot firstSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 6 && current.PendingSendRequests == 1,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(6, firstSnapshot.SentBytes);
+            Assert.AreEqual(1, firstSnapshot.PendingSendRequests);
+            Assert.AreEqual(3, firstSnapshot.SendBufferBytes);
+
+            allowSecondSend.SetResult();
+            ServerTelemetrySnapshot completedSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.SentBytes == 9 && current.PendingSendRequests == 0,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(9, completedSnapshot.SentBytes);
+            Assert.AreEqual(0, completedSnapshot.PendingSendRequests);
+            Assert.AreEqual(0, completedSnapshot.SendBufferBytes);
+            Assert.AreEqual(2, sendAttempts);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
+    [TestMethod]
+    public async Task BaseSession_TryRequestSendBuffers_RejectsWhenSendQueueIsClosed()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64));
+
+        session.RequestDisconnect();
+
+        bool queued = session.TrySendBytes(new byte[2]);
+        ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
+
+        Assert.IsFalse(queued);
+        Assert.AreEqual(0, snapshot.SendRequests);
+        Assert.AreEqual(0, snapshot.PendingSendRequests);
+        Assert.AreEqual(1, snapshot.SendRejectedRequests);
+        Assert.AreEqual(4, snapshot.SendRejectedBytes);
+        Assert.AreEqual(0, snapshot.SendBufferBytes);
+
+        await session.WaitSession();
+    }
+
     private sealed class TestSession : BaseSession
     {
         private readonly Func<Socket, ReadOnlyMemory<byte>, CancellationToken, ValueTask<int>>? _sendOverride;
+        private readonly Func<Socket, IList<ArraySegment<byte>>, CancellationToken, ValueTask<int>>? _sendBatchOverride;
 
         public TestSession(
             Socket socket,
             IServerTelemetry telemetry,
             SessionSendOptions sendOptions,
-            Func<Socket, ReadOnlyMemory<byte>, CancellationToken, ValueTask<int>>? sendOverride = null)
+            Func<Socket, ReadOnlyMemory<byte>, CancellationToken, ValueTask<int>>? sendOverride = null,
+            Func<Socket, IList<ArraySegment<byte>>, CancellationToken, ValueTask<int>>? sendBatchOverride = null)
             : base(
                 NullLogger<BaseSession>.Instance,
                 socket,
@@ -180,6 +386,7 @@ public sealed class BaseSessionSendPolicyTests
                 sendOptions)
         {
             _sendOverride = sendOverride;
+            _sendBatchOverride = sendBatchOverride;
         }
 
         public bool TrySendBytes(byte[] bytes)
@@ -195,6 +402,25 @@ public sealed class BaseSessionSendPolicyTests
             return _sendOverride is null
                 ? base.SendSocketAsync(socket, sendBuffers, cancellationToken)
                 : _sendOverride(socket, sendBuffers, cancellationToken);
+        }
+
+        protected override ValueTask<int> SendSocketAsync(
+            Socket socket,
+            IList<ArraySegment<byte>> sendBuffers,
+            CancellationToken cancellationToken)
+        {
+            if (_sendBatchOverride is not null)
+            {
+                return _sendBatchOverride(socket, sendBuffers, cancellationToken);
+            }
+
+            if (_sendOverride is not null && sendBuffers.Count == 1)
+            {
+                ArraySegment<byte> segment = sendBuffers[0];
+                return _sendOverride(socket, segment.Array!.AsMemory(segment.Offset, segment.Count), cancellationToken);
+            }
+
+            return base.SendSocketAsync(socket, sendBuffers, cancellationToken);
         }
     }
 
@@ -251,5 +477,16 @@ public sealed class BaseSessionSendPolicyTests
         }
 
         return snapshot;
+    }
+
+    private static void AssertSegmentPayload(ArraySegment<byte> segment, byte[] expectedPayload)
+    {
+        Assert.IsNotNull(segment.Array);
+        Assert.AreEqual(expectedPayload.Length + BasePacket.HeaderSize, segment.Count);
+
+        for (int i = 0; i < expectedPayload.Length; i++)
+        {
+            Assert.AreEqual(expectedPayload[i], segment.Array[segment.Offset + BasePacket.HeaderSize + i]);
+        }
     }
 }
