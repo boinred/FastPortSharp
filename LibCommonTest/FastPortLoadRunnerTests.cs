@@ -6,6 +6,7 @@ using FastPort.Protocols.Commons;
 using FastPort.Protocols.Tests;
 using FastPortLoadRunner;
 using Google.Protobuf;
+using LibNetworks.Telemetry;
 
 namespace LibCommonTest;
 
@@ -277,6 +278,23 @@ public sealed class FastPortLoadRunnerTests
     }
 
     [TestMethod]
+    public void LoadSession_ParseEchoResponse_RecordsSessionRtt()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1, collector);
+        byte[] body = CreateEchoResponseBody();
+
+        bool parsed = session.ParseEchoResponse(body);
+
+        Assert.IsTrue(parsed);
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.IsNotNull(snapshot.SessionRtt);
+        Assert.AreEqual(1, snapshot.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(0, snapshot.SessionRtt.EligibleSessionCount);
+        Assert.AreEqual(1, snapshot.SessionRtt.ExcludedLowSampleSessionCount);
+    }
+
+    [TestMethod]
     public void MetricsCollector_CreateSnapshot_TracksTotalsAndRates()
     {
         var collector = new MetricsCollector(targetSessions: 10);
@@ -332,7 +350,122 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsTrue(snapshot.SocketErrorRate > 0);
     }
 
-    private static LoadSession CreateLoadSession(int? maxPendingRequestsPerSession)
+    [TestMethod]
+    public void MetricsCollector_RecordRtt_TracksSessionRttSummary()
+    {
+        var collector = new MetricsCollector(targetSessions: 2);
+        long start = Stopwatch.GetTimestamp();
+
+        for (int i = 1; i <= 8; i++)
+        {
+            collector.RecordRtt(sessionId: 1, start, TimestampAfter(start, i));
+            collector.RecordRtt(sessionId: 2, start, TimestampAfter(start, i * 10));
+        }
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.SessionRtt);
+        Assert.AreEqual(2, snapshot.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(2, snapshot.SessionRtt.EligibleSessionCount);
+        Assert.AreEqual(0, snapshot.SessionRtt.ExcludedLowSampleSessionCount);
+        Assert.AreEqual(8, snapshot.SessionRtt.MinSamplesPerSession);
+        Assert.AreEqual(2, snapshot.SessionRtt.SlowestSessions[0].SessionId);
+        Assert.AreEqual(76.5, snapshot.SessionRtt.SlowestSessions[0].RttP95Ms, 0.001);
+        Assert.AreEqual(42.075, snapshot.SessionRtt.P50OfSessionP95Ms, 0.001);
+        Assert.AreEqual(73.0575, snapshot.SessionRtt.P95OfSessionP95Ms, 0.001);
+        Assert.AreEqual(75.8115, snapshot.SessionRtt.P99OfSessionP95Ms, 0.001);
+        Assert.AreEqual(76.5, snapshot.SessionRtt.MaxSessionP95Ms, 0.001);
+        Assert.AreEqual(80, snapshot.SessionRtt.MaxSessionMaxMs, 0.001);
+    }
+
+    [TestMethod]
+    public void MetricsCollector_RecordRtt_ExcludesLowSampleSessions()
+    {
+        var collector = new MetricsCollector(targetSessions: 2);
+        long start = Stopwatch.GetTimestamp();
+
+        for (int i = 1; i <= 7; i++)
+        {
+            collector.RecordRtt(sessionId: 1, start, TimestampAfter(start, i));
+        }
+
+        for (int i = 1; i <= 8; i++)
+        {
+            collector.RecordRtt(sessionId: 2, start, TimestampAfter(start, i * 10));
+        }
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.SessionRtt);
+        Assert.AreEqual(2, snapshot.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(1, snapshot.SessionRtt.EligibleSessionCount);
+        Assert.AreEqual(1, snapshot.SessionRtt.ExcludedLowSampleSessionCount);
+        Assert.AreEqual(1, snapshot.SessionRtt.SlowestSessions.Count);
+        Assert.AreEqual(2, snapshot.SessionRtt.SlowestSessions[0].SessionId);
+    }
+
+    [TestMethod]
+    public void MetricsCollector_RecordRtt_CapsPerSessionSamples()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        long start = Stopwatch.GetTimestamp();
+
+        for (int i = 1; i <= 300; i++)
+        {
+            collector.RecordRtt(sessionId: 1, start, TimestampAfter(start, i));
+        }
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.SessionRtt);
+        Assert.AreEqual(1, snapshot.SessionRtt.SlowestSessions.Count);
+        Assert.AreEqual(256, snapshot.SessionRtt.SlowestSessions[0].SampleCount);
+        Assert.AreEqual(300, snapshot.SessionRtt.SlowestSessions[0].TotalSampleCount);
+    }
+
+    [TestMethod]
+    public void MetricsCollector_RecordRtt_OrdersSlowestSessionsByTieBreakers()
+    {
+        var collector = new MetricsCollector(targetSessions: 4);
+        long start = Stopwatch.GetTimestamp();
+
+        RecordRttSamples(collector, sessionId: 1, start, CreateTieBreakSamples(p99: 110, max: 120));
+        RecordRttSamples(collector, sessionId: 2, start, CreateTieBreakSamples(p99: 120, max: 130));
+        RecordRttSamples(collector, sessionId: 4, start, CreateTieBreakSamples(p99: 120, max: 140));
+        RecordRttSamples(collector, sessionId: 3, start, CreateTieBreakSamples(p99: 120, max: 140));
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.SessionRtt);
+        CollectionAssert.AreEqual(
+            new[] { 3, 4, 2, 1 },
+            snapshot.SessionRtt.SlowestSessions.Select(session => session.SessionId).Take(4).ToArray());
+    }
+
+    [TestMethod]
+    public void MetricsCollector_RecordRtt_IsSafeAcrossConcurrentSessions()
+    {
+        var collector = new MetricsCollector(targetSessions: 32);
+        long start = Stopwatch.GetTimestamp();
+
+        Parallel.For(1, 33, sessionId =>
+        {
+            for (int i = 1; i <= 10; i++)
+            {
+                collector.RecordRtt(sessionId, start, TimestampAfter(start, sessionId + i));
+            }
+        });
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.SessionRtt);
+        Assert.AreEqual(32, snapshot.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(32, snapshot.SessionRtt.EligibleSessionCount);
+        Assert.AreEqual(0, snapshot.SessionRtt.ExcludedLowSampleSessionCount);
+        Assert.AreEqual(20, snapshot.SessionRtt.SlowestSessions.Count);
+    }
+
+    private static LoadSession CreateLoadSession(int? maxPendingRequestsPerSession, MetricsCollector? metricsCollector = null)
     {
         var scenario = new LoadScenario(
             Host: "127.0.0.1",
@@ -352,7 +485,28 @@ public sealed class FastPortLoadRunnerTests
             sessionId: 1,
             scenario,
             new PayloadGenerator(PayloadProfile.Fixed(1), seed: 1),
-            new MetricsCollector(targetSessions: 1));
+            metricsCollector ?? new MetricsCollector(targetSessions: 1));
+    }
+
+    private static long TimestampAfter(long timestamp, double elapsedMs)
+    {
+        return timestamp + (long)Math.Round(elapsedMs * Stopwatch.Frequency / 1000.0, MidpointRounding.AwayFromZero);
+    }
+
+    private static void RecordRttSamples(MetricsCollector collector, int sessionId, long start, IEnumerable<double> elapsedMsValues)
+    {
+        foreach (double elapsedMs in elapsedMsValues)
+        {
+            collector.RecordRtt(sessionId, start, TimestampAfter(start, elapsedMs));
+        }
+    }
+
+    private static double[] CreateTieBreakSamples(double p99, double max)
+    {
+        return Enumerable
+            .Repeat(1.0, 95)
+            .Concat([100.0, 105.0, 105.0, 105.0, p99, max])
+            .ToArray();
     }
 
     private static byte[] CreateEchoResponseBody()
@@ -396,6 +550,21 @@ public sealed class FastPortLoadRunnerTests
     [TestMethod]
     public void JsonMetricsReporter_SerializeSnapshot_WritesObservedClientEnvelope()
     {
+        var sessionRtt = new SessionRttSummarySnapshot(
+            TrackedSessionCount: 2,
+            EligibleSessionCount: 1,
+            ExcludedLowSampleSessionCount: 1,
+            MinSamplesPerSession: 8,
+            P50OfSessionP95Ms: 4,
+            P95OfSessionP95Ms: 5,
+            P99OfSessionP95Ms: 6,
+            MaxSessionP95Ms: 5,
+            MaxSessionP99Ms: 6,
+            MaxSessionMaxMs: 7,
+            SlowestSessions:
+            [
+                new SlowSessionRttSnapshot(7, 8, 10, 2, 3, 5, 6, 7)
+            ]);
         var snapshot = new MetricsSnapshot(
             Timestamp: new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
             TargetSessions: 100,
@@ -433,7 +602,8 @@ public sealed class FastPortLoadRunnerTests
             PacingWindowIncreaseCount: 2,
             PacingWindowDecreaseCount: 1,
             MinObservedPacingWindow: 2,
-            MaxObservedPacingWindow: 8);
+            MaxObservedPacingWindow: 8,
+            SessionRtt: sessionRtt);
 
         string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
 
@@ -459,6 +629,10 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(5, clientObserved.GetProperty("totalPacingWaitCount").GetInt64());
         Assert.AreEqual(1.5, clientObserved.GetProperty("pacingAverageWaitMs").GetDouble(), 0.0001);
         Assert.AreEqual(8, clientObserved.GetProperty("maxObservedPacingWindow").GetInt64());
+        Assert.AreEqual(2, clientObserved.GetProperty("sessionRtt").GetProperty("trackedSessionCount").GetInt32());
+        Assert.AreEqual(8, clientObserved.GetProperty("sessionRtt").GetProperty("minSamplesPerSession").GetInt32());
+        Assert.IsFalse(clientObserved.GetProperty("sessionRtt").TryGetProperty("minSampleCountForTail", out _));
+        Assert.AreEqual(7, clientObserved.GetProperty("sessionRtt").GetProperty("slowestSessions")[0].GetProperty("sessionId").GetInt32());
         Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByPhase").GetProperty("receive").GetInt64());
         Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByClass").GetProperty("receive|SocketException|ConnectionReset").GetInt64());
     }

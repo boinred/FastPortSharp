@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-30T05:04:54Z",
+  "lastUpdated": "2026-04-30T07:30:59Z",
   "activeFeatures": [],
   "primaryFeature": null,
   "features": {
@@ -590,6 +590,57 @@
       "completedAt": "2026-04-30T05:01:59.721Z",
       "archivedAt": "2026-04-30T05:04:54Z",
       "archivePath": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction"
+    },
+    "loadrunner-per-session-rtt-tail-telemetry": {
+      "phase": "archived",
+      "matchRate": null,
+      "iterationCount": 2,
+      "documents": {
+        "plan": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.plan.md",
+        "design": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.design.md",
+        "do": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.do.md",
+        "analysis": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.analysis.md",
+        "report": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-30T05:12:36.807Z",
+          "completedAt": "2026-04-30T05:13:57.351Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-30T05:12:36.807Z",
+          "completedAt": "2026-04-30T05:21:53.214Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-30T05:12:36.807Z",
+          "completedAt": "2026-04-30T05:40:55.235Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-30T05:12:36.807Z",
+          "completedAt": "2026-04-30T06:07:05.203Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-30T05:12:36.807Z",
+          "completedAt": "2026-04-30T07:25:41.112Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-30T05:12:36.809Z",
+        "lastUpdated": "2026-04-30T07:30:59Z"
+      },
+      "completedAt": "2026-04-30T07:25:41.108Z",
+      "archivedAt": "2026-04-30T07:30:59Z",
+      "archivePath": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry"
     }
   },
   "pipeline": {
@@ -600,7 +651,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-30T05:04:54Z"
+    "lastActivity": "2026-04-30T07:30:59Z"
   },
   "history": [
     {
@@ -1428,6 +1479,90 @@
       "action": "archive",
       "archivePath": "docs/archive/2026-04/basesession-send-channel-queue-lock-reduction",
       "timestamp": "2026-04-30T05:04:54Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-30T05:13:57.349Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-30T05:13:57.349Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-30T05:19:37.794Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-30T05:21:53.212Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-30T05:21:53.213Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-30T05:40:55.231Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-30T05:40:55.234Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-30T06:07:05.202Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-30T06:07:05.202Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-04-30T07:22:31.238Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-30T07:22:31.239Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-30T07:25:41.109Z"
+    },
+    {
+      "feature": "loadrunner-per-session-rtt-tail-telemetry",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry",
+      "timestamp": "2026-04-30T07:30:59Z"
     }
   ]
 }

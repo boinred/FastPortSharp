@@ -45,6 +45,7 @@ internal static class ObservedMetricsExtensions
             snapshot.PacingWindowIncreaseCount,
             snapshot.PacingWindowDecreaseCount,
             snapshot.MinObservedPacingWindow,
-            snapshot.MaxObservedPacingWindow);
+            snapshot.MaxObservedPacingWindow,
+            snapshot.SessionRtt);
     }
 }

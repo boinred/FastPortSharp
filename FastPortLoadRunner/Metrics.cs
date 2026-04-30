@@ -8,8 +8,12 @@ namespace FastPortLoadRunner;
 internal sealed class MetricsCollector(int targetSessions)
 {
     private const int MaxRttSamples = 100_000;
+    private const int MaxSessionRttSamplesPerSession = 256;
+    private const int MinSessionRttSamplesForTail = 8;
+    private const int MaxSlowSessionRttEntries = 20;
 
     private readonly ConcurrentQueue<double> _rttSamplesMs = new();
+    private readonly ConcurrentDictionary<int, SessionRttSamples> _sessionRttSamples = new();
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByPhase = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByType = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByCode = new(StringComparer.Ordinal);
@@ -115,6 +119,11 @@ internal sealed class MetricsCollector(int targetSessions)
 
     public void RecordRtt(long clientSendTimestamp, long clientReceiveTimestamp)
     {
+        RecordRtt(sessionId: 0, clientSendTimestamp, clientReceiveTimestamp);
+    }
+
+    public void RecordRtt(int sessionId, long clientSendTimestamp, long clientReceiveTimestamp)
+    {
         long elapsedTicks = clientReceiveTimestamp - clientSendTimestamp;
         if (elapsedTicks <= 0)
         {
@@ -127,6 +136,16 @@ internal sealed class MetricsCollector(int targetSessions)
         while (_rttSamplesMs.Count > MaxRttSamples && _rttSamplesMs.TryDequeue(out _))
         {
         }
+
+        if (sessionId <= 0)
+        {
+            return;
+        }
+
+        SessionRttSamples sessionSamples = _sessionRttSamples.GetOrAdd(
+            sessionId,
+            static _ => new SessionRttSamples(MaxSessionRttSamplesPerSession));
+        sessionSamples.Add(elapsedMs);
     }
 
     public void RecordPacingWait(TimeSpan elapsed)
@@ -220,7 +239,8 @@ internal sealed class MetricsCollector(int targetSessions)
             PacingWindowIncreaseCount: Interlocked.Read(ref _pacingWindowIncreaseCount),
             PacingWindowDecreaseCount: Interlocked.Read(ref _pacingWindowDecreaseCount),
             MinObservedPacingWindow: Interlocked.Read(ref _minObservedPacingWindow),
-            MaxObservedPacingWindow: Interlocked.Read(ref _maxObservedPacingWindow));
+            MaxObservedPacingWindow: Interlocked.Read(ref _maxObservedPacingWindow),
+            SessionRtt: CreateSessionRttSummary());
     }
 
     private void RecordSocketErrorClassification(string phase, string exceptionType, string socketErrorCode)
@@ -343,6 +363,48 @@ internal sealed class MetricsCollector(int targetSessions)
             GetPercentile(values, 99));
     }
 
+    private SessionRttSummarySnapshot? CreateSessionRttSummary()
+    {
+        SlowSessionRttSnapshot[] snapshots = _sessionRttSamples
+            .Select(pair => pair.Value.CreateSnapshot(pair.Key))
+            .Where(snapshot => snapshot.SampleCount > 0)
+            .OrderBy(snapshot => snapshot.SessionId)
+            .ToArray();
+
+        if (snapshots.Length == 0)
+        {
+            return null;
+        }
+
+        SlowSessionRttSnapshot[] eligibleSnapshots = snapshots
+            .Where(snapshot => snapshot.TotalSampleCount >= MinSessionRttSamplesForTail)
+            .ToArray();
+        double[] sessionP95Values = eligibleSnapshots
+            .Select(snapshot => snapshot.RttP95Ms)
+            .OrderBy(value => value)
+            .ToArray();
+        SlowSessionRttSnapshot[] slowestSessions = eligibleSnapshots
+            .OrderByDescending(snapshot => snapshot.RttP95Ms)
+            .ThenByDescending(snapshot => snapshot.RttP99Ms)
+            .ThenByDescending(snapshot => snapshot.RttMaxMs)
+            .ThenBy(snapshot => snapshot.SessionId)
+            .Take(MaxSlowSessionRttEntries)
+            .ToArray();
+
+        return new SessionRttSummarySnapshot(
+            TrackedSessionCount: snapshots.Length,
+            EligibleSessionCount: eligibleSnapshots.Length,
+            ExcludedLowSampleSessionCount: snapshots.Length - eligibleSnapshots.Length,
+            MinSamplesPerSession: MinSessionRttSamplesForTail,
+            P50OfSessionP95Ms: GetPercentile(sessionP95Values, 50),
+            P95OfSessionP95Ms: GetPercentile(sessionP95Values, 95),
+            P99OfSessionP95Ms: GetPercentile(sessionP95Values, 99),
+            MaxSessionP95Ms: eligibleSnapshots.Length == 0 ? 0 : eligibleSnapshots.Max(snapshot => snapshot.RttP95Ms),
+            MaxSessionP99Ms: eligibleSnapshots.Length == 0 ? 0 : eligibleSnapshots.Max(snapshot => snapshot.RttP99Ms),
+            MaxSessionMaxMs: eligibleSnapshots.Length == 0 ? 0 : eligibleSnapshots.Max(snapshot => snapshot.RttMaxMs),
+            SlowestSessions: slowestSessions);
+    }
+
     private static double GetPercentile(double[] sortedValues, int percentile)
     {
         if (sortedValues.Length == 0)
@@ -363,6 +425,60 @@ internal sealed class MetricsCollector(int targetSessions)
     }
 
     private readonly record struct RttStats(double Average, double P50, double P95, double P99);
+
+    private sealed class SessionRttSamples
+    {
+        private readonly object _gate = new();
+        private readonly Queue<double> _samples = new();
+        private readonly int _maxSamples;
+        private long _totalSampleCount;
+
+        public SessionRttSamples(int maxSamples)
+        {
+            _maxSamples = maxSamples;
+        }
+
+        public void Add(double elapsedMs)
+        {
+            lock (_gate)
+            {
+                _samples.Enqueue(elapsedMs);
+                _totalSampleCount++;
+
+                while (_samples.Count > _maxSamples)
+                {
+                    _samples.Dequeue();
+                }
+            }
+        }
+
+        public SlowSessionRttSnapshot CreateSnapshot(int sessionId)
+        {
+            double[] values;
+            long totalSampleCount;
+            lock (_gate)
+            {
+                values = _samples.ToArray();
+                totalSampleCount = _totalSampleCount;
+            }
+
+            if (values.Length == 0)
+            {
+                return new SlowSessionRttSnapshot(sessionId, 0, totalSampleCount, 0, 0, 0, 0, 0);
+            }
+
+            Array.Sort(values);
+            return new SlowSessionRttSnapshot(
+                sessionId,
+                values.Length,
+                totalSampleCount,
+                values.Average(),
+                GetPercentile(values, 50),
+                GetPercentile(values, 95),
+                GetPercentile(values, 99),
+                values[^1]);
+        }
+    }
 }
 
 internal sealed record MetricsSnapshot(
@@ -404,7 +520,8 @@ internal sealed record MetricsSnapshot(
     long PacingWindowIncreaseCount = 0,
     long PacingWindowDecreaseCount = 0,
     long MinObservedPacingWindow = 0,
-    long MaxObservedPacingWindow = 0);
+    long MaxObservedPacingWindow = 0,
+    SessionRttSummarySnapshot? SessionRtt = null);
 
 internal interface IMetricsReporter
 {

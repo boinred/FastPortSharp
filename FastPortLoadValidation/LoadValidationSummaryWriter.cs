@@ -64,8 +64,8 @@ internal sealed class LoadValidationSummaryWriter
             $"Started: {summary.StartedAt:O}",
             $"Completed: {summary.CompletedAt:O}",
             string.Empty,
-            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Drain Yield | Pacing | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
-            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------------|--------|-------|-----------|---------|---------|---------------|---------|"
+            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Drain Yield | Pacing | Merge | Max Drift | RTT P95 | RTT P99 | Session RTT | Socket Errors | Samples |",
+            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------------|--------|-------|-----------|---------|---------|-------------|---------------|---------|"
         };
 
         foreach (LoadValidationStageSummary stage in summary.Stages)
@@ -89,6 +89,7 @@ internal sealed class LoadValidationSummaryWriter
                 $"{stage.MaxSchedulerDriftMs:F2}ms",
                 $"{stage.MaxRttP95Ms:F2}ms",
                 $"{stage.MaxRttP99Ms:F2}ms",
+                FormatSessionRtt(stage),
                 stage.MaxSocketErrorRate.ToString("P2"),
                 stage.JsonSamples.ToString(),
                 string.Empty));
@@ -108,6 +109,19 @@ internal sealed class LoadValidationSummaryWriter
                     lines.Add($"- {stage.StageId}: socket {pair.Key} = {pair.Value}");
                 }
             }
+
+            if (stage.SessionRttTrackedSessionCount > 0)
+            {
+                lines.Add($"- {stage.StageId}: session RTT excluded low-sample sessions = {stage.SessionRttExcludedLowSampleSessionCount}");
+            }
+
+            if (stage.SlowestSessions is { Count: > 0 })
+            {
+                foreach (SlowSessionRttSnapshot session in stage.SlowestSessions.Take(5))
+                {
+                    lines.Add($"- {stage.StageId}: slow session {session.SessionId} p95={session.RttP95Ms:F2}ms p99={session.RttP99Ms:F2}ms max={session.RttMaxMs:F2}ms samples={session.SampleCount}/{session.TotalSampleCount}");
+                }
+            }
         }
 
         lines.Add(string.Empty);
@@ -124,5 +138,15 @@ internal sealed class LoadValidationSummaryWriter
         }
 
         return $"waits={stage.MaxPacingWaitCount}, avg={stage.MaxPacingAverageWaitMs:F2}ms, win={stage.MinObservedPacingWindow}-{stage.MaxObservedPacingWindow}, +/-={stage.MaxPacingWindowIncreaseCount}/{stage.MaxPacingWindowDecreaseCount}";
+    }
+
+    private static string FormatSessionRtt(LoadValidationStageSummary stage)
+    {
+        if (stage.SessionRttTrackedSessionCount <= 0)
+        {
+            return "none";
+        }
+
+        return $"eligible={stage.SessionRttEligibleSessionCount}/{stage.SessionRttTrackedSessionCount}, p50/p95/p99-of-p95={stage.MaxSessionRttP50OfP95Ms:F2}/{stage.MaxSessionRttP95OfP95Ms:F2}/{stage.MaxSessionRttP99OfP95Ms:F2}ms, max-p95={stage.MaxSessionRttMaxSessionP95Ms:F2}ms";
     }
 }

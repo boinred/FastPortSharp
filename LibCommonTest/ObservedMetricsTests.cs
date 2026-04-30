@@ -199,6 +199,21 @@ public sealed class ObservedMetricsTests
     [TestMethod]
     public void ObservedMetricsJson_DeserializesClientPacingFields()
     {
+        var sessionRtt = new SessionRttSummarySnapshot(
+            TrackedSessionCount: 2,
+            EligibleSessionCount: 1,
+            ExcludedLowSampleSessionCount: 1,
+            MinSamplesPerSession: 8,
+            P50OfSessionP95Ms: 10,
+            P95OfSessionP95Ms: 12,
+            P99OfSessionP95Ms: 14,
+            MaxSessionP95Ms: 16,
+            MaxSessionP99Ms: 18,
+            MaxSessionMaxMs: 20,
+            SlowestSessions:
+            [
+                new SlowSessionRttSnapshot(7, 8, 10, 5, 6, 16, 18, 20)
+            ]);
         var client = new ClientObservedMetricsSnapshot(
             Timestamp: new DateTimeOffset(2026, 4, 29, 9, 0, 0, TimeSpan.Zero),
             TargetSessions: 100,
@@ -227,7 +242,8 @@ public sealed class ObservedMetricsTests
             PacingWindowIncreaseCount: 2,
             PacingWindowDecreaseCount: 1,
             MinObservedPacingWindow: 2,
-            MaxObservedPacingWindow: 8);
+            MaxObservedPacingWindow: 8,
+            SessionRtt: sessionRtt);
 
         string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromClient(client));
 
@@ -245,11 +261,71 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(1, observed.ClientObserved.PacingWindowDecreaseCount);
         Assert.AreEqual(2, observed.ClientObserved.MinObservedPacingWindow);
         Assert.AreEqual(8, observed.ClientObserved.MaxObservedPacingWindow);
+        Assert.IsNotNull(observed.ClientObserved.SessionRtt);
+        Assert.AreEqual(2, observed.ClientObserved.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(1, observed.ClientObserved.SessionRtt.EligibleSessionCount);
+        Assert.AreEqual(7, observed.ClientObserved.SessionRtt.SlowestSessions[0].SessionId);
+    }
+
+    [TestMethod]
+    public void ObservedMetricsJson_DeserializesClientWithoutSessionRtt()
+    {
+        string json = """
+            {
+              "timestamp": "2026-04-29T09:00:00+00:00",
+              "clientObserved": {
+                "timestamp": "2026-04-29T09:00:00+00:00",
+                "targetSessions": 10,
+                "currentSessions": 10,
+                "totalSentPackets": 10,
+                "totalReceivedPackets": 10,
+                "totalSentBytes": 1024,
+                "totalReceivedBytes": 1024,
+                "sentPacketsPerSecond": 1,
+                "receivedPacketsPerSecond": 1,
+                "sentBytesPerSecond": 1024,
+                "receivedBytesPerSecond": 1024,
+                "tps": 1,
+                "rttAverageMs": 1,
+                "rttP50Ms": 1,
+                "rttP95Ms": 2,
+                "rttP99Ms": 3,
+                "connectCount": 10,
+                "disconnectCount": 0,
+                "socketErrorCount": 0,
+                "socketErrorRate": 0
+              },
+              "serverObserved": null
+            }
+            """;
+
+        ObservedMetricsSnapshot? observed = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
+            json,
+            ObservedMetricsJson.SerializerOptions);
+
+        Assert.IsNotNull(observed);
+        Assert.IsNotNull(observed.ClientObserved);
+        Assert.IsNull(observed.ClientObserved.SessionRtt);
     }
 
     [TestMethod]
     public void ClientObservedMetricsSnapshot_MapsLoadRunnerMetrics()
     {
+        var sessionRtt = new SessionRttSummarySnapshot(
+            TrackedSessionCount: 1,
+            EligibleSessionCount: 1,
+            ExcludedLowSampleSessionCount: 0,
+            MinSamplesPerSession: 8,
+            P50OfSessionP95Ms: 4,
+            P95OfSessionP95Ms: 4,
+            P99OfSessionP95Ms: 5,
+            MaxSessionP95Ms: 4,
+            MaxSessionP99Ms: 5,
+            MaxSessionMaxMs: 6,
+            SlowestSessions:
+            [
+                new SlowSessionRttSnapshot(3, 8, 8, 2, 3, 4, 5, 6)
+            ]);
         var raw = new MetricsSnapshot(
             Timestamp: new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
             TargetSessions: 100,
@@ -283,7 +359,8 @@ public sealed class ObservedMetricsTests
             PacingWindowIncreaseCount: 2,
             PacingWindowDecreaseCount: 1,
             MinObservedPacingWindow: 2,
-            MaxObservedPacingWindow: 8);
+            MaxObservedPacingWindow: 8,
+            SessionRtt: sessionRtt);
 
         ClientObservedMetricsSnapshot observed = raw.ToClientObservedMetricsSnapshot();
 
@@ -312,5 +389,8 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(raw.PacingWindowDecreaseCount, observed.PacingWindowDecreaseCount);
         Assert.AreEqual(raw.MinObservedPacingWindow, observed.MinObservedPacingWindow);
         Assert.AreEqual(raw.MaxObservedPacingWindow, observed.MaxObservedPacingWindow);
+        Assert.IsNotNull(observed.SessionRtt);
+        Assert.AreEqual(1, observed.SessionRtt.TrackedSessionCount);
+        Assert.AreEqual(3, observed.SessionRtt.SlowestSessions[0].SessionId);
     }
 }

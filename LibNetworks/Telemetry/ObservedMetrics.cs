@@ -29,6 +29,29 @@ public sealed record ObservedMetricsSnapshot(
     }
 }
 
+public sealed record SessionRttSummarySnapshot(
+    int TrackedSessionCount,
+    int EligibleSessionCount,
+    int ExcludedLowSampleSessionCount,
+    int MinSamplesPerSession,
+    double P50OfSessionP95Ms,
+    double P95OfSessionP95Ms,
+    double P99OfSessionP95Ms,
+    double MaxSessionP95Ms,
+    double MaxSessionP99Ms,
+    double MaxSessionMaxMs,
+    IReadOnlyList<SlowSessionRttSnapshot> SlowestSessions);
+
+public sealed record SlowSessionRttSnapshot(
+    int SessionId,
+    int SampleCount,
+    long TotalSampleCount,
+    double RttAverageMs,
+    double RttP50Ms,
+    double RttP95Ms,
+    double RttP99Ms,
+    double RttMaxMs);
+
 public sealed record ClientObservedMetricsSnapshot(
     DateTimeOffset Timestamp,
     int TargetSessions,
@@ -68,7 +91,8 @@ public sealed record ClientObservedMetricsSnapshot(
     long PacingWindowIncreaseCount = 0,
     long PacingWindowDecreaseCount = 0,
     long MinObservedPacingWindow = 0,
-    long MaxObservedPacingWindow = 0);
+    long MaxObservedPacingWindow = 0,
+    SessionRttSummarySnapshot? SessionRtt = null);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,

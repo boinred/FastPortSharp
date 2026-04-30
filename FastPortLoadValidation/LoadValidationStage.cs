@@ -1,3 +1,5 @@
+using LibNetworks.Telemetry;
+
 namespace FastPortLoadValidation;
 
 internal sealed record LoadValidationStage(
@@ -103,7 +105,17 @@ internal sealed record LoadValidationStageSummary(
     long MinObservedPacingWindow = 0,
     long MaxObservedPacingWindow = 0,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
-    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
+    int SessionRttTrackedSessionCount = 0,
+    int SessionRttEligibleSessionCount = 0,
+    int SessionRttExcludedLowSampleSessionCount = 0,
+    double MaxSessionRttP50OfP95Ms = 0,
+    double MaxSessionRttP95OfP95Ms = 0,
+    double MaxSessionRttP99OfP95Ms = 0,
+    double MaxSessionRttMaxSessionP95Ms = 0,
+    double MaxSessionRttMaxSessionP99Ms = 0,
+    double MaxSessionRttMaxSessionMaxMs = 0,
+    IReadOnlyList<SlowSessionRttSnapshot>? SlowestSessions = null);
 
 internal sealed record LoadValidationRunSummary(
     string RunId,

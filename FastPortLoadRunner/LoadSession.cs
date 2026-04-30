@@ -197,7 +197,7 @@ internal sealed class LoadSession(
                 long clientSendTs = (long)response.Header.ClientSendTs;
                 long clientReceiveTs = Stopwatch.GetTimestamp();
                 _pacer.OnResponse(CalculateRttMs(clientSendTs, clientReceiveTs));
-                metricsCollector.RecordRtt(clientSendTs, clientReceiveTs);
+                metricsCollector.RecordRtt(sessionId, clientSendTs, clientReceiveTs);
             }
             else
             {

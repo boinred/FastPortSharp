@@ -4,6 +4,8 @@ namespace FastPortLoadValidation;
 
 internal sealed class LoadValidationEvaluator
 {
+    private const int MaxSlowSessionEntries = 20;
+
     public LoadValidationStageSummary Evaluate(
         LoadValidationStage stage,
         string metricsPath,
@@ -16,6 +18,11 @@ internal sealed class LoadValidationEvaluator
     {
         var failures = new List<string>(readResult.Errors);
         IReadOnlyList<ClientObservedMetricsSnapshot> samples = readResult.Samples;
+        SessionRttSummarySnapshot[] sessionRttSamples = samples
+            .Select(sample => sample.SessionRtt)
+            .Where(sample => sample is not null)
+            .Cast<SessionRttSummarySnapshot>()
+            .ToArray();
         IReadOnlyList<ServerObservedMetricsSnapshot> mergedServerSamples = mergeResult?.CombinedSamples
             .Select(sample => sample.ServerObserved)
             .Where(sample => sample is not null)
@@ -143,7 +150,52 @@ internal sealed class LoadValidationEvaluator
             MinObservedPacingWindow: minObservedPacingWindow,
             MaxObservedPacingWindow: samples.Count == 0 ? 0 : samples.Max(sample => sample.MaxObservedPacingWindow),
             SocketErrorCountsByPhase: CopyCounters(finalSample?.SocketErrorCountsByPhase),
-            SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass));
+            SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass),
+            SessionRttTrackedSessionCount: MaxSessionRttCount(sessionRttSamples, sample => sample.TrackedSessionCount),
+            SessionRttEligibleSessionCount: MaxSessionRttCount(sessionRttSamples, sample => sample.EligibleSessionCount),
+            SessionRttExcludedLowSampleSessionCount: MaxSessionRttCount(sessionRttSamples, sample => sample.ExcludedLowSampleSessionCount),
+            MaxSessionRttP50OfP95Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.P50OfSessionP95Ms),
+            MaxSessionRttP95OfP95Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.P95OfSessionP95Ms),
+            MaxSessionRttP99OfP95Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.P99OfSessionP95Ms),
+            MaxSessionRttMaxSessionP95Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.MaxSessionP95Ms),
+            MaxSessionRttMaxSessionP99Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.MaxSessionP99Ms),
+            MaxSessionRttMaxSessionMaxMs: MaxSessionRttValue(sessionRttSamples, sample => sample.MaxSessionMaxMs),
+            SlowestSessions: SelectSlowestSessions(sessionRttSamples));
+    }
+
+    private static int MaxSessionRttCount(
+        IReadOnlyCollection<SessionRttSummarySnapshot> samples,
+        Func<SessionRttSummarySnapshot, int> selector)
+    {
+        return samples.Count == 0 ? 0 : samples.Max(selector);
+    }
+
+    private static double MaxSessionRttValue(
+        IReadOnlyCollection<SessionRttSummarySnapshot> samples,
+        Func<SessionRttSummarySnapshot, double> selector)
+    {
+        return samples.Count == 0 ? 0 : samples.Max(selector);
+    }
+
+    private static IReadOnlyList<SlowSessionRttSnapshot>? SelectSlowestSessions(
+        IReadOnlyCollection<SessionRttSummarySnapshot> samples)
+    {
+        SlowSessionRttSnapshot[] slowestSessions = samples
+            .SelectMany(sample => sample.SlowestSessions ?? Array.Empty<SlowSessionRttSnapshot>())
+            .GroupBy(session => session.SessionId)
+            .Select(group => group
+                .OrderByDescending(session => session.RttP95Ms)
+                .ThenByDescending(session => session.RttP99Ms)
+                .ThenByDescending(session => session.RttMaxMs)
+                .First())
+            .OrderByDescending(session => session.RttP95Ms)
+            .ThenByDescending(session => session.RttP99Ms)
+            .ThenByDescending(session => session.RttMaxMs)
+            .ThenBy(session => session.SessionId)
+            .Take(MaxSlowSessionEntries)
+            .ToArray();
+
+        return slowestSessions.Length == 0 ? null : slowestSessions;
     }
 
     private static IReadOnlyDictionary<string, long>? CopyCounters(IReadOnlyDictionary<string, long>? counters)

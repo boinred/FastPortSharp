@@ -270,6 +270,21 @@ public sealed class FastPortLoadValidationTests
     {
         LoadValidationStage stage = CreateStage(targetSessions: 10);
         DateTimeOffset timestamp = new(2026, 4, 28, 9, 0, 0, TimeSpan.Zero);
+        var sessionRtt = new SessionRttSummarySnapshot(
+            TrackedSessionCount: 10,
+            EligibleSessionCount: 8,
+            ExcludedLowSampleSessionCount: 2,
+            MinSamplesPerSession: 8,
+            P50OfSessionP95Ms: 10,
+            P95OfSessionP95Ms: 11,
+            P99OfSessionP95Ms: 12,
+            MaxSessionP95Ms: 50,
+            MaxSessionP99Ms: 60,
+            MaxSessionMaxMs: 70,
+            SlowestSessions:
+            [
+                new SlowSessionRttSnapshot(7, 8, 10, 20, 30, 50, 60, 70)
+            ]);
         ClientObservedMetricsSnapshot client = CreateSample(
             currentSessions: 10,
             targetSessions: 10,
@@ -283,7 +298,8 @@ public sealed class FastPortLoadValidationTests
             minObservedPacingWindow: 2,
             maxObservedPacingWindow: 8,
             socketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
-            socketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 });
+            socketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 },
+            sessionRtt: sessionRtt);
         ServerObservedMetricsSnapshot server = CreateServerSample(
             timestamp.AddMilliseconds(100),
             pendingSendRequests: 12,
@@ -339,6 +355,16 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(8, summary.MaxObservedPacingWindow);
         Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
         Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
+        Assert.AreEqual(10, summary.SessionRttTrackedSessionCount);
+        Assert.AreEqual(8, summary.SessionRttEligibleSessionCount);
+        Assert.AreEqual(2, summary.SessionRttExcludedLowSampleSessionCount);
+        Assert.AreEqual(10, summary.MaxSessionRttP50OfP95Ms);
+        Assert.AreEqual(11, summary.MaxSessionRttP95OfP95Ms);
+        Assert.AreEqual(12, summary.MaxSessionRttP99OfP95Ms);
+        Assert.AreEqual(50, summary.MaxSessionRttMaxSessionP95Ms);
+        Assert.AreEqual(60, summary.MaxSessionRttMaxSessionP99Ms);
+        Assert.AreEqual(70, summary.MaxSessionRttMaxSessionMaxMs);
+        Assert.AreEqual(7, summary.SlowestSessions![0].SessionId);
     }
 
     [TestMethod]
@@ -412,7 +438,20 @@ public sealed class FastPortLoadValidationTests
                     MaxPacingWindowIncreaseCount: 2,
                     MaxPacingWindowDecreaseCount: 1,
                     MinObservedPacingWindow: 2,
-                    MaxObservedPacingWindow: 8)
+                    MaxObservedPacingWindow: 8,
+                    SessionRttTrackedSessionCount: 2,
+                    SessionRttEligibleSessionCount: 1,
+                    SessionRttExcludedLowSampleSessionCount: 1,
+                    MaxSessionRttP50OfP95Ms: 14,
+                    MaxSessionRttP95OfP95Ms: 16,
+                    MaxSessionRttP99OfP95Ms: 18,
+                    MaxSessionRttMaxSessionP95Ms: 16,
+                    MaxSessionRttMaxSessionP99Ms: 18,
+                    MaxSessionRttMaxSessionMaxMs: 20,
+                    SlowestSessions:
+                    [
+                        new SlowSessionRttSnapshot(7, 8, 10, 5, 6, 16, 18, 20)
+                    ])
             ]);
         var writer = new LoadValidationSummaryWriter();
 
@@ -433,6 +472,10 @@ public sealed class FastPortLoadValidationTests
         StringAssert.Contains(markdown, "Pacing");
         StringAssert.Contains(markdown, "win=2-8");
         StringAssert.Contains(markdown, "RTT P99");
+        StringAssert.Contains(markdown, "Session RTT");
+        StringAssert.Contains(markdown, "eligible=1/2");
+        StringAssert.Contains(markdown, "session RTT excluded low-sample sessions = 1");
+        StringAssert.Contains(markdown, "slow session 7");
     }
 
     [TestMethod]
@@ -503,7 +546,8 @@ public sealed class FastPortLoadValidationTests
         long minObservedPacingWindow = 0,
         long maxObservedPacingWindow = 0,
         IReadOnlyDictionary<string, long>? socketErrorCountsByPhase = null,
-        IReadOnlyDictionary<string, long>? socketErrorCountsByClass = null)
+        IReadOnlyDictionary<string, long>? socketErrorCountsByClass = null,
+        SessionRttSummarySnapshot? sessionRtt = null)
     {
         return new ClientObservedMetricsSnapshot(
             Timestamp: timestamp ?? new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
@@ -540,7 +584,8 @@ public sealed class FastPortLoadValidationTests
             MinObservedPacingWindow: minObservedPacingWindow,
             MaxObservedPacingWindow: maxObservedPacingWindow,
             SocketErrorCountsByPhase: socketErrorCountsByPhase,
-            SocketErrorCountsByClass: socketErrorCountsByClass);
+            SocketErrorCountsByClass: socketErrorCountsByClass,
+            SessionRtt: sessionRtt);
     }
 
     private static ServerObservedMetricsSnapshot CreateServerSample(
