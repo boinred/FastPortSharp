@@ -1,200 +1,207 @@
 # FastPortSharp Handoff
 
-> Last updated: 2026-04-29
+> Last updated: 2026-04-30
 > Branch: `main`
-> Remote baseline before this handoff update: `e524ab4 Checkpoint 10K telemetry and next PDCA plan`
+> Remote baseline before this handoff update: `146b729 Add per-session RTT tail telemetry`
 
 ## Current State
 
-- Latest pushed commit before current local work: `e524ab4 Checkpoint 10K telemetry and next PDCA plan`
-- Completed and archived PDCA feature: `10k-load-bottleneck-telemetry`
-- Completed PDCA feature: `server-telemetry-export-merge-socket-error-classification`
-- Match rate: 96%
-- Current recommended action: analyze server-merged 10K result and tune send/backpressure path
+- Active PDCA features: none.
+- Primary feature: none.
+- Latest archived PDCA feature: `loadrunner-10k-session-rtt-validation`
 - Project level detected by bkit: `Starter`
+- Current recommended action: start `$pdca pm throughput-pacing-server-processing-decomposition`.
 
-## Completed Since Previous Handoff
+The latest completed work was diagnostic, not a runtime optimization. It validated the latest 10K run with per-session RTT telemetry and confirmed that the RTT tail is broad load pressure, not only a few isolated slow sessions.
 
-### 10K Bottleneck Telemetry
+## Latest Completed Work
 
-- Added server send-path telemetry counters:
-  - send requests
-  - pending send requests
-  - max pending send requests
-  - send backpressure events
-  - send buffer byte sample
-  - max send buffer bytes
-- Added client bottleneck telemetry:
-  - connect attempts
-  - connect failures
-  - pending request count
-  - max pending request count
-  - active session ratio
-  - scheduler drift average/max
-- Extended observed DTOs and JSONL output while keeping the existing `ObservedMetricsSnapshot` envelope.
-- Extended load validation summaries with bottleneck fields.
-- Added focused tests for server telemetry, observed metrics, load runner metrics, load validation summaries, and smoke server telemetry.
-- Ran focused `s5-random-10k` validation with logging reduced.
-- Archived PDCA docs under:
-  - `docs/archive/2026-04/10k-load-bottleneck-telemetry/`
+### LoadRunner 10K Session RTT Validation
 
-### Server Telemetry Export/Merge + Socket Error Classification
+- Archived PDCA documents under:
+  - `docs/archive/2026-04/loadrunner-10k-session-rtt-validation/`
+- Updated `docs/load-validation-benchmark-results.md` with the latest 10K comparison and session RTT interpretation.
+- Verified `docs/.pdca-status.json` has no active feature after archive.
 
-- Added `FastPortSmokeServer` server observed JSONL export:
-  - `--Telemetry:Output`
-  - `--Telemetry:IntervalSeconds`
-  - `ServerTelemetryExportBackgroundService`
-- Added client socket error classification in `FastPortLoadRunner`:
-  - phase counters
-  - exception type counters
-  - socket error code counters
-  - combined class key counters
-- Extended `ClientObservedMetricsSnapshot` with optional socket classification dictionaries.
-- Extended `FastPortLoadValidation`:
-  - `--server-metrics`
-  - `--merge-tolerance-ms`
-  - server-only observed JSONL reader
-  - client/server nearest timestamp merge
-  - `{stageId}.combined.metrics.jsonl`
-  - server backlog fields in summary JSON/Markdown
-- Added tests for export, reader, merger, evaluator, summary, and socket classification counters.
-- Completed PDCA docs:
-  - `docs/01-plan/features/server-telemetry-export-merge-socket-error-classification.plan.md`
-  - `docs/02-design/features/server-telemetry-export-merge-socket-error-classification.design.md`
-  - `docs/03-analysis/server-telemetry-export-merge-socket-error-classification.analysis.md`
-  - `docs/04-report/server-telemetry-export-merge-socket-error-classification.report.md`
+Final focused 10K artifact:
 
-## 10K Focused Run Result
-
-Focused run artifact path:
-
-- `artifacts/load-validation/s5-logging-off/summary.md`
-- `artifacts/load-validation/s5-logging-off/summary.json`
-- `artifacts/load-validation/s5-logging-off/s5-random-10k.metrics.jsonl`
+- `artifacts/load-validation/s5-session-rtt-validation/summary.md`
 
 Important result:
 
 | Metric | Value |
 |--------|------:|
-| Target sessions | 10,000 |
-| Peak current sessions | 8,624 |
-| Peak session ratio | 86.24% |
-| Final disconnect count | 1,782 |
-| Max socket error rate | 0.19% |
-| Max pending request count | 55,695 |
-| Max scheduler drift | 28.21 ms |
-| Max RTT P95 | 43,268.80 ms |
-| Max RTT P99 | 44,895.97 ms |
-| Connect attempts | 10,000 |
-| Connect failures | 0 |
+| Run ID | `20260430-172637-staged` |
+| Result | Passed |
+| Peak sessions | `10,000 / 10,000` |
+| Final disconnects | `0` |
+| Max TPS | `9,371.08` |
+| Max pending request count | `36,695` |
+| Max pending send requests | `1,095` |
+| Server send backpressure events | `1,583` |
+| Max send buffer bytes | `64,204` |
+| RTT P95 | `19,210.39ms` |
+| RTT P99 | `24,863.90ms` |
+| Socket error rate | `0.13%` |
+| `send|IOException|NoBufferSpaceAvailable` | `1,639` |
+| `receive|IOException|TimedOut` | `184` |
+| Max scheduler drift | `12.12ms` |
+
+Session RTT finding:
+
+| Session RTT Metric | Value |
+|--------------------|------:|
+| Tracked sessions | `10,000` |
+| Eligible sessions | `9,922` |
+| P50 of session P95 | `13,663.21ms` |
+| P95 of session P95 | `18,211.02ms` |
+| P99 of session P95 | `23,295.81ms` |
+| Max session P95 | `38,710.49ms` |
+| Max session P99 | `87,523.53ms` |
+| Max session max RTT | `93,670.83ms` |
 
 Interpretation:
 
-- Connect establishment was not the primary failure point in this focused run.
-- The problem appears after successful connections: disconnect/socket-error pressure plus request backlog accumulation.
-- Client-only JSONL is insufficient for the next diagnosis because `serverObserved` is still `null` in LoadRunner output.
+- Global RTT P95 is `19,210.39ms`.
+- P95 of per-session P95 is `18,211.02ms`.
+- These values are close enough to treat the current tail as broad high-load pressure.
+- Slow outlier sessions still exist, but they are not the only source of the tail.
 
-## 10K Server-Merged Run Result
+## Current Benchmark Interpretation
 
-Focused server-merged run artifact path:
+The current implementation can pass focused same-machine 10K validation, but it is not yet good enough for a real-time game workload.
 
-- `artifacts/load-validation/s5-server-merged/summary.md`
-- `artifacts/load-validation/s5-server-merged/summary.json`
-- `artifacts/load-validation/s5-server-merged/server.metrics.jsonl`
-- `artifacts/load-validation/s5-server-merged/s5-random-10k.metrics.jsonl`
-- `artifacts/load-validation/s5-server-merged/s5-random-10k.combined.metrics.jsonl`
+What improved compared with the original server-merged failure path:
 
-Important result:
+- Peak sessions now reach `10,000 / 10,000`.
+- Final disconnects are down to `0`.
+- Server pending send depth is no longer exploding into hundreds of thousands.
+- Server send buffer bytes remain bounded.
+- Per-session RTT telemetry is now available for tail analysis.
 
-| Metric | Value |
-|--------|------:|
-| Target sessions | 10,000 |
-| Peak current sessions | 8,611 |
-| Peak session ratio | 86.11% |
-| Final disconnect count | 1,855 |
-| Max socket error rate | 0.70% |
-| Connect attempts | 10,000 |
-| Connect failures | 0 |
-| Max pending request count | 52,820 |
-| Max pending send requests | 180,466 |
-| Server send backpressure events | 878,503 |
-| Max send buffer bytes | 2,649,731 |
-| Server samples | 422 |
-| Merged samples | 421 |
-| Unmatched client samples | 0 |
-| Max merge skew | 793.683 ms |
-| Max RTT P95 | 28,754.76 ms |
-| Max RTT P99 | 29,912.06 ms |
+What remains weak:
 
-Socket classification:
+- RTT P95 is still about `19.2s`.
+- RTT P99 is still about `24.9s`.
+- Max TPS is still too low for high-frequency movement workloads.
+- Send-side `NoBufferSpaceAvailable` is reduced but still present.
+- Server send backpressure and receive timeout still appear under 10K pressure.
 
-| Class | Count |
-|-------|------:|
-| `send|IOException|NoBufferSpaceAvailable` | 6,586 |
-| `send|IOException|Shutdown` | 1,314 |
-| `receive|IOException|ConnectionReset` | 149 |
+## Recommended Roadmap
 
-Interpretation:
+### 1. Throughput/Pacing/Server Processing Decomposition
 
-- Connect establishment is still not the primary failure point.
-- The server-merged run confirms severe server send backlog: max pending send requests reached 180,466.
-- Client socket errors are dominated by send-side `NoBufferSpaceAvailable`, which points to socket/send buffer pressure rather than protocol parse failures.
-- Next optimization should target send queue/backpressure behavior before changing protocol or connect logic.
-
-## Next Work
-
-Recommended next feature:
+Recommended command:
 
 ```text
-server-send-backpressure-queue-drain-optimization
+$pdca pm throughput-pacing-server-processing-decomposition
 ```
 
-Primary investigation targets:
+Goal:
 
-- avoid unbounded send request accumulation
-- reduce server send queue copies and large queued buffer growth
-- introduce explicit send backpressure/drop/defer policy for load-test echo responses
-- compare send requests per second vs send completions per second during 10K
+- Separate broad 10K RTT pressure into measurable phases:
+  - client pacing wait
+  - client pending request depth
+  - server receive/parse/echo processing
+  - server send queue/drain time
+  - socket send backpressure
 
-Optional PDCA cleanup after review:
+This should decide whether the next code change belongs in `FastPortLoadRunner`, `FastPortSmokeServer`, or `LibNetworks`.
+
+### 2. Follow-up Optimization
+
+Pick only after decomposition data is available.
+
+Likely candidates:
+
+- `adaptive-client-pacing-threshold-tuning`
+- `server-processing-throughput-tuning`
+- `receive-timeout-tail-flow-control`
+- `send-throughput-drain-fairness-optimization`
+
+### 3. Game Server Template Foundation
+
+Recommended feature name:
 
 ```text
-$pdca archive server-telemetry-export-merge-socket-error-classification
+$pdca pm fastport-game-server-template-foundation
 ```
+
+Purpose:
+
+- Turn the optimized engine shape into a usable server template.
+- Keep responsibilities separated:
+  - `LibNetworks`: protocol-neutral engine core.
+  - `FastPortServer`: basic network engine host/sample.
+  - `FastPortSmokeServer`: echo/load validation server.
+  - future game template: game protocol/session/handler replacement points.
+
+Expected scope:
+
+- game session base sample
+- packet handler registration pattern
+- startup/config/logging defaults
+- telemetry hook points
+- health/startup verification
+- README or template usage guide
+
+### 4. MAUI Dashboard
+
+Start after the telemetry and server template boundaries are stable.
+
+Likely candidates:
+
+- `maui-telemetry-dashboard-foundation`
+- `maui-load-validation-run-viewer`
+- `maui-run-comparison-report-export`
+
+The dashboard should consume the existing observed metric envelope:
+
+- root `timestamp`
+- `clientObserved`
+- `serverObserved`
+
+Initial views should focus on:
+
+- TPS
+- RTT P95/P99
+- per-session RTT tail
+- pending request/send
+- pacing window/wait
+- socket error classification
+- server backpressure/send buffer
+- stage pass/fail comparison
 
 ## Important Architecture Decisions
 
 - `LibNetworks` should stay protocol-neutral.
 - Smoke/load-test behavior belongs in `FastPortSmokeServer`, `FastPortLoadRunner`, and `FastPortLoadValidation`.
-- `FastPortServer` should remain a basic network engine host/sample.
-- The observed metrics envelope should remain:
-  - root `timestamp`
-  - `clientObserved`
-  - `serverObserved`
+- Do not move echo/smoke protocol behavior back into `FastPortServer`.
+- `FastPortServer` should remain a basic network engine host/sample until the game server template is explicitly designed.
 - High-load generated artifacts remain under `artifacts/load-validation/` and should not be committed.
+- Same-machine 10K results are useful for comparison, but server/runner split-machine validation is still needed before claiming production capacity.
 
 ## Verification Recently Run
 
+Latest validation from the archived feature:
+
 ```bash
-dotnet build FastPortCharp.sln
-dotnet test FastPortCharp.sln --no-build
 dotnet build FastPortCharp.sln -c Release
-./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation --profile staged --stage s5-random-10k --output artifacts/load-validation/s5-logging-off
-./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation --profile smoke --output artifacts/load-validation/server-merge-smoke --server-metrics artifacts/load-validation/server-merge-smoke/server.metrics.jsonl
+dotnet test FastPortCharp.sln --no-build
+./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation \
+  --profile staged \
+  --stage s5-random-10k \
+  --pacing-policy adaptive-window \
+  --output artifacts/load-validation/s5-session-rtt-validation \
+  --server-metrics artifacts/load-validation/s5-session-rtt-validation/server.metrics.jsonl
 ```
 
 Results:
 
-- Debug build passed with 0 warnings and 0 errors.
-- Test suite passed: 78 passed, 0 failed.
-- Release build passed with 0 warnings and 0 errors.
-- Focused 10K validation produced artifacts but failed thresholds, as expected for the bottleneck investigation.
-- Reduced smoke export/merge passed.
-- Focused server-merged 10K produced complete server/client combined artifacts and failed expected thresholds.
-- Reduced smoke artifacts:
-  - `artifacts/load-validation/server-merge-smoke/server.metrics.jsonl` (45 lines)
-  - `artifacts/load-validation/server-merge-smoke/smoke-fixed-10.combined.metrics.jsonl` (11 lines)
-  - `artifacts/load-validation/server-merge-smoke/smoke-random-25.combined.metrics.jsonl` (19 lines)
+- Release build passed with `0` warnings and `0` errors.
+- Test suite passed: `104 / 104`.
+- Focused 10K validation passed.
+- Server/client merge produced `407` merged samples with `0` unmatched client samples.
 
 ## Suggested Commands
 
@@ -204,28 +211,22 @@ Check repository state:
 git status --short --branch
 ```
 
-Run tests:
-
-```bash
-dotnet test FastPortCharp.sln --no-build
-```
-
-Build:
-
-```bash
-dotnet build FastPortCharp.sln
-```
-
-Inspect active PDCA:
+Inspect PDCA status:
 
 ```text
 $pdca status
 ```
 
+Start next PM:
+
+```text
+$pdca pm throughput-pacing-server-processing-decomposition
+```
+
 ## Notes For Next Session
 
-- Start by checking `docs/.pdca-status.json`.
-- Do not move echo/smoke protocol behavior back into `FastPortServer`.
-- Server telemetry export is intentionally application-layer code in `FastPortSmokeServer`.
-- Socket classification is intentionally diagnosis-oriented, not a production monitoring framework.
-- Next useful work is send/backpressure optimization based on the server-merged 10K result.
+- Start with `docs/.pdca-status.json`; it should have no active feature.
+- Treat the latest 10K result as a diagnostic baseline, not a clean performance win.
+- Keep server template work after the next decomposition/optimization pass.
+- Keep MAUI dashboard after server template boundaries are stable.
+- Do not commit `.DS_Store` files.

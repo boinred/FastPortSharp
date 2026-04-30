@@ -10,27 +10,27 @@ This document tracks same-machine `FastPortLoadValidation` results for the 10,00
 
 ## Latest 10K Comparison
 
-Current candidate: `artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md`
+Current candidate: `artifacts/load-validation/s5-session-rtt-validation/summary.md`
 
-| Metric | Reference: `s5-adaptive-pacing-window` | Current: `s5-send-channel-queue-batch-pool-adaptive` | Change |
-|--------|---------------------------------------:|------------------------------------------------------:|-------:|
+| Metric | Reference: `s5-send-channel-queue-batch-pool-adaptive` | Current: `s5-session-rtt-validation` | Change |
+|--------|--------------------------------------------------------:|--------------------------------------:|-------:|
 | Result | Passed | Passed | Stable |
-| Peak sessions | `10,000 / 10,000` | `9,975 / 10,000` | `-0.25pp`, still above 99% target |
-| Final disconnects | `0` | `2` | Regression, within target |
-| Max pending request count | `36,384` | `38,246` | `+1,862` (`+5.1%`) |
-| Max pending send requests | `212` | `1,282` | `+1,070` (`+504.7%`) |
-| Server send backpressure events | `501` | `0` | `-501` (`-100.0%`) |
-| Max send buffer bytes | `63,233` | `63,364` | `+131` (`+0.2%`) |
-| `send\|IOException\|NoBufferSpaceAvailable` | `1,415` | `0` | `-1,415` (`-100.0%`) |
-| `receive\|IOException\|TimedOut` | None material | `1,266` | Regression |
-| Other socket classifications | None material | `send\|IOException\|Shutdown = 2` | New minor classification |
-| Socket error rate | `0.05%` | `0.12%` | `+0.07pp` |
-| Max TPS | `13,034.37` | `7,901.40` | `-39.4%` |
-| RTT P95 | `16,234.27ms` | `17,796.60ms` | `+9.6%` |
-| RTT P99 | `18,420.99ms` | `27,398.15ms` | `+48.7%` |
-| Max scheduler drift | `320.86ms` | `19.66ms` | Lower |
+| Peak sessions | `9,975 / 10,000` | `10,000 / 10,000` | `+0.25pp` |
+| Final disconnects | `2` | `0` | Improved |
+| Max pending request count | `38,246` | `36,695` | `-1,551` (`-4.1%`) |
+| Max pending send requests | `1,282` | `1,095` | `-187` (`-14.6%`) |
+| Server send backpressure events | `0` | `1,583` | Regression |
+| Max send buffer bytes | `63,364` | `64,204` | `+840` (`+1.3%`) |
+| `send\|IOException\|NoBufferSpaceAvailable` | `0` | `1,639` | Regression |
+| `receive\|IOException\|TimedOut` | `1,266` | `184` | `-1,082` (`-85.5%`) |
+| Socket error rate | `0.12%` | `0.13%` | `+0.01pp` |
+| Max TPS | `7,901.40` | `9,371.08` | `+18.6%` |
+| RTT P95 | `17,796.60ms` | `19,210.39ms` | `+7.9%` |
+| RTT P99 | `27,398.15ms` | `24,863.90ms` | `-9.3%` |
+| Max scheduler drift | `19.66ms` | `12.12ms` | Lower |
+| Session RTT p95-of-session-P95 | Not tracked | `18,211.02ms` | Newly observed |
 
-Current interpretation: the latest 10K run passes the validation threshold and improves scheduler drift, server send backpressure, send-side `NoBufferSpaceAvailable`, and final disconnects compared with the direct scatter/gather batch result. It is not a clean performance win because TPS, RTT P95/P99, socket error rate, pending send depth, and receive timeouts regress against the adaptive-window reference.
+Current interpretation: the latest 10K run passes the validation threshold and now includes per-session RTT telemetry. It improves peak sessions, final disconnects, max TPS, pending request depth, pending send depth, receive timeouts, RTT P99, and scheduler drift compared with the previous batch+pool candidate. It is still not a clean performance win because RTT P95, server send backpressure, send-side `NoBufferSpaceAvailable`, and socket error rate remain above the desired direction. The session RTT data suggests the tail is mostly a broad high-load slowdown, with a smaller set of outlier sessions extending the worst tail.
 
 ## Initial 10K Breakthrough Comparison
 
@@ -154,6 +154,62 @@ The Channel-based `BaseSession` send queue passes focused 10K and lowers `NoBuff
 The first iterate pass adds scatter/gather batching and restores the `SendChunkBytes` cap. That fixes the drift problem (`36.02ms`) and reduces receive timeouts compared with Channel-only (`4,419 -> 900`), but it leaves final disconnects slightly above target and RTT P99 high.
 
 The second iterate pass coalesces multi-segment batches into an ArrayPool-rented buffer before using the memory send overload. That improves final disconnects (`109 -> 2`), server send backpressure (`1,591 -> 0`), send-side `NoBufferSpaceAvailable` (`1,159 -> 0`), and drift (`36.02ms -> 19.66ms`). It is still not a clean performance win: max TPS drops further, pending send depth rises, receive timeouts remain material, socket error rate is still above the `0.10%` target, and RTT P99 remains above the `20,000ms` target.
+
+## Session RTT Validation Follow-up
+
+This run validates whether the latest focused 10K RTT tail is broad or concentrated by using per-session RTT telemetry.
+
+- Baseline: `artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md`
+- Session RTT validation: `artifacts/load-validation/s5-session-rtt-validation/summary.md`
+- Run ID: `20260430-172637-staged`
+- Started: `2026-04-30T17:26:37.3803570+09:00`
+- Completed: `2026-04-30T17:33:44.1348890+09:00`
+- Server metrics: `artifacts/load-validation/s5-session-rtt-validation/server.metrics.jsonl`
+- Combined metrics: `artifacts/load-validation/s5-session-rtt-validation/s5-random-10k.combined.metrics.jsonl`
+
+| Metric | Value |
+|--------|------:|
+| Result | Passed |
+| Peak sessions | `10,000 / 10,000` |
+| Final disconnects | `0` |
+| Max TPS | `9,371.08` |
+| Max pending request count | `36,695` |
+| Max pending send requests | `1,095` |
+| Server send backpressure events | `1,583` |
+| Max send buffer bytes | `64,204` |
+| `send\|IOException\|NoBufferSpaceAvailable` | `1,639` |
+| `receive\|IOException\|TimedOut` | `184` |
+| Socket error rate | `0.13%` |
+| RTT P95 | `19,210.39ms` |
+| RTT P99 | `24,863.90ms` |
+| Max scheduler drift | `12.12ms` |
+| Merge | `407 / 0` unmatched client samples |
+
+| Session RTT Metric | Value |
+|--------------------|------:|
+| Tracked sessions | `10,000` |
+| Eligible sessions | `9,922` |
+| Max excluded low-sample sessions | `773` |
+| P50 of session P95 | `13,663.21ms` |
+| P95 of session P95 | `18,211.02ms` |
+| P99 of session P95 | `23,295.81ms` |
+| Max session P95 | `38,710.49ms` |
+| Max session P99 | `87,523.53ms` |
+| Max session max RTT | `93,670.83ms` |
+
+| Slow Session | Samples | RTT P50 | RTT P95 | RTT P99 | Max RTT |
+|--------------|--------:|--------:|--------:|--------:|--------:|
+| `7977` | `39 / 39` | `2,893.24ms` | `38,710.49ms` | `54,278.30ms` | `57,058.88ms` |
+| `8587` | `26 / 26` | `3,337.31ms` | `31,466.97ms` | `34,156.44ms` | `35,037.68ms` |
+| `9484` | `71 / 71` | `7,534.53ms` | `31,103.52ms` | `44,122.22ms` | `45,754.75ms` |
+| `6764` | `49 / 49` | `191.68ms` | `30,370.43ms` | `32,200.57ms` | `32,711.67ms` |
+| `8095` | `33 / 33` | `355.45ms` | `29,626.03ms` | `30,251.24ms` | `30,398.60ms` |
+
+Session RTT interpretation:
+
+- The global RTT P95 is `19,210.39ms`, while the P95 of per-session P95 is `18,211.02ms`. These are close enough to indicate that the problem is not limited to a tiny set of sessions.
+- The max session P95 is `38,710.49ms`, so there are still concentrated outliers. However, the broader distribution is already high before the Top 5 outliers.
+- The next feature should focus on throughput/pacing/server processing decomposition first. Socket error correlation remains useful, but the per-session evidence points to broad pressure before isolated starvation.
 
 ## Implemented Improvements
 
