@@ -57,7 +57,7 @@ public sealed class FastPortSmokeServerTests
             Duration: TimeSpan.FromSeconds(2),
             MetricsInterval: TimeSpan.FromSeconds(1),
             OutputPath: null,
-            MaxPendingRequestsPerSession: null);
+            Pacing: LoadPacingOptions.None);
 
         var metricsCollector = new MetricsCollector(scenario.Sessions);
         var runner = new LoadRunner(scenario, metricsCollector, Array.Empty<IMetricsReporter>());

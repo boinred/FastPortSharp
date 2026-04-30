@@ -29,7 +29,32 @@ internal sealed record LoadValidationRunManifest(
     string Profile,
     string Host,
     int Port,
+    LoadValidationPacingManifest Pacing,
     IReadOnlyList<LoadValidationStage> Stages);
+
+internal sealed record LoadValidationPacingManifest(
+    string Policy,
+    int? FixedWindow,
+    int MinWindow,
+    int InitialWindow,
+    int MaxWindow,
+    double RttTargetMs,
+    double RttHighMs,
+    int IncreaseEveryResponses)
+{
+    public static LoadValidationPacingManifest FromOptions(LoadValidationPacingOptions options)
+    {
+        return new LoadValidationPacingManifest(
+            options.ToRunnerPolicyArgument(),
+            options.FixedWindow,
+            options.MinWindow,
+            options.InitialWindow,
+            options.MaxWindow,
+            options.RttTargetMs,
+            options.RttHighMs,
+            options.IncreaseEveryResponses);
+    }
+}
 
 internal sealed record LoadValidationStageSummary(
     string StageId,
@@ -71,6 +96,12 @@ internal sealed record LoadValidationStageSummary(
     double MaxSendCompletionsPerSecond = 0,
     double MaxSendRejectedRequestsPerSecond = 0,
     double MaxSendDrainYieldCountPerSecond = 0,
+    long MaxPacingWaitCount = 0,
+    double MaxPacingAverageWaitMs = 0,
+    long MaxPacingWindowIncreaseCount = 0,
+    long MaxPacingWindowDecreaseCount = 0,
+    long MinObservedPacingWindow = 0,
+    long MaxObservedPacingWindow = 0,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
 

@@ -64,8 +64,8 @@ internal sealed class LoadValidationSummaryWriter
             $"Started: {summary.StartedAt:O}",
             $"Completed: {summary.CompletedAt:O}",
             string.Empty,
-            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Drain Yield | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
-            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------------|-------|-----------|---------|---------|---------------|---------|"
+            "| Stage | Result | Target | Peak | Peak Ratio | Max TPS | Max Pending Req | Max Pending Send | Server Backpressure | Rejected Send | Drain Yield | Pacing | Merge | Max Drift | RTT P95 | RTT P99 | Socket Errors | Samples |",
+            "|-------|--------|--------|------|------------|---------|-----------------|------------------|---------------------|---------------|-------------|--------|-------|-----------|---------|---------|---------------|---------|"
         };
 
         foreach (LoadValidationStageSummary stage in summary.Stages)
@@ -84,6 +84,7 @@ internal sealed class LoadValidationSummaryWriter
                 stage.MaxSendBackpressureEvents.ToString(),
                 $"{stage.MaxSendRejectedRequests}/{stage.MaxSendRejectedBytes}",
                 $"{stage.MaxSendDrainYieldCount}/{stage.MaxSendDrainYieldQueuedBytes}",
+                FormatPacing(stage),
                 $"{stage.MergedSamples}/{stage.UnmatchedClientSamples}",
                 $"{stage.MaxSchedulerDriftMs:F2}ms",
                 $"{stage.MaxRttP95Ms:F2}ms",
@@ -111,5 +112,17 @@ internal sealed class LoadValidationSummaryWriter
 
         lines.Add(string.Empty);
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatPacing(LoadValidationStageSummary stage)
+    {
+        if (stage.MaxPacingWaitCount <= 0
+            && stage.MinObservedPacingWindow <= 0
+            && stage.MaxObservedPacingWindow <= 0)
+        {
+            return "none";
+        }
+
+        return $"waits={stage.MaxPacingWaitCount}, avg={stage.MaxPacingAverageWaitMs:F2}ms, win={stage.MinObservedPacingWindow}-{stage.MaxObservedPacingWindow}, +/-={stage.MaxPacingWindowIncreaseCount}/{stage.MaxPacingWindowDecreaseCount}";
     }
 }

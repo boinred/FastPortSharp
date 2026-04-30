@@ -16,6 +16,7 @@ internal sealed class LoadSession(
     private const int PacketHeaderSize = 2;
     private const int ProtocolHeaderSize = 4;
 
+    private readonly OutstandingRequestPacer _pacer = new(scenario.Pacing, metricsCollector);
     private long _requestId;
     private long _outstandingRequests;
 
@@ -90,14 +91,23 @@ internal sealed class LoadSession(
         while (!cancellationToken.IsCancellationRequested)
         {
             long startedAt = Stopwatch.GetTimestamp();
-            await WaitForPendingRequestBudgetAsync(interval, cancellationToken);
+            await _pacer.WaitForPermitAsync(cancellationToken);
 
             byte[] packet = CreateEchoRequestPacket();
 
-            await stream.WriteAsync(packet, cancellationToken);
-            await stream.FlushAsync(cancellationToken);
-            IncrementOutstandingRequests();
-            metricsCollector.RecordSentPacket(packet.Length);
+            try
+            {
+                await stream.WriteAsync(packet, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+                _pacer.OnRequestSent();
+                IncrementOutstandingRequests();
+                metricsCollector.RecordSentPacket(packet.Length);
+            }
+            catch
+            {
+                _pacer.OnRequestAbandoned();
+                throw;
+            }
 
             TimeSpan elapsed = Stopwatch.GetElapsedTime(startedAt);
             TimeSpan delay = interval - elapsed;
@@ -184,7 +194,14 @@ internal sealed class LoadSession(
             var response = EchoResponse.Parser.ParseFrom(body.AsSpan(ProtocolHeaderSize).ToArray());
             if (response.Header?.ClientSendTs > 0)
             {
-                metricsCollector.RecordRtt((long)response.Header.ClientSendTs, Stopwatch.GetTimestamp());
+                long clientSendTs = (long)response.Header.ClientSendTs;
+                long clientReceiveTs = Stopwatch.GetTimestamp();
+                _pacer.OnResponse(CalculateRttMs(clientSendTs, clientReceiveTs));
+                metricsCollector.RecordRtt(clientSendTs, clientReceiveTs);
+            }
+            else
+            {
+                _pacer.OnResponse(0);
             }
 
             DecrementOutstandingRequests();
@@ -219,21 +236,8 @@ internal sealed class LoadSession(
 
     internal async Task WaitForPendingRequestBudgetAsync(TimeSpan interval, CancellationToken cancellationToken)
     {
-        int? maxPendingRequestsPerSession = scenario.MaxPendingRequestsPerSession;
-        if (maxPendingRequestsPerSession is null)
-        {
-            return;
-        }
-
-        TimeSpan delay = interval < TimeSpan.FromMilliseconds(1)
-            ? interval
-            : TimeSpan.FromMilliseconds(1);
-
-        while (!cancellationToken.IsCancellationRequested
-            && Interlocked.Read(ref _outstandingRequests) >= maxPendingRequestsPerSession.Value)
-        {
-            await Task.Delay(delay, cancellationToken);
-        }
+        _ = interval;
+        await _pacer.WaitForPermitAsync(cancellationToken);
     }
 
     internal void IncrementOutstandingRequests()
@@ -253,6 +257,17 @@ internal sealed class LoadSession(
             }
         }
         while (Interlocked.CompareExchange(ref _outstandingRequests, current - 1, current) != current);
+    }
+
+    private static double CalculateRttMs(long clientSendTimestamp, long clientReceiveTimestamp)
+    {
+        long elapsedTicks = clientReceiveTimestamp - clientSendTimestamp;
+        if (elapsedTicks <= 0)
+        {
+            return 0;
+        }
+
+        return elapsedTicks * 1000.0 / Stopwatch.Frequency;
     }
 }
 

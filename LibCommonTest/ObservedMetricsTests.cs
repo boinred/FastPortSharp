@@ -197,6 +197,57 @@ public sealed class ObservedMetricsTests
     }
 
     [TestMethod]
+    public void ObservedMetricsJson_DeserializesClientPacingFields()
+    {
+        var client = new ClientObservedMetricsSnapshot(
+            Timestamp: new DateTimeOffset(2026, 4, 29, 9, 0, 0, TimeSpan.Zero),
+            TargetSessions: 100,
+            CurrentSessions: 90,
+            TotalSentPackets: 1000,
+            TotalReceivedPackets: 990,
+            TotalSentBytes: 8192,
+            TotalReceivedBytes: 4096,
+            SentPacketsPerSecond: 100,
+            ReceivedPacketsPerSecond: 99,
+            SentBytesPerSecond: 819.2,
+            ReceivedBytesPerSecond: 409.6,
+            Tps: 99,
+            RttAverageMs: 2.5,
+            RttP50Ms: 2,
+            RttP95Ms: 4,
+            RttP99Ms: 6,
+            ConnectCount: 100,
+            DisconnectCount: 10,
+            SocketErrorCount: 1,
+            SocketErrorRate: 0.001,
+            TotalPacingWaitCount: 5,
+            PacingWaitsPerSecond: 2.5,
+            TotalPacingWaitTimeMs: 7.5,
+            PacingAverageWaitMs: 1.5,
+            PacingWindowIncreaseCount: 2,
+            PacingWindowDecreaseCount: 1,
+            MinObservedPacingWindow: 2,
+            MaxObservedPacingWindow: 8);
+
+        string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromClient(client));
+
+        ObservedMetricsSnapshot? observed = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
+            json,
+            ObservedMetricsJson.SerializerOptions);
+
+        Assert.IsNotNull(observed);
+        Assert.IsNotNull(observed.ClientObserved);
+        Assert.AreEqual(5, observed.ClientObserved.TotalPacingWaitCount);
+        Assert.AreEqual(2.5, observed.ClientObserved.PacingWaitsPerSecond);
+        Assert.AreEqual(7.5, observed.ClientObserved.TotalPacingWaitTimeMs);
+        Assert.AreEqual(1.5, observed.ClientObserved.PacingAverageWaitMs);
+        Assert.AreEqual(2, observed.ClientObserved.PacingWindowIncreaseCount);
+        Assert.AreEqual(1, observed.ClientObserved.PacingWindowDecreaseCount);
+        Assert.AreEqual(2, observed.ClientObserved.MinObservedPacingWindow);
+        Assert.AreEqual(8, observed.ClientObserved.MaxObservedPacingWindow);
+    }
+
+    [TestMethod]
     public void ClientObservedMetricsSnapshot_MapsLoadRunnerMetrics()
     {
         var raw = new MetricsSnapshot(
@@ -226,7 +277,13 @@ public sealed class ObservedMetricsTests
             MaxPendingRequestCount: 20,
             ActiveSessionRatio: 0.9,
             SchedulerDriftAverageMs: 1.5,
-            SchedulerDriftMaxMs: 3.5);
+            SchedulerDriftMaxMs: 3.5,
+            TotalPacingWaitCount: 5,
+            PacingAverageWaitMs: 1.5,
+            PacingWindowIncreaseCount: 2,
+            PacingWindowDecreaseCount: 1,
+            MinObservedPacingWindow: 2,
+            MaxObservedPacingWindow: 8);
 
         ClientObservedMetricsSnapshot observed = raw.ToClientObservedMetricsSnapshot();
 
@@ -249,5 +306,11 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(raw.ActiveSessionRatio, observed.ActiveSessionRatio);
         Assert.AreEqual(raw.SchedulerDriftAverageMs, observed.SchedulerDriftAverageMs);
         Assert.AreEqual(raw.SchedulerDriftMaxMs, observed.SchedulerDriftMaxMs);
+        Assert.AreEqual(raw.TotalPacingWaitCount, observed.TotalPacingWaitCount);
+        Assert.AreEqual(raw.PacingAverageWaitMs, observed.PacingAverageWaitMs);
+        Assert.AreEqual(raw.PacingWindowIncreaseCount, observed.PacingWindowIncreaseCount);
+        Assert.AreEqual(raw.PacingWindowDecreaseCount, observed.PacingWindowDecreaseCount);
+        Assert.AreEqual(raw.MinObservedPacingWindow, observed.MinObservedPacingWindow);
+        Assert.AreEqual(raw.MaxObservedPacingWindow, observed.MaxObservedPacingWindow);
     }
 }

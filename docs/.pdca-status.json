@@ -1,10 +1,8 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-29T08:13:46Z",
-  "activeFeatures": [
-    "server-telemetry-export-merge-socket-error-classification"
-  ],
-  "primaryFeature": "server-telemetry-export-merge-socket-error-classification",
+  "lastUpdated": "2026-04-30T01:40:44Z",
+  "activeFeatures": [],
+  "primaryFeature": null,
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -319,10 +317,15 @@
       "archivePath": "docs/archive/2026-04/10k-load-bottleneck-telemetry"
     },
     "server-telemetry-export-merge-socket-error-classification": {
-      "phase": "completed",
-      "matchRate": null,
+      "phase": "archived",
+      "matchRate": 96,
       "iterationCount": 1,
-      "documents": {},
+      "documents": {
+        "plan": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification/server-telemetry-export-merge-socket-error-classification.plan.md",
+        "design": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification/server-telemetry-export-merge-socket-error-classification.design.md",
+        "analysis": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification/server-telemetry-export-merge-socket-error-classification.analysis.md",
+        "report": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification/server-telemetry-export-merge-socket-error-classification.report.md"
+      },
       "taskChain": [
         {
           "phase": "plan",
@@ -357,9 +360,11 @@
       ],
       "timestamps": {
         "started": "2026-04-29T02:15:02.662Z",
-        "lastUpdated": "2026-04-29T02:45:39.628Z"
+        "lastUpdated": "2026-04-29T08:46:42Z"
       },
-      "completedAt": "2026-04-29T02:45:39.625Z"
+      "completedAt": "2026-04-29T02:45:39.625Z",
+      "archivedAt": "2026-04-29T08:46:42Z",
+      "archivePath": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification"
     },
     "server-send-backpressure-queue-drain-optimization": {
       "phase": "archived",
@@ -472,6 +477,62 @@
       "completedAt": "2026-04-29T07:45:40.295Z",
       "archivedAt": "2026-04-29T08:13:46Z",
       "archivePath": "docs/archive/2026-04/client-send-buffer-pressure-receive-flow-control"
+    },
+    "adaptive-client-send-pacing-and-rtt-stability": {
+      "phase": "archived",
+      "matchRate": 92,
+      "iterationCount": 3,
+      "documents": {
+        "plan": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability/adaptive-client-send-pacing-and-rtt-stability.plan.md",
+        "design": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability/adaptive-client-send-pacing-and-rtt-stability.design.md",
+        "analysis": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability/adaptive-client-send-pacing-and-rtt-stability.analysis.md",
+        "report": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability/adaptive-client-send-pacing-and-rtt-stability.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-29T08:54:56.812Z",
+          "completedAt": "2026-04-29T08:56:14.898Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-29T08:54:56.812Z",
+          "completedAt": "2026-04-29T09:03:16.064Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-04-29T08:54:56.812Z",
+          "completedAt": "2026-04-29T09:34:21.678Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-04-29T08:54:56.812Z",
+          "completedAt": "2026-04-29T09:40:18.634Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-29T09:40:18.634Z",
+          "completedAt": "2026-04-29T14:40:46.267Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-04-29T08:54:56.812Z",
+          "completedAt": "2026-04-30T01:37:53.154Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-29T08:54:56.813Z",
+        "lastUpdated": "2026-04-30T01:40:44Z"
+      },
+      "completedAt": "2026-04-30T01:37:53.150Z",
+      "archivedAt": "2026-04-30T01:40:44Z",
+      "archivePath": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability"
     }
   },
   "pipeline": {
@@ -482,7 +543,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-29T08:13:46Z"
+    "lastActivity": "2026-04-30T01:40:44Z"
   },
   "history": [
     {
@@ -1136,6 +1197,96 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-04-29T07:45:40.296Z"
+    },
+    {
+      "feature": "server-telemetry-export-merge-socket-error-classification",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-04/server-telemetry-export-merge-socket-error-classification",
+      "timestamp": "2026-04-29T08:46:42Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-29T08:56:14.894Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-29T08:56:14.896Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-29T08:59:57.165Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-29T09:03:16.058Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-29T09:03:16.061Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-04-29T09:34:21.667Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-04-29T09:34:21.677Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-04-29T09:40:18.630Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-04-29T09:40:18.632Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-04-29T14:40:46.266Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-04-29T14:40:46.267Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-04-30T01:37:53.153Z"
+    },
+    {
+      "feature": "adaptive-client-send-pacing-and-rtt-stability",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-04/adaptive-client-send-pacing-and-rtt-stability",
+      "timestamp": "2026-04-30T01:40:44Z"
     }
   ]
 }

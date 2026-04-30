@@ -36,15 +36,44 @@ internal sealed class LoadRunnerCommandBuilder
             metricsPath
         };
 
-        if (options.MaxPendingRequestsPerSession is int maxPendingRequestsPerSession)
-        {
-            arguments.Add("--max-pending-requests-per-session");
-            arguments.Add(maxPendingRequestsPerSession.ToString(CultureInfo.InvariantCulture));
-        }
+        AddPacingArguments(arguments, options.Pacing);
 
         return new LoadRunnerCommand(
             "dotnet",
             arguments);
+    }
+
+    private static void AddPacingArguments(List<string> arguments, LoadValidationPacingOptions pacing)
+    {
+        if (pacing.Policy == LoadValidationPacingPolicy.None)
+        {
+            return;
+        }
+
+        arguments.Add("--pacing-policy");
+        arguments.Add(pacing.ToRunnerPolicyArgument());
+
+        if (pacing.Policy == LoadValidationPacingPolicy.FixedWindow)
+        {
+            arguments.Add("--pacing-fixed-window");
+            arguments.Add(pacing.FixedWindow!.Value.ToString(CultureInfo.InvariantCulture));
+        }
+
+        if (pacing.Policy == LoadValidationPacingPolicy.AdaptiveWindow)
+        {
+            arguments.Add("--pacing-min-window");
+            arguments.Add(pacing.MinWindow.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("--pacing-initial-window");
+            arguments.Add(pacing.InitialWindow.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("--pacing-max-window");
+            arguments.Add(pacing.MaxWindow.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("--pacing-rtt-target-ms");
+            arguments.Add(pacing.RttTargetMs.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("--pacing-rtt-high-ms");
+            arguments.Add(pacing.RttHighMs.ToString(CultureInfo.InvariantCulture));
+            arguments.Add("--pacing-increase-every");
+            arguments.Add(pacing.IncreaseEveryResponses.ToString(CultureInfo.InvariantCulture));
+        }
     }
 
     public static string GetMetricsPath(string outputDirectory, LoadValidationStage stage)

@@ -55,6 +55,44 @@ Budgeted server send drain by itself does not solve the remaining client `NoBuff
 
 The client cap diagnostic strongly reduces `NoBufferSpaceAvailable` from `7,344` to `905`, which supports the hypothesis that the remaining error is largely client/load-generator pacing pressure. However, cap `4` is not a free win: it introduces receive timeouts, raises final disconnects to `26`, and worsens RTT P95/P99 materially. Treat cap `4` as a diagnostic result, not a production recommendation.
 
+## Adaptive Client Pacing Follow-up
+
+These runs validate `adaptive-client-send-pacing-and-rtt-stability` against the prior focused 10K baseline and the earlier polling cap diagnostic:
+
+- Baseline: `artifacts/load-validation/s5-send-backpressure-iterate2/summary.md`
+- Polling cap reference: `artifacts/load-validation/s5-client-cap-4/summary.md`
+- Event-driven fixed cap: `artifacts/load-validation/s5-fixed-cap-4-event-gate/summary.md`
+- Adaptive window: `artifacts/load-validation/s5-adaptive-pacing-window/summary.md`
+
+| Metric | Baseline | Polling Cap 4 | Event-Gate Cap 4 | Adaptive Window |
+|--------|---------:|--------------:|-----------------:|----------------:|
+| Result | Passed | Passed | Passed | Passed |
+| Peak sessions | `10,000 / 10,000` | `10,000 / 10,000` | `10,000 / 10,000` | `10,000 / 10,000` |
+| Final disconnects | `0` | `26` | `89` | `0` |
+| Max pending request count | `36,653` | `37,509` | `37,294` | `36,384` |
+| Max pending send requests | `905` | `154` | `219` | `212` |
+| Server send backpressure events | `4,153` | `1,064` | `1,453` | `501` |
+| Max send buffer bytes | `195,683` | `61,567` | `63,586` | `63,233` |
+| `send\|IOException\|NoBufferSpaceAvailable` | `7,344` | `905` | `1,149` | `1,415` |
+| `receive\|IOException\|TimedOut` | None material | `629` | `5,150` | None material |
+| Other socket classifications | None material | `send\|IOException\|Shutdown = 1` | `send\|IOException\|Shutdown = 36` | None material |
+| Socket error rate | `0.55%` | `0.12%` | `0.36%` | `0.05%` |
+| Max TPS | `11,094.55` | `8,392.50` | `13,118.68` | `13,034.37` |
+| RTT P95 | `10,611.83ms` | `18,259.91ms` | `17,832.44ms` | `16,234.27ms` |
+| RTT P99 | `12,949.47ms` | `62,738.87ms` | `26,785.33ms` | `18,420.99ms` |
+| Max scheduler drift | `12.04ms` | `86.30ms` | `56.04ms` | `320.86ms` |
+| Pacing wait count / avg | Not applicable | Not tracked | `272,480 / 2763.47ms` | `656,889 / 2765.26ms` |
+| Observed pacing window | Not applicable | fixed `4` | `4-4` | `1-5` |
+| Window +/- | Not applicable | Not tracked | `0 / 0` | `142 / 424` |
+
+### Adaptive Pacing Interpretation
+
+The event-driven fixed cap removes the 1ms polling implementation, but it does not remove the cap `4` tradeoff. It keeps `NoBufferSpaceAvailable` low at `1,149`, but still drives RTT P95/P99 above target and increases receive timeouts to `5,150`.
+
+The adaptive window is the better current candidate. It keeps peak sessions at `100%`, leaves final disconnects at `0`, removes material receive timeouts, lowers socket error rate to `0.05%`, and keeps `NoBufferSpaceAvailable = 1,415`, which is below the first target of `3,500`. It also brings RTT P99 under the `20,000ms` first target.
+
+The remaining weakness is RTT P95 and scheduler drift. RTT P95 is still `16,234.27ms`, above the `12,000ms` target, and max scheduler drift rises to `320.86ms`. Adaptive pacing should therefore be kept as an opt-in validation policy for now, with a follow-up tuning pass before considering it as a default.
+
 ## Implemented Improvements
 
 | Area | Change | Expected Effect | Observed Result |
@@ -67,9 +105,10 @@ The client cap diagnostic strongly reduces `NoBufferSpaceAvailable` from `7,344`
 | Completion accounting | Added request-size based send completion tracking. | Decrement pending send requests only after each queued response is fully drained. | Pending send metrics now represent logical response backlog instead of raw send-loop progress. |
 | Telemetry | Added rejected-send request/byte counters to server and observed metrics. | Distinguish intentional queue rejection from socket errors and ordinary backpressure. | Current focused 10K reported `0 / 0` rejected send requests/bytes. |
 | Load validation output | Added rejected-send fields to JSON and Markdown summaries. | Keep future benchmark comparisons auditable without parsing raw metrics logs. | `summary.md` now reports the `Rejected Send` column. |
-| Test coverage | Added direct tests for queue rejection and completion accounting, plus telemetry/load-summary updates. | Lock in the new send policy behavior. | `dotnet test FastPortCharp.sln --no-build` passed `80` tests. |
+| Test coverage | Added direct tests for queue rejection, completion accounting, pacing gates, manifest options, and telemetry/load-summary updates. | Lock in the new send policy behavior. | `dotnet test FastPortCharp.sln --no-build` passed `93` tests. |
 | Budgeted drain | Added per-wake drain byte/op budget and drain-yield telemetry. | Reduce response burst pressure without violating `Drain(sentSize)`. | Server-side send pressure improved, but client NoBuffer worsened in uncapped 10K. |
 | Load-runner pacing | Added `--max-pending-requests-per-session`. | Diagnose whether client pacing drives NoBuffer. | Cap `4` reduced NoBuffer by `87.7%` but worsened RTT tail and introduced receive timeouts. |
+| Adaptive client pacing | Added event-driven fixed/adaptive outstanding request pacing with pacing metrics and manifest options. | Lower client send-buffer pressure without cap `4` receive-timeout regression. | Adaptive 10K reduced NoBuffer to `1,415`, removed material receive timeouts, and kept RTT P99 under `20,000ms`; RTT P95/drift still need tuning. |
 
 ## Current Run Details
 
@@ -118,3 +157,5 @@ The current implementation was checked with:
 - focused 10K validation: `artifacts/load-validation/s5-send-backpressure-iterate2/summary.md`
 - follow-up focused 10K server-only budgeted drain: `artifacts/load-validation/s5-budgeted-drain/summary.md`
 - follow-up focused 10K client cap `4`: `artifacts/load-validation/s5-client-cap-4/summary.md`
+- follow-up focused 10K event-driven fixed cap `4`: `artifacts/load-validation/s5-fixed-cap-4-event-gate/summary.md`
+- follow-up focused 10K adaptive pacing: `artifacts/load-validation/s5-adaptive-pacing-window/summary.md`

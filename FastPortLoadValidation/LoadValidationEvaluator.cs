@@ -80,6 +80,11 @@ internal sealed class LoadValidationEvaluator
         long finalConnectAttemptCount = finalSample?.ConnectAttemptCount ?? 0;
         long finalConnectFailureCount = finalSample?.ConnectFailureCount ?? 0;
         double maxTps = samples.Count == 0 ? 0 : samples.Max(sample => sample.Tps);
+        long minObservedPacingWindow = samples
+            .Select(sample => sample.MinObservedPacingWindow)
+            .Where(window => window > 0)
+            .DefaultIfEmpty(0)
+            .Min();
 
         if (totalReceivedPackets <= 0)
         {
@@ -131,6 +136,12 @@ internal sealed class LoadValidationEvaluator
             MaxSendCompletionsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendCompletionsPerSecond),
             MaxSendRejectedRequestsPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendRejectedRequestsPerSecond),
             MaxSendDrainYieldCountPerSecond: mergedServerSamples.Count == 0 ? 0 : mergedServerSamples.Max(sample => sample.SendDrainYieldCountPerSecond),
+            MaxPacingWaitCount: samples.Count == 0 ? 0 : samples.Max(sample => sample.TotalPacingWaitCount),
+            MaxPacingAverageWaitMs: samples.Count == 0 ? 0 : samples.Max(sample => sample.PacingAverageWaitMs),
+            MaxPacingWindowIncreaseCount: samples.Count == 0 ? 0 : samples.Max(sample => sample.PacingWindowIncreaseCount),
+            MaxPacingWindowDecreaseCount: samples.Count == 0 ? 0 : samples.Max(sample => sample.PacingWindowDecreaseCount),
+            MinObservedPacingWindow: minObservedPacingWindow,
+            MaxObservedPacingWindow: samples.Count == 0 ? 0 : samples.Max(sample => sample.MaxObservedPacingWindow),
             SocketErrorCountsByPhase: CopyCounters(finalSample?.SocketErrorCountsByPhase),
             SocketErrorCountsByClass: CopyCounters(finalSample?.SocketErrorCountsByClass));
     }

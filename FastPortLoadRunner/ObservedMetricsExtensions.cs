@@ -37,6 +37,14 @@ internal static class ObservedMetricsExtensions
             snapshot.SocketErrorCountsByPhase,
             snapshot.SocketErrorCountsByType,
             snapshot.SocketErrorCountsByCode,
-            snapshot.SocketErrorCountsByClass);
+            snapshot.SocketErrorCountsByClass,
+            snapshot.TotalPacingWaitCount,
+            snapshot.PacingWaitsPerSecond,
+            snapshot.TotalPacingWaitTimeMs,
+            snapshot.PacingAverageWaitMs,
+            snapshot.PacingWindowIncreaseCount,
+            snapshot.PacingWindowDecreaseCount,
+            snapshot.MinObservedPacingWindow,
+            snapshot.MaxObservedPacingWindow);
     }
 }

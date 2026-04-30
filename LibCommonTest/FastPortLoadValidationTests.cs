@@ -21,6 +21,7 @@ public sealed class FastPortLoadValidationTests
         Assert.IsNull(options.ServerMetricsPath);
         Assert.AreEqual(TimeSpan.FromMilliseconds(1500), options.MergeTolerance);
         Assert.IsNull(options.MaxPendingRequestsPerSession);
+        Assert.AreEqual(LoadValidationPacingPolicy.None, options.Pacing.Policy);
         Assert.IsFalse(options.DryRun);
         Assert.IsFalse(options.ContinueOnFailure);
         StringAssert.Contains(options.OutputDirectory, Path.Combine("artifacts", "load-validation"));
@@ -40,7 +41,13 @@ public sealed class FastPortLoadValidationTests
             "--configuration", "Debug",
             "--server-metrics", "server.metrics.jsonl",
             "--merge-tolerance-ms", "2500",
-            "--max-pending-requests-per-session", "4",
+            "--pacing-policy", "adaptive-window",
+            "--pacing-min-window", "2",
+            "--pacing-initial-window", "4",
+            "--pacing-max-window", "8",
+            "--pacing-rtt-target-ms", "1000",
+            "--pacing-rtt-high-ms", "2000",
+            "--pacing-increase-every", "3",
             "--dry-run",
             "--continue-on-failure"
         ];
@@ -57,9 +64,30 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual("Debug", options.Configuration);
         Assert.AreEqual("server.metrics.jsonl", options.ServerMetricsPath);
         Assert.AreEqual(TimeSpan.FromMilliseconds(2500), options.MergeTolerance);
-        Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
+        Assert.IsNull(options.MaxPendingRequestsPerSession);
+        Assert.AreEqual(LoadValidationPacingPolicy.AdaptiveWindow, options.Pacing.Policy);
+        Assert.AreEqual(2, options.Pacing.MinWindow);
+        Assert.AreEqual(4, options.Pacing.InitialWindow);
+        Assert.AreEqual(8, options.Pacing.MaxWindow);
+        Assert.AreEqual(1000, options.Pacing.RttTargetMs);
+        Assert.AreEqual(2000, options.Pacing.RttHighMs);
+        Assert.AreEqual(3, options.Pacing.IncreaseEveryResponses);
         Assert.IsTrue(options.DryRun);
         Assert.IsTrue(options.ContinueOnFailure);
+    }
+
+    [TestMethod]
+    public void LoadValidationOptions_TryParse_LegacyPendingCapMapsToFixedWindow()
+    {
+        bool result = LoadValidationOptions.TryParse(
+            ["--max-pending-requests-per-session", "4"],
+            out LoadValidationOptions options,
+            out string errorMessage);
+
+        Assert.IsTrue(result, errorMessage);
+        Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
+        Assert.AreEqual(LoadValidationPacingPolicy.FixedWindow, options.Pacing.Policy);
+        Assert.AreEqual(4, options.Pacing.FixedWindow);
     }
 
     [TestMethod]
@@ -90,7 +118,15 @@ public sealed class FastPortLoadValidationTests
             Configuration: "Release",
             ServerMetricsPath: null,
             MergeTolerance: TimeSpan.FromMilliseconds(1500),
-            MaxPendingRequestsPerSession: 4,
+            Pacing: new LoadValidationPacingOptions(
+                LoadValidationPacingPolicy.AdaptiveWindow,
+                FixedWindow: null,
+                MinWindow: 2,
+                InitialWindow: 4,
+                MaxWindow: 8,
+                RttTargetMs: 1000,
+                RttHighMs: 2000,
+                IncreaseEveryResponses: 3),
             DryRun: false,
             ContinueOnFailure: false);
         LoadValidationStage stage = LoadValidationProfiles.Get("staged").Stages[^1];
@@ -105,8 +141,12 @@ public sealed class FastPortLoadValidationTests
         CollectionAssert.Contains(command.Arguments.ToArray(), "120s");
         CollectionAssert.Contains(command.Arguments.ToArray(), "5m");
         CollectionAssert.Contains(command.Arguments.ToArray(), Path.Combine("out", "s5-random-10k.metrics.jsonl"));
-        CollectionAssert.Contains(command.Arguments.ToArray(), "--max-pending-requests-per-session");
-        CollectionAssert.Contains(command.Arguments.ToArray(), "4");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "--pacing-policy");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "adaptive-window");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "--pacing-min-window");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "2");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "--pacing-max-window");
+        CollectionAssert.Contains(command.Arguments.ToArray(), "8");
     }
 
     [TestMethod]
@@ -236,6 +276,12 @@ public sealed class FastPortLoadValidationTests
             totalReceivedPackets: 20,
             tps: 10,
             timestamp: timestamp,
+            totalPacingWaitCount: 5,
+            pacingAverageWaitMs: 1.5,
+            pacingWindowIncreaseCount: 2,
+            pacingWindowDecreaseCount: 1,
+            minObservedPacingWindow: 2,
+            maxObservedPacingWindow: 8,
             socketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
             socketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 });
         ServerObservedMetricsSnapshot server = CreateServerSample(
@@ -285,6 +331,12 @@ public sealed class FastPortLoadValidationTests
         Assert.AreEqual(2048, summary.MaxSendDrainYieldQueuedBytes);
         Assert.AreEqual(3.5, summary.MaxSendDrainYieldCountPerSecond);
         Assert.AreEqual(4096, summary.MaxSendBufferBytes);
+        Assert.AreEqual(5, summary.MaxPacingWaitCount);
+        Assert.AreEqual(1.5, summary.MaxPacingAverageWaitMs);
+        Assert.AreEqual(2, summary.MaxPacingWindowIncreaseCount);
+        Assert.AreEqual(1, summary.MaxPacingWindowDecreaseCount);
+        Assert.AreEqual(2, summary.MinObservedPacingWindow);
+        Assert.AreEqual(8, summary.MaxObservedPacingWindow);
         Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
         Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
     }
@@ -354,7 +406,13 @@ public sealed class FastPortLoadValidationTests
                     MaxRttP99Ms: 2,
                     JsonSamples: 3,
                     MetricsPath: "metrics.jsonl",
-                    Failures: [])
+                    Failures: [],
+                    MaxPacingWaitCount: 5,
+                    MaxPacingAverageWaitMs: 1.5,
+                    MaxPacingWindowIncreaseCount: 2,
+                    MaxPacingWindowDecreaseCount: 1,
+                    MinObservedPacingWindow: 2,
+                    MaxObservedPacingWindow: 8)
             ]);
         var writer = new LoadValidationSummaryWriter();
 
@@ -372,7 +430,47 @@ public sealed class FastPortLoadValidationTests
         StringAssert.Contains(markdown, "Max Pending Send");
         StringAssert.Contains(markdown, "Rejected Send");
         StringAssert.Contains(markdown, "Drain Yield");
+        StringAssert.Contains(markdown, "Pacing");
+        StringAssert.Contains(markdown, "win=2-8");
         StringAssert.Contains(markdown, "RTT P99");
+    }
+
+    [TestMethod]
+    public async Task LoadValidationSummaryWriter_WritesManifestWithEffectivePacingOptions()
+    {
+        string directory = CreateTempDirectory();
+        var pacing = new LoadValidationPacingOptions(
+            LoadValidationPacingPolicy.AdaptiveWindow,
+            FixedWindow: null,
+            MinWindow: 2,
+            InitialWindow: 4,
+            MaxWindow: 8,
+            RttTargetMs: 1000,
+            RttHighMs: 2000,
+            IncreaseEveryResponses: 3);
+        var manifest = new LoadValidationRunManifest(
+            RunId: "test-run",
+            StartedAt: new DateTimeOffset(2026, 4, 29, 9, 0, 0, TimeSpan.Zero),
+            Profile: "smoke",
+            Host: "127.0.0.1",
+            Port: 6628,
+            Pacing: LoadValidationPacingManifest.FromOptions(pacing),
+            Stages: [CreateStage(targetSessions: 10)]);
+        var writer = new LoadValidationSummaryWriter();
+
+        await writer.WriteManifestAsync(directory, manifest);
+
+        string json = await File.ReadAllTextAsync(Path.Combine(directory, "manifest.json"));
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement pacingJson = document.RootElement.GetProperty("pacing");
+
+        Assert.AreEqual("adaptive-window", pacingJson.GetProperty("policy").GetString());
+        Assert.AreEqual(2, pacingJson.GetProperty("minWindow").GetInt32());
+        Assert.AreEqual(4, pacingJson.GetProperty("initialWindow").GetInt32());
+        Assert.AreEqual(8, pacingJson.GetProperty("maxWindow").GetInt32());
+        Assert.AreEqual(1000, pacingJson.GetProperty("rttTargetMs").GetDouble());
+        Assert.AreEqual(2000, pacingJson.GetProperty("rttHighMs").GetDouble());
+        Assert.AreEqual(3, pacingJson.GetProperty("increaseEveryResponses").GetInt32());
     }
 
     private static LoadValidationStage CreateStage(int targetSessions)
@@ -398,6 +496,12 @@ public sealed class FastPortLoadValidationTests
         double schedulerDriftMaxMs = 0,
         long connectFailureCount = 0,
         DateTimeOffset? timestamp = null,
+        long totalPacingWaitCount = 0,
+        double pacingAverageWaitMs = 0,
+        long pacingWindowIncreaseCount = 0,
+        long pacingWindowDecreaseCount = 0,
+        long minObservedPacingWindow = 0,
+        long maxObservedPacingWindow = 0,
         IReadOnlyDictionary<string, long>? socketErrorCountsByPhase = null,
         IReadOnlyDictionary<string, long>? socketErrorCountsByClass = null)
     {
@@ -429,6 +533,12 @@ public sealed class FastPortLoadValidationTests
             ActiveSessionRatio: targetSessions <= 0 ? 0 : currentSessions / (double)targetSessions,
             SchedulerDriftAverageMs: schedulerDriftMaxMs,
             SchedulerDriftMaxMs: schedulerDriftMaxMs,
+            TotalPacingWaitCount: totalPacingWaitCount,
+            PacingAverageWaitMs: pacingAverageWaitMs,
+            PacingWindowIncreaseCount: pacingWindowIncreaseCount,
+            PacingWindowDecreaseCount: pacingWindowDecreaseCount,
+            MinObservedPacingWindow: minObservedPacingWindow,
+            MaxObservedPacingWindow: maxObservedPacingWindow,
             SocketErrorCountsByPhase: socketErrorCountsByPhase,
             SocketErrorCountsByClass: socketErrorCountsByClass);
     }

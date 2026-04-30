@@ -47,6 +47,7 @@ internal static class Program
             options.Profile,
             options.Host,
             options.Port,
+            LoadValidationPacingManifest.FromOptions(options.Pacing),
             stages);
 
         var writer = new LoadValidationSummaryWriter();

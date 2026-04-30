@@ -10,10 +10,13 @@ internal sealed record LoadValidationOptions(
     string Configuration,
     string? ServerMetricsPath,
     TimeSpan MergeTolerance,
-    int? MaxPendingRequestsPerSession,
+    LoadValidationPacingOptions Pacing,
     bool DryRun,
     bool ContinueOnFailure)
 {
+    public int? MaxPendingRequestsPerSession =>
+        Pacing.Policy == LoadValidationPacingPolicy.FixedWindow ? Pacing.FixedWindow : null;
+
     public static bool TryParse(string[] args, out LoadValidationOptions options, out string errorMessage)
     {
         string profile = LoadValidationProfiles.Smoke;
@@ -26,6 +29,14 @@ internal sealed record LoadValidationOptions(
         string? serverMetricsPath = null;
         TimeSpan mergeTolerance = TimeSpan.FromMilliseconds(1500);
         int? maxPendingRequestsPerSession = null;
+        LoadValidationPacingPolicy? pacingPolicy = null;
+        int? pacingFixedWindow = null;
+        int pacingMinWindow = LoadValidationPacingOptions.DefaultMinWindow;
+        int pacingInitialWindow = LoadValidationPacingOptions.DefaultInitialWindow;
+        int pacingMaxWindow = LoadValidationPacingOptions.DefaultMaxWindow;
+        double pacingRttTargetMs = LoadValidationPacingOptions.DefaultRttTargetMs;
+        double pacingRttHighMs = LoadValidationPacingOptions.DefaultRttHighMs;
+        int pacingIncreaseEveryResponses = LoadValidationPacingOptions.DefaultIncreaseEveryResponses;
         bool dryRun = false;
         bool continueOnFailure = false;
 
@@ -116,11 +127,102 @@ internal sealed record LoadValidationOptions(
 
                     maxPendingRequestsPerSession = parsedMaxPendingRequestsPerSession;
                     break;
+                case "--pacing-policy":
+                    if (!LoadValidationPacingOptions.TryParsePolicy(value, out LoadValidationPacingPolicy parsedPolicy))
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-policy must be none, fixed-window, or adaptive-window.";
+                        return false;
+                    }
+
+                    pacingPolicy = parsedPolicy;
+                    break;
+                case "--pacing-fixed-window":
+                    if (!int.TryParse(value, out int parsedFixedWindow) || parsedFixedWindow <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-fixed-window must be greater than zero.";
+                        return false;
+                    }
+
+                    pacingFixedWindow = parsedFixedWindow;
+                    break;
+                case "--pacing-min-window":
+                    if (!int.TryParse(value, out pacingMinWindow) || pacingMinWindow <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-min-window must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
+                case "--pacing-initial-window":
+                    if (!int.TryParse(value, out pacingInitialWindow) || pacingInitialWindow <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-initial-window must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
+                case "--pacing-max-window":
+                    if (!int.TryParse(value, out pacingMaxWindow) || pacingMaxWindow <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-max-window must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
+                case "--pacing-rtt-target-ms":
+                    if (!double.TryParse(value, out pacingRttTargetMs) || pacingRttTargetMs <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-rtt-target-ms must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
+                case "--pacing-rtt-high-ms":
+                    if (!double.TryParse(value, out pacingRttHighMs) || pacingRttHighMs <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-rtt-high-ms must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
+                case "--pacing-increase-every":
+                    if (!int.TryParse(value, out pacingIncreaseEveryResponses) || pacingIncreaseEveryResponses <= 0)
+                    {
+                        options = default!;
+                        errorMessage = "--pacing-increase-every must be greater than zero.";
+                        return false;
+                    }
+
+                    break;
                 default:
                     options = default!;
                     errorMessage = $"Unknown option '{arg}'.";
                     return false;
             }
+        }
+
+        if (!LoadValidationPacingOptions.TryCreate(
+            pacingPolicy,
+            maxPendingRequestsPerSession,
+            pacingFixedWindow,
+            pacingMinWindow,
+            pacingInitialWindow,
+            pacingMaxWindow,
+            pacingRttTargetMs,
+            pacingRttHighMs,
+            pacingIncreaseEveryResponses,
+            out LoadValidationPacingOptions pacing,
+            out errorMessage))
+        {
+            options = default!;
+            return false;
         }
 
         outputDirectory ??= CreateDefaultOutputDirectory(profile);
@@ -134,7 +236,7 @@ internal sealed record LoadValidationOptions(
             configuration,
             serverMetricsPath,
             mergeTolerance,
-            maxPendingRequestsPerSession,
+            pacing,
             dryRun,
             continueOnFailure);
         errorMessage = string.Empty;
@@ -164,7 +266,17 @@ internal sealed record LoadValidationOptions(
           --server-metrics <path>        Optional server observed JSONL path to merge into stage summaries.
           --merge-tolerance-ms <ms>      Timestamp merge tolerance for client/server samples. Default: 1500
           --max-pending-requests-per-session <count>
-                                          Optional per-session load runner outstanding request cap.
+                                          Legacy shortcut for --pacing-policy fixed-window.
+          --pacing-policy <policy>       none, fixed-window, or adaptive-window. Default: none
+          --pacing-fixed-window <count>  Fixed outstanding request window.
+          --pacing-min-window <count>    Adaptive minimum window. Default: 1
+          --pacing-initial-window <count>
+                                          Adaptive initial window. Default: 4
+          --pacing-max-window <count>    Adaptive maximum window. Default: 16
+          --pacing-rtt-target-ms <ms>    RTT target for adaptive increase. Default: 12000
+          --pacing-rtt-high-ms <ms>      RTT high watermark for adaptive decrease. Default: 20000
+          --pacing-increase-every <count>
+                                          Stable responses before window increase. Default: 256
           --dry-run                      Print stage commands without running them.
           --continue-on-failure          Continue after a failed stage.
           --help                         Show help.
@@ -173,5 +285,169 @@ internal sealed record LoadValidationOptions(
           dotnet run -c Release --project FastPortLoadValidation -- --profile smoke
           dotnet run -c Release --project FastPortLoadValidation -- --profile staged --stage s5-random-10k
         """);
+    }
+}
+
+internal enum LoadValidationPacingPolicy
+{
+    None,
+    FixedWindow,
+    AdaptiveWindow
+}
+
+internal sealed record LoadValidationPacingOptions(
+    LoadValidationPacingPolicy Policy,
+    int? FixedWindow,
+    int MinWindow,
+    int InitialWindow,
+    int MaxWindow,
+    double RttTargetMs,
+    double RttHighMs,
+    int IncreaseEveryResponses)
+{
+    public const int DefaultMinWindow = 1;
+    public const int DefaultInitialWindow = 4;
+    public const int DefaultMaxWindow = 16;
+    public const double DefaultRttTargetMs = 12_000;
+    public const double DefaultRttHighMs = 20_000;
+    public const int DefaultIncreaseEveryResponses = 256;
+
+    public static LoadValidationPacingOptions None { get; } = new(
+        LoadValidationPacingPolicy.None,
+        FixedWindow: null,
+        DefaultMinWindow,
+        DefaultInitialWindow,
+        DefaultMaxWindow,
+        DefaultRttTargetMs,
+        DefaultRttHighMs,
+        DefaultIncreaseEveryResponses);
+
+    public static bool TryParsePolicy(string value, out LoadValidationPacingPolicy policy)
+    {
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "none":
+                policy = LoadValidationPacingPolicy.None;
+                return true;
+            case "fixed-window":
+                policy = LoadValidationPacingPolicy.FixedWindow;
+                return true;
+            case "adaptive-window":
+                policy = LoadValidationPacingPolicy.AdaptiveWindow;
+                return true;
+            default:
+                policy = default;
+                return false;
+        }
+    }
+
+    public static bool TryCreate(
+        LoadValidationPacingPolicy? parsedPolicy,
+        int? legacyFixedWindow,
+        int? pacingFixedWindow,
+        int minWindow,
+        int initialWindow,
+        int maxWindow,
+        double rttTargetMs,
+        double rttHighMs,
+        int increaseEveryResponses,
+        out LoadValidationPacingOptions options,
+        out string errorMessage)
+    {
+        LoadValidationPacingPolicy policy = parsedPolicy
+            ?? (legacyFixedWindow.HasValue || pacingFixedWindow.HasValue
+                ? LoadValidationPacingPolicy.FixedWindow
+                : LoadValidationPacingPolicy.None);
+
+        if (rttHighMs < rttTargetMs)
+        {
+            options = default!;
+            errorMessage = "--pacing-rtt-high-ms must be greater than or equal to --pacing-rtt-target-ms.";
+            return false;
+        }
+
+        switch (policy)
+        {
+            case LoadValidationPacingPolicy.None:
+                if (legacyFixedWindow.HasValue || pacingFixedWindow.HasValue)
+                {
+                    options = default!;
+                    errorMessage = "Fixed window options cannot be used with --pacing-policy none.";
+                    return false;
+                }
+
+                options = None with
+                {
+                    MinWindow = minWindow,
+                    InitialWindow = initialWindow,
+                    MaxWindow = maxWindow,
+                    RttTargetMs = rttTargetMs,
+                    RttHighMs = rttHighMs,
+                    IncreaseEveryResponses = increaseEveryResponses
+                };
+                errorMessage = string.Empty;
+                return true;
+            case LoadValidationPacingPolicy.FixedWindow:
+                int? fixedWindow = pacingFixedWindow ?? legacyFixedWindow;
+                if (fixedWindow is null)
+                {
+                    options = default!;
+                    errorMessage = "--pacing-policy fixed-window requires --pacing-fixed-window or --max-pending-requests-per-session.";
+                    return false;
+                }
+
+                options = new LoadValidationPacingOptions(
+                    policy,
+                    fixedWindow.Value,
+                    minWindow,
+                    initialWindow,
+                    maxWindow,
+                    rttTargetMs,
+                    rttHighMs,
+                    increaseEveryResponses);
+                errorMessage = string.Empty;
+                return true;
+            case LoadValidationPacingPolicy.AdaptiveWindow:
+                if (legacyFixedWindow.HasValue || pacingFixedWindow.HasValue)
+                {
+                    options = default!;
+                    errorMessage = "Fixed window options cannot be used with --pacing-policy adaptive-window.";
+                    return false;
+                }
+
+                if (minWindow > initialWindow || initialWindow > maxWindow)
+                {
+                    options = default!;
+                    errorMessage = "Adaptive pacing windows must satisfy min <= initial <= max.";
+                    return false;
+                }
+
+                options = new LoadValidationPacingOptions(
+                    policy,
+                    FixedWindow: null,
+                    minWindow,
+                    initialWindow,
+                    maxWindow,
+                    rttTargetMs,
+                    rttHighMs,
+                    increaseEveryResponses);
+                errorMessage = string.Empty;
+                return true;
+            default:
+                options = default!;
+                errorMessage = "Unsupported pacing policy.";
+                return false;
+        }
+    }
+
+    public string ToRunnerPolicyArgument()
+    {
+        return Policy switch
+        {
+            LoadValidationPacingPolicy.None => "none",
+            LoadValidationPacingPolicy.FixedWindow => "fixed-window",
+            LoadValidationPacingPolicy.AdaptiveWindow => "adaptive-window",
+            _ => Policy.ToString()
+        };
     }
 }

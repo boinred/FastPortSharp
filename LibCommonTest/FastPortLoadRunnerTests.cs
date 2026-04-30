@@ -29,6 +29,7 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromSeconds(1), options.MetricsInterval);
         Assert.IsNull(options.OutputPath);
         Assert.IsNull(options.MaxPendingRequestsPerSession);
+        Assert.AreEqual(LoadPacingPolicy.None, options.Pacing.Policy);
     }
 
     [TestMethod]
@@ -63,6 +64,35 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromSeconds(2), options.MetricsInterval);
         Assert.AreEqual("metrics.jsonl", options.OutputPath);
         Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
+        Assert.AreEqual(LoadPacingPolicy.FixedWindow, options.Pacing.Policy);
+        Assert.AreEqual(4, options.Pacing.FixedWindow);
+    }
+
+    [TestMethod]
+    public void LoadRunnerOptions_TryParse_AcceptsAdaptivePacing()
+    {
+        string[] args =
+        [
+            "--pacing-policy", "adaptive-window",
+            "--pacing-min-window", "2",
+            "--pacing-initial-window", "4",
+            "--pacing-max-window", "8",
+            "--pacing-rtt-target-ms", "1000",
+            "--pacing-rtt-high-ms", "2000",
+            "--pacing-increase-every", "3"
+        ];
+
+        bool result = LoadRunnerOptions.TryParse(args, out var options, out var errorMessage);
+
+        Assert.IsTrue(result, errorMessage);
+        Assert.AreEqual(LoadPacingPolicy.AdaptiveWindow, options.Pacing.Policy);
+        Assert.AreEqual(2, options.Pacing.MinWindow);
+        Assert.AreEqual(4, options.Pacing.InitialWindow);
+        Assert.AreEqual(8, options.Pacing.MaxWindow);
+        Assert.AreEqual(1000, options.Pacing.RttTargetMs);
+        Assert.AreEqual(2000, options.Pacing.RttHighMs);
+        Assert.AreEqual(3, options.Pacing.IncreaseEveryResponses);
+        Assert.IsNull(options.MaxPendingRequestsPerSession);
     }
 
     [TestMethod]
@@ -74,6 +104,8 @@ public sealed class FastPortLoadRunnerTests
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--duration", "5x"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--payload", "random:16384-4096"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--max-pending-requests-per-session", "0"], out _, out _));
+        Assert.IsFalse(LoadRunnerOptions.TryParse(["--pacing-policy", "adaptive-window", "--max-pending-requests-per-session", "4"], out _, out _));
+        Assert.IsFalse(LoadRunnerOptions.TryParse(["--pacing-policy", "adaptive-window", "--pacing-min-window", "8", "--pacing-initial-window", "4"], out _, out _));
     }
 
     [TestMethod]
@@ -121,7 +153,9 @@ public sealed class FastPortLoadRunnerTests
     public async Task LoadSession_WaitForPendingRequestBudget_BlocksUntilOutstandingDrops()
     {
         LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
-        session.IncrementOutstandingRequests();
+        await session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            CancellationToken.None);
 
         Task waitTask = session.WaitForPendingRequestBudgetAsync(
             TimeSpan.FromMilliseconds(1),
@@ -130,9 +164,10 @@ public sealed class FastPortLoadRunnerTests
         await Task.Delay(50);
         Assert.IsFalse(waitTask.IsCompleted);
 
-        session.DecrementOutstandingRequests();
+        Assert.IsTrue(session.ParseEchoResponse(CreateEchoResponseBody()));
         await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
 
+        Assert.IsTrue(session.ParseEchoResponse(CreateEchoResponseBody()));
         Assert.AreEqual(0, session.OutstandingRequests);
     }
 
@@ -140,7 +175,9 @@ public sealed class FastPortLoadRunnerTests
     public async Task LoadSession_WaitForPendingRequestBudget_CancellationExitsGate()
     {
         LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
-        session.IncrementOutstandingRequests();
+        await session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            CancellationToken.None);
         using var cancellationSource = new CancellationTokenSource();
 
         Task waitTask = session.WaitForPendingRequestBudgetAsync(
@@ -150,6 +187,80 @@ public sealed class FastPortLoadRunnerTests
         cancellationSource.Cancel();
 
         await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await waitTask);
+    }
+
+    [TestMethod]
+    public async Task OutstandingRequestPacer_FixedWindow_WaitsForResponseSignal()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        var pacer = new OutstandingRequestPacer(LoadPacingOptions.Fixed(1), collector);
+
+        await pacer.WaitForPermitAsync(CancellationToken.None);
+        Task waitTask = pacer.WaitForPermitAsync(CancellationToken.None).AsTask();
+
+        await Task.Delay(50);
+        Assert.IsFalse(waitTask.IsCompleted);
+
+        pacer.OnResponse(rttMs: 1);
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.AreEqual(1, snapshot.TotalPacingWaitCount);
+        Assert.AreEqual(1, snapshot.MinObservedPacingWindow);
+        Assert.AreEqual(1, snapshot.MaxObservedPacingWindow);
+    }
+
+    [TestMethod]
+    public async Task OutstandingRequestPacer_OnRequestAbandoned_ReleasesReservedPermit()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        var pacer = new OutstandingRequestPacer(LoadPacingOptions.Fixed(1), collector);
+
+        await pacer.WaitForPermitAsync(CancellationToken.None);
+        Task waitTask = pacer.WaitForPermitAsync(CancellationToken.None).AsTask();
+
+        await Task.Delay(50);
+        Assert.IsFalse(waitTask.IsCompleted);
+
+        pacer.OnRequestAbandoned();
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.AreEqual(1, pacer.InFlight);
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.AreEqual(1, snapshot.TotalPacingWaitCount);
+    }
+
+    [TestMethod]
+    public void OutstandingRequestPacer_AdaptiveWindow_IncreasesAndDecreases()
+    {
+        var options = new LoadPacingOptions(
+            LoadPacingPolicy.AdaptiveWindow,
+            FixedWindow: null,
+            MinWindow: 1,
+            InitialWindow: 2,
+            MaxWindow: 4,
+            RttTargetMs: 10,
+            RttHighMs: 100,
+            IncreaseEveryResponses: 2);
+        var collector = new MetricsCollector(targetSessions: 1);
+        var pacer = new OutstandingRequestPacer(options, collector);
+
+        pacer.ReserveForTest();
+        pacer.OnResponse(rttMs: 1);
+        pacer.ReserveForTest();
+        pacer.OnResponse(rttMs: 1);
+
+        Assert.AreEqual(3, pacer.CurrentWindow);
+
+        pacer.ReserveForTest();
+        pacer.OnResponse(rttMs: 200);
+
+        Assert.AreEqual(1, pacer.CurrentWindow);
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.AreEqual(1, snapshot.PacingWindowIncreaseCount);
+        Assert.AreEqual(1, snapshot.PacingWindowDecreaseCount);
+        Assert.AreEqual(1, snapshot.MinObservedPacingWindow);
+        Assert.AreEqual(3, snapshot.MaxObservedPacingWindow);
     }
 
     [TestMethod]
@@ -233,7 +344,9 @@ public sealed class FastPortLoadRunnerTests
             Duration: TimeSpan.FromSeconds(1),
             MetricsInterval: TimeSpan.FromSeconds(1),
             OutputPath: null,
-            MaxPendingRequestsPerSession: maxPendingRequestsPerSession);
+            Pacing: maxPendingRequestsPerSession is int cap
+                ? LoadPacingOptions.Fixed(cap)
+                : LoadPacingOptions.None);
 
         return new LoadSession(
             sessionId: 1,
@@ -314,7 +427,13 @@ public sealed class FastPortLoadRunnerTests
             SocketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
             SocketErrorCountsByType: new Dictionary<string, long> { ["SocketException"] = 2 },
             SocketErrorCountsByCode: new Dictionary<string, long> { ["ConnectionReset"] = 2 },
-            SocketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 });
+            SocketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 },
+            TotalPacingWaitCount: 5,
+            PacingAverageWaitMs: 1.5,
+            PacingWindowIncreaseCount: 2,
+            PacingWindowDecreaseCount: 1,
+            MinObservedPacingWindow: 2,
+            MaxObservedPacingWindow: 8);
 
         string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
 
@@ -337,6 +456,9 @@ public sealed class FastPortLoadRunnerTests
         Assert.AreEqual(0.9, clientObserved.GetProperty("activeSessionRatio").GetDouble(), 0.0001);
         Assert.AreEqual(3.5, clientObserved.GetProperty("schedulerDriftMaxMs").GetDouble(), 0.0001);
         Assert.AreEqual(990, clientObserved.GetProperty("totalReceivedPackets").GetInt64());
+        Assert.AreEqual(5, clientObserved.GetProperty("totalPacingWaitCount").GetInt64());
+        Assert.AreEqual(1.5, clientObserved.GetProperty("pacingAverageWaitMs").GetDouble(), 0.0001);
+        Assert.AreEqual(8, clientObserved.GetProperty("maxObservedPacingWindow").GetInt64());
         Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByPhase").GetProperty("receive").GetInt64());
         Assert.AreEqual(2, clientObserved.GetProperty("socketErrorCountsByClass").GetProperty("receive|SocketException|ConnectionReset").GetInt64());
     }

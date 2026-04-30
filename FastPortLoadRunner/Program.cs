@@ -77,7 +77,7 @@ internal static class Program
         Console.WriteLine($"Duration            : {scenario.Duration}");
         Console.WriteLine($"Metrics interval    : {scenario.MetricsInterval}");
         Console.WriteLine($"Output              : {scenario.OutputPath ?? "console only"}");
-        Console.WriteLine($"Pending cap/session : {scenario.MaxPendingRequestsPerSession?.ToString() ?? "unbounded"}");
+        Console.WriteLine($"Pacing              : {scenario.Pacing.ToDisplayString()}");
         Console.WriteLine();
     }
 }

@@ -29,6 +29,12 @@ internal sealed class MetricsCollector(int targetSessions)
     private long _schedulerDriftSampleCount;
     private long _schedulerDriftTotalMicroseconds;
     private long _schedulerDriftMaxMicroseconds;
+    private long _pacingWaitCount;
+    private long _pacingWaitTicks;
+    private long _pacingWindowIncreaseCount;
+    private long _pacingWindowDecreaseCount;
+    private long _minObservedPacingWindow;
+    private long _maxObservedPacingWindow;
 
     public void RecordConnectAttempt()
     {
@@ -123,6 +129,33 @@ internal sealed class MetricsCollector(int targetSessions)
         }
     }
 
+    public void RecordPacingWait(TimeSpan elapsed)
+    {
+        Interlocked.Increment(ref _pacingWaitCount);
+        Interlocked.Add(ref _pacingWaitTicks, Math.Max(0, elapsed.Ticks));
+    }
+
+    public void RecordPacingWindowIncrease()
+    {
+        Interlocked.Increment(ref _pacingWindowIncreaseCount);
+    }
+
+    public void RecordPacingWindowDecrease()
+    {
+        Interlocked.Increment(ref _pacingWindowDecreaseCount);
+    }
+
+    public void RecordPacingWindowSample(int window)
+    {
+        if (window <= 0)
+        {
+            return;
+        }
+
+        UpdateMin(ref _minObservedPacingWindow, window);
+        UpdateMax(ref _maxObservedPacingWindow, window);
+    }
+
     public MetricsSnapshot CreateSnapshot(MetricsSnapshot? previous = null)
     {
         DateTimeOffset timestamp = DateTimeOffset.Now;
@@ -135,6 +168,9 @@ internal sealed class MetricsCollector(int targetSessions)
         long disconnectCount = Interlocked.Read(ref _disconnectCount);
         long connectedSessions = Interlocked.Read(ref _connectedSessions);
         long schedulerDriftSampleCount = Interlocked.Read(ref _schedulerDriftSampleCount);
+        long pacingWaitCount = Interlocked.Read(ref _pacingWaitCount);
+        long pacingWaitTicks = Interlocked.Read(ref _pacingWaitTicks);
+        double totalPacingWaitMs = pacingWaitTicks * 1000.0 / TimeSpan.TicksPerSecond;
 
         double elapsedSeconds = previous is null
             ? 0
@@ -176,7 +212,15 @@ internal sealed class MetricsCollector(int targetSessions)
             CopyCounters(_socketErrorCountsByPhase),
             CopyCounters(_socketErrorCountsByType),
             CopyCounters(_socketErrorCountsByCode),
-            CopyCounters(_socketErrorCountsByClass));
+            CopyCounters(_socketErrorCountsByClass),
+            TotalPacingWaitCount: pacingWaitCount,
+            PacingWaitsPerSecond: previous is null ? 0 : (pacingWaitCount - previous.TotalPacingWaitCount) / elapsedSeconds,
+            TotalPacingWaitTimeMs: totalPacingWaitMs,
+            PacingAverageWaitMs: pacingWaitCount <= 0 ? 0 : totalPacingWaitMs / pacingWaitCount,
+            PacingWindowIncreaseCount: Interlocked.Read(ref _pacingWindowIncreaseCount),
+            PacingWindowDecreaseCount: Interlocked.Read(ref _pacingWindowDecreaseCount),
+            MinObservedPacingWindow: Interlocked.Read(ref _minObservedPacingWindow),
+            MaxObservedPacingWindow: Interlocked.Read(ref _maxObservedPacingWindow));
     }
 
     private void RecordSocketErrorClassification(string phase, string exceptionType, string socketErrorCode)
@@ -248,6 +292,20 @@ internal sealed class MetricsCollector(int targetSessions)
         {
             current = Interlocked.Read(ref target);
             if (value <= current)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref target, value, current) != current);
+    }
+
+    private static void UpdateMin(ref long target, long value)
+    {
+        long current;
+        do
+        {
+            current = Interlocked.Read(ref target);
+            if (current != 0 && value >= current)
             {
                 return;
             }
@@ -338,7 +396,15 @@ internal sealed record MetricsSnapshot(
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
-    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
+    long TotalPacingWaitCount = 0,
+    double PacingWaitsPerSecond = 0,
+    double TotalPacingWaitTimeMs = 0,
+    double PacingAverageWaitMs = 0,
+    long PacingWindowIncreaseCount = 0,
+    long PacingWindowDecreaseCount = 0,
+    long MinObservedPacingWindow = 0,
+    long MaxObservedPacingWindow = 0);
 
 internal interface IMetricsReporter
 {

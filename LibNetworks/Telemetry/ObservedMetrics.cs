@@ -60,7 +60,15 @@ public sealed record ClientObservedMetricsSnapshot(
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
-    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
+    long TotalPacingWaitCount = 0,
+    double PacingWaitsPerSecond = 0,
+    double TotalPacingWaitTimeMs = 0,
+    double PacingAverageWaitMs = 0,
+    long PacingWindowIncreaseCount = 0,
+    long PacingWindowDecreaseCount = 0,
+    long MinObservedPacingWindow = 0,
+    long MaxObservedPacingWindow = 0);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,
