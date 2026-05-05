@@ -59,7 +59,7 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 | DI Container | Microsoft.Extensions.DependencyInjection |
 | Hosting | Microsoft.Extensions.Hosting |
 | Concurrency | **Channel\<T\>**, .NET 10 Lock |
-| Testing | MSTest, FastPortLoadRunner |
+| Testing | MSTest, FastPortTestLoadRunner |
 
 ---
 
@@ -85,7 +85,7 @@ FastPortSharp는 고성능 네트워크 통신을 위한 프레임워크입니�
 ### 부하 테스트 실행
 
 ```bash
-dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
+dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -220,8 +220,8 @@ FastPortSharp/
 ├── 📂 FastPortServer/             # TCP 서버 애플리케이션
 ├── 📂 FastPortClient/             # TCP 클라이언트 애플리케이션
 ├── 📂 Protocols/                  # Protocol Buffers 정의
-├── 📂 FastPortLoadRunner/         # TCP 부하 테스트 실행기
-├── 📂 LibCommonTest/              # 단위 테스트
+├── 📂 FastPortTestLoadRunner/         # TCP 부하 테스트 실행기
+├── 📂 FastPortTests/              # 단위 테스트
 └── 📂 docs/                       # 문서
     ├── latency-performance-report.md           # 개선 전 성능 리포트
     ├── latency-performance-report-after-lock.md # Lock 개선 후 리포트
@@ -354,7 +354,7 @@ dotnet run --project FastPortClient -c Release
 ### 테스트 실행
 
 ```bash
-dotnet test LibCommonTest
+dotnet test FastPortTests
 ```
 
 ---

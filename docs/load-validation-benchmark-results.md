@@ -1,36 +1,62 @@
 # Load Validation Benchmark Results
 
-> Last updated: 2026-04-30
+> Last updated: 2026-05-05
 
 `artifacts/load-validation/` is git ignored, so selected load-validation results are summarized here when they are used as a baseline or comparison point.
 
 ## Scope
 
-This document tracks same-machine `FastPortLoadValidation` results for the 10,000-session load path. It is separate from `docs/baseline-benchmark-results.md`, which records component-level micro benchmarks.
+This document tracks same-machine `FastPortTestLoadValidation` results for the 10,000-session load path. It is separate from `docs/baseline-benchmark-results.md`, which records component-level micro benchmarks.
 
 ## Latest 10K Comparison
 
-Current candidate: `artifacts/load-validation/s5-session-rtt-validation/summary.md`
+Current diagnostic: `artifacts/load-validation/adaptive-pacing-operation-duration-s5/summary.md`
 
-| Metric | Reference: `s5-send-channel-queue-batch-pool-adaptive` | Current: `s5-session-rtt-validation` | Change |
-|--------|--------------------------------------------------------:|--------------------------------------:|-------:|
-| Result | Passed | Passed | Stable |
-| Peak sessions | `9,975 / 10,000` | `10,000 / 10,000` | `+0.25pp` |
-| Final disconnects | `2` | `0` | Improved |
-| Max pending request count | `38,246` | `36,695` | `-1,551` (`-4.1%`) |
-| Max pending send requests | `1,282` | `1,095` | `-187` (`-14.6%`) |
-| Server send backpressure events | `0` | `1,583` | Regression |
-| Max send buffer bytes | `63,364` | `64,204` | `+840` (`+1.3%`) |
-| `send\|IOException\|NoBufferSpaceAvailable` | `0` | `1,639` | Regression |
-| `receive\|IOException\|TimedOut` | `1,266` | `184` | `-1,082` (`-85.5%`) |
-| Socket error rate | `0.12%` | `0.13%` | `+0.01pp` |
-| Max TPS | `7,901.40` | `9,371.08` | `+18.6%` |
-| RTT P95 | `17,796.60ms` | `19,210.39ms` | `+7.9%` |
-| RTT P99 | `27,398.15ms` | `24,863.90ms` | `-9.3%` |
-| Max scheduler drift | `19.66ms` | `12.12ms` | Lower |
-| Session RTT p95-of-session-P95 | Not tracked | `18,211.02ms` | Newly observed |
+Rejected candidates:
 
-Current interpretation: the latest 10K run passes the validation threshold and now includes per-session RTT telemetry. It improves peak sessions, final disconnects, max TPS, pending request depth, pending send depth, receive timeouts, RTT P99, and scheduler drift compared with the previous batch+pool candidate. It is still not a clean performance win because RTT P95, server send backpressure, send-side `NoBufferSpaceAvailable`, and socket error rate remain above the desired direction. The session RTT data suggests the tail is mostly a broad high-load slowdown, with a smaller set of outlier sessions extending the worst tail.
+- `artifacts/load-validation/adaptive-pacing-stability-restore-s5/summary.md`
+- `artifacts/load-validation/adaptive-pacing-header-pressure-s5/summary.md`
+
+| Metric | Reference: `s5-session-rtt-validation` | Duplex lifecycle: `adaptive-pacing-duplex-cancel-s5` | Diagnostic: `adaptive-pacing-operation-duration-s5` | Rejected: `adaptive-pacing-stability-restore-s5` | Rejected: `adaptive-pacing-header-pressure-s5` |
+|--------|---------------------------------------:|------------------------------------------------:|---------------------------------------------:|----------------------------------------------:|-------------------------------------------:|
+| Result | Passed under old thresholds | Failed under hard guardrails | Failed under hard guardrails | Failed under hard guardrails | Failed under hard guardrails |
+| Peak sessions | `10,000 / 10,000` | `9,830 / 10,000` | `9,802 / 10,000` | `9,690 / 10,000` | `9,698 / 10,000` |
+| Final disconnects | `0` | `1,856` | `2,152` | `5,936` | `2,453` |
+| Max pending request count | `36,695` | `38,012` | `37,544` | `38,123` | `40,453` |
+| Max pending send requests | `1,095` | `1,016` | `986` | `1,194` | `1,438` |
+| Server send backpressure events | `1,583` | `2,986` | `3,850` | `3,225` | `1,863` |
+| Max send buffer bytes | `64,204` | `63,122` | `87,228` | `69,042` | `88,030` |
+| `send\|IOException\|NoBufferSpaceAvailable` | `1,639` | `1,396` | `1,742` | `1,340` | `1,217` |
+| `receive\|IOException\|TimedOut` | `184` | `460` | `410` | `4,554` | `1,236` |
+| Socket error rate | `0.13%` | `0.14%` | `0.17%` | `0.18%` | `0.18%` |
+| Max TPS | `9,371.08` | `9,058.89` | `9,254.96` | `8,176.32` | `9,735.19` |
+| RTT P95 | `19,210.39ms` | `16,310.30ms` | `14,980.04ms` | `20,569.94ms` | `23,529.55ms` |
+| RTT P99 | `24,863.90ms` | `18,863.93ms` | `22,016.89ms` | `32,961.34ms` | `29,609.81ms` |
+| Max scheduler drift | `12.12ms` | `10.64ms` | `34.35ms` | `502.25ms` | `57.59ms` |
+| Session RTT p95-of-session-P95 | `18,211.02ms` | `15,818.94ms` | `17,044.66ms` | `17,924.93ms` | `27,259.05ms` |
+| Pacing wait count / avg | `570,841 / 2,857.09ms` | `948,833 / 2,410.34ms` | `665,825 / 2,515.80ms` | `578,784 / 2,739.45ms` | `568,466 / 2,263.84ms` |
+| Observed pacing window | `1-5` | `1-7` | `1-6` | `1-5` | `1-6` |
+| Window +/- | `7 / 7,753` | `5,359 / 703` | `4,960 / 1,900` | `9 / 5,750` | `6,326 / 9,050` |
+| `receive-header` avg / max | Not tracked | Not tracked | `1,474.78ms / 52,261.89ms` | `1,519.41ms / 73,423.99ms` | `1,480.13ms / 59,731.73ms` |
+| `receive-body` avg / max | Not tracked | Not tracked | `8.34ms / 3,512.89ms` | `8.30ms / 1,134.88ms` | `10.75ms / 3,635.43ms` |
+| `send-write` avg / max | Not tracked | Not tracked | `0.07ms / 67.28ms` | `0.09ms / 398.59ms` | `0.10ms / 106.58ms` |
+
+Current interpretation: operation-duration telemetry narrowed the current failure. The client write path is not stalling long enough to explain the receive timeout (`send-write` max `67.28ms`). The dominant signal is waiting for the next response header: `receive-header` max reaches `52,261.89ms`, with the first timeout wave appearing after the late-ramp backlog has already pushed `receive-header` above `25s`.
+
+The stability-restore candidate returned to older static adaptive defaults (`MaxWindow=16`, target/high `12s/20s`, increase every `256`) and was rejected. It reduced send-side `NoBufferSpaceAvailable`, but final disconnects rose to `5,936` and receive timeouts rose to `4,554`; static threshold-only tuning is now low confidence.
+
+The header-pressure candidate reacted to long `receive-header` waits by reducing the adaptive window. It also failed: `NoBufferSpaceAvailable` dropped to `1,217`, but receive timeouts rose to `1,236`, final disconnects rose to `2,453`, RTT P95/P99 regressed, and pending requests/session reached `4.05`. Header-wait-only client feedback is also low confidence.
+
+Guardrail update:
+
+- `FinalDisconnectCount > 0` fails validation.
+- `receive|IOException|TimedOut > 0` fails validation.
+- `artifacts/load-validation/adaptive-pacing-guardrail-smoke/summary.md` passed with the stricter evaluator.
+- `artifacts/load-validation/adaptive-pacing-duplex-cancel-smoke/summary.md` passed with the load-runner duplex cancellation fix.
+- `artifacts/load-validation/adaptive-pacing-operation-duration-smoke/summary.md` passed with operation-duration telemetry.
+- `artifacts/load-validation/adaptive-pacing-operation-duration-s5/summary.md` failed and should be treated as the current diagnostic artifact.
+- `artifacts/load-validation/adaptive-pacing-stability-restore-smoke/summary.md` passed, but `adaptive-pacing-stability-restore-s5` failed badly and should not be used as the retained default.
+- `artifacts/load-validation/adaptive-pacing-header-pressure-smoke/summary.md` passed, but `adaptive-pacing-header-pressure-s5` failed and the candidate was reverted.
 
 ## Initial 10K Breakthrough Comparison
 
@@ -227,6 +253,7 @@ Session RTT interpretation:
 | Budgeted drain | Added per-wake drain byte/op budget and drain-yield telemetry. | Reduce response burst pressure without violating `Drain(sentSize)`. | Server-side send pressure improved, but client NoBuffer worsened in uncapped 10K. |
 | Load-runner pacing | Added `--max-pending-requests-per-session`. | Diagnose whether client pacing drives NoBuffer. | Cap `4` reduced NoBuffer by `87.7%` but worsened RTT tail and introduced receive timeouts. |
 | Adaptive client pacing | Added event-driven fixed/adaptive outstanding request pacing with pacing metrics and manifest options. | Lower client send-buffer pressure without cap `4` receive-timeout regression. | Adaptive 10K reduced NoBuffer to `1,415`, removed material receive timeouts, and kept RTT P99 under `20,000ms`; RTT P95/drift still need tuning. |
+| Adaptive pacing threshold tuning | Changed adaptive-window defaults to max window `8`, RTT target `14,000ms`, RTT high `24,000ms`, increase every `128`; added hard guardrails, duplex phase cancellation, and client operation-duration telemetry; rejected the older `16/12s/20s/256` stability-restore candidate and the header-wait pressure candidate. | Allow limited window recovery while exposing real receive-path failures and separating client write, response header wait, and response body read durations. | Retained focused 10K still fails hard guardrails with `9,802 / 10,000` peak sessions and `2,152` final disconnects; rejected candidates worsened receive timeouts/disconnects despite reducing send-side NoBuffer. |
 | BaseSession send queue | Replaced the send hot-path `IBuffers`/signal path with a Channel item queue, explicit byte budget, FIFO batching, and ArrayPool-backed coalesced multi-segment sends. | Reduce send-path lock contention while preserving logical completion accounting and small-packet coalescing. | Focused 10K passed at `9,975 / 10,000`; final disconnects, server send backpressure, send-side NoBuffer, and drift improved, but TPS, RTT P99, socket error rate, pending send depth, and receive timeouts still miss acceptance targets. |
 
 ## Current Run Details

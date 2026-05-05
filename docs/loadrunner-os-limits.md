@@ -1,4 +1,4 @@
-# FastPortLoadRunner OS Limits
+# FastPortTestLoadRunner OS Limits
 
 This document captures the operating-system limits that can affect large local load tests such as `--sessions 10000`.
 
@@ -28,7 +28,7 @@ Use progressive validation:
 Example:
 
 ```bash
-dotnet run -c Release --project FastPortLoadRunner -- \
+dotnet run -c Release --project FastPortTestLoadRunner -- \
   --sessions 10000 \
   --payload random:4096-16384 \
   --rate 1 \

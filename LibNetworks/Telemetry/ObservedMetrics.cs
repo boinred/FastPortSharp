@@ -52,6 +52,11 @@ public sealed record SlowSessionRttSnapshot(
     double RttP99Ms,
     double RttMaxMs);
 
+public sealed record ObservedOperationDurationSnapshot(
+    long Count,
+    double AverageMs,
+    double MaxMs);
+
 public sealed record ClientObservedMetricsSnapshot(
     DateTimeOffset Timestamp,
     int TargetSessions,
@@ -92,7 +97,8 @@ public sealed record ClientObservedMetricsSnapshot(
     long PacingWindowDecreaseCount = 0,
     long MinObservedPacingWindow = 0,
     long MaxObservedPacingWindow = 0,
-    SessionRttSummarySnapshot? SessionRtt = null);
+    SessionRttSummarySnapshot? SessionRtt = null,
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,

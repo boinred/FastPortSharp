@@ -1,8 +1,12 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-04-30T08:52:03Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
+  "lastUpdated": "2026-05-05T01:10:49Z",
+  "activeFeatures": [
+    "cloud-server-runner-split-load-validation",
+    "adaptive-client-pacing-threshold-tuning",
+    "extract-telemetry-contracts-from-network-core"
+  ],
+  "primaryFeature": "adaptive-client-pacing-threshold-tuning",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -593,7 +597,7 @@
     },
     "loadrunner-per-session-rtt-tail-telemetry": {
       "phase": "archived",
-      "matchRate": null,
+      "matchRate": 92,
       "iterationCount": 2,
       "documents": {
         "plan": "docs/archive/2026-04/loadrunner-per-session-rtt-tail-telemetry/loadrunner-per-session-rtt-tail-telemetry.plan.md",
@@ -692,6 +696,239 @@
       "completedAt": "2026-04-30T08:47:22.565Z",
       "archivedAt": "2026-04-30T08:52:03Z",
       "archivePath": "docs/archive/2026-04/loadrunner-10k-session-rtt-validation"
+    },
+    "cloud-server-runner-split-load-validation": {
+      "phase": "do",
+      "matchRate": null,
+      "iterationCount": 0,
+      "documents": {
+        "plan": "docs/01-plan/features/cloud-server-runner-split-load-validation.plan.md",
+        "design": "docs/02-design/features/cloud-server-runner-split-load-validation.design.md",
+        "do": "docs/02-design/features/cloud-server-runner-split-load-validation.do.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-04-30T23:15:19.949Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-04-30T23:31:37.256Z"
+        },
+        {
+          "phase": "do",
+          "status": "active",
+          "createdAt": "2026-04-30T23:13:52.312Z"
+        },
+        {
+          "phase": "check",
+          "status": "pending",
+          "createdAt": "2026-04-30T23:13:52.312Z"
+        },
+        {
+          "phase": "report",
+          "status": "pending",
+          "createdAt": "2026-04-30T23:13:52.312Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-04-30T23:13:52.312Z",
+        "lastUpdated": "2026-04-30T23:31:37.256Z"
+      }
+    },
+    "throughput-pacing-server-processing-decomposition": {
+      "phase": "archived",
+      "matchRate": 92,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition/throughput-pacing-server-processing-decomposition.plan.md",
+        "design": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition/throughput-pacing-server-processing-decomposition.design.md",
+        "do": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition/throughput-pacing-server-processing-decomposition.do.md",
+        "analysis": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition/throughput-pacing-server-processing-decomposition.analysis.md",
+        "report": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition/throughput-pacing-server-processing-decomposition.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-01T05:35:52.272Z",
+          "completedAt": "2026-05-01T05:38:13.788Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-01T05:35:52.272Z",
+          "completedAt": "2026-05-01T05:40:56.812Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-01T05:35:52.272Z",
+          "completedAt": "2026-05-01T05:58:40.383Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-01T05:35:52.272Z",
+          "completedAt": "2026-05-01T06:03:06.689Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-05-01T05:35:52.272Z",
+          "completedAt": "2026-05-03T00:07:57.194Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-01T05:35:52.275Z",
+        "lastUpdated": "2026-05-03T00:29:44Z"
+      },
+      "completedAt": "2026-05-03T00:07:57.189Z",
+      "archivedAt": "2026-05-03T00:29:44Z",
+      "archivePath": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition"
+    },
+    "adaptive-client-pacing-threshold-tuning": {
+      "phase": "check",
+      "matchRate": 86,
+      "iterationCount": 8,
+      "documents": {
+        "plan": "docs/01-plan/features/adaptive-client-pacing-threshold-tuning.plan.md",
+        "design": "docs/02-design/features/adaptive-client-pacing-threshold-tuning.design.md",
+        "do": "docs/02-design/features/adaptive-client-pacing-threshold-tuning.do.md",
+        "analysis": "docs/03-analysis/adaptive-client-pacing-threshold-tuning.analysis.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-03T01:02:39.760Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-03T01:11:40.073Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-03T01:30:08.704Z"
+        },
+        {
+          "phase": "check",
+          "status": "active",
+          "createdAt": "2026-05-03T00:46:43Z"
+        },
+        {
+          "phase": "act",
+          "status": "pending",
+          "createdAt": "2026-05-03T00:46:43Z"
+        },
+        {
+          "phase": "report",
+          "status": "pending",
+          "createdAt": "2026-05-03T00:46:43Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-03T00:46:43Z",
+        "lastUpdated": "2026-05-04T22:55:47.747Z"
+      }
+    },
+    "extract-telemetry-contracts-from-network-core": {
+      "phase": "do",
+      "matchRate": null,
+      "iterationCount": 0,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-04T23:50:00.495Z",
+          "completedAt": "2026-05-04T23:51:08.674Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-04T23:50:00.495Z",
+          "completedAt": "2026-05-04T23:58:44.062Z"
+        },
+        {
+          "phase": "do",
+          "status": "active",
+          "createdAt": "2026-05-04T23:50:00.495Z"
+        },
+        {
+          "phase": "check",
+          "status": "pending",
+          "createdAt": "2026-05-04T23:50:00.495Z"
+        },
+        {
+          "phase": "report",
+          "status": "pending",
+          "createdAt": "2026-05-04T23:50:00.495Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-04T23:50:00.497Z",
+        "lastUpdated": "2026-05-04T23:58:44.062Z"
+      }
+    },
+    "clarify-test-tool-project-names": {
+      "phase": "archived",
+      "matchRate": 96,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-05/clarify-test-tool-project-names/clarify-test-tool-project-names.plan.md",
+        "design": "docs/archive/2026-05/clarify-test-tool-project-names/clarify-test-tool-project-names.design.md",
+        "analysis": "docs/archive/2026-05/clarify-test-tool-project-names/clarify-test-tool-project-names.analysis.md",
+        "report": "docs/archive/2026-05/clarify-test-tool-project-names/clarify-test-tool-project-names.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-05T00:09:35.973Z",
+          "completedAt": "2026-05-05T00:11:36.239Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-05T00:09:35.973Z",
+          "completedAt": "2026-05-05T00:15:42.185Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-05T00:09:35.973Z",
+          "completedAt": "2026-05-05T00:32:29.336Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-05T00:09:35.973Z",
+          "completedAt": "2026-05-05T00:51:48.330Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-05-05T00:09:35.973Z",
+          "completedAt": "2026-05-05T00:55:51.204Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-05T00:09:35.975Z",
+        "lastUpdated": "2026-05-05T01:10:49Z"
+      },
+      "completedAt": "2026-05-05T00:55:51.202Z",
+      "archivedAt": "2026-05-05T01:10:49Z",
+      "archivePath": "docs/archive/2026-05/clarify-test-tool-project-names"
     }
   },
   "pipeline": {
@@ -702,7 +939,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-04-30T08:52:03Z"
+    "lastActivity": "2026-05-05T01:10:49Z"
   },
   "history": [
     {
@@ -1685,6 +1922,303 @@
       "action": "archive",
       "archivePath": "docs/archive/2026-04/loadrunner-10k-session-rtt-validation",
       "timestamp": "2026-04-30T08:52:03Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-04-30T23:15:19.945Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-04-30T23:15:19.947Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-04-30T23:29:46.413Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-04-30T23:31:37.254Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-04-30T23:31:37.255Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-01T05:38:13.781Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-01T05:38:13.784Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-01T05:38:31.740Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-01T05:40:56.803Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-01T05:40:56.808Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-01T05:58:40.379Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-01T05:58:40.381Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-05-01T06:03:06.684Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "report",
+      "timestamp": "2026-05-01T06:03:06.687Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-03T00:07:57.193Z"
+    },
+    {
+      "feature": "throughput-pacing-server-processing-decomposition",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition",
+      "timestamp": "2026-05-03T00:29:44Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": null,
+      "to": "plan",
+      "timestamp": "2026-05-03T00:46:43Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "pm_start",
+      "phase": "plan",
+      "nextPhase": "plan",
+      "timestamp": "2026-05-03T00:46:43Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-03T01:02:39.756Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-03T01:02:39.758Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-03T01:09:06.720Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-03T01:11:40.070Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-03T01:11:40.071Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-03T01:30:08.699Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-03T01:30:08.703Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-03T01:39:12.489Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-03T01:39:12.490Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "act",
+      "to": "report",
+      "timestamp": "2026-05-03T01:57:06.378Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-05-03T01:57:06.380Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "from": "report",
+      "to": "act",
+      "timestamp": "2026-05-03T02:47:26Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "iterate_reopen",
+      "phase": "act",
+      "reason": "Final disconnects and receive timeouts are now hard validation failures.",
+      "timestamp": "2026-05-03T02:47:26Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-04T23:51:08.669Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-04T23:51:08.671Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-04T23:57:08.987Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-04T23:58:44.055Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-04T23:58:44.058Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-05T00:11:36.238Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-05T00:11:36.238Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-05T00:13:27.162Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-05T00:15:42.184Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-05T00:15:42.184Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T00:32:29.334Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T00:32:29.335Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T00:51:48.327Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T00:51:48.329Z"
+    },
+    {
+      "feature": "clarify-test-tool-project-names",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T00:55:51.204Z"
     }
   ]
 }

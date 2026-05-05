@@ -1,14 +1,14 @@
 # Staged Load Validation Test Guide
 
 > Date: 2026-04-28  
-> Tool: `FastPortLoadValidation`  
+> Tool: `FastPortTestLoadValidation`
 > Scope: smoke validation, staged validation, result review
 
 ---
 
 ## 1. 목적
 
-이 문서는 `FastPortSmokeServer`와 `FastPortLoadValidation`을 사용해 FastPortSharp의 실제 TCP 경로를 검증하는 방법을 정리한다.
+이 문서는 `FastPortTestSmokeServer`와 `FastPortTestLoadValidation`을 사용해 FastPortSharp의 실제 TCP 경로를 검증하는 방법을 정리한다.
 
 검증 목표는 다음과 같다.
 
@@ -33,7 +33,7 @@ Full staged validation은 기본 `dotnet test`에 넣지 않는다. 10,000 sessi
 
 - .NET SDK 10
 - repository root에서 실행
-- `FastPortSmokeServer`가 사용할 port가 비어 있어야 함
+- `FastPortTestSmokeServer`가 사용할 port가 비어 있어야 함
 - high-load 실행 전에는 OS file descriptor limit 확인 필요
 
 기본 서버 port는 `6628`이다.
@@ -69,15 +69,15 @@ dotnet test FastPortCharp.sln --no-build
 
 기대 결과:
 
-- `FastPortLoadValidationTests` 포함
+- `FastPortTestLoadValidationTests` 포함
 - 현재 기준: 71 passed, 0 failed
 
 ### 4.3 Dry-run
 
-Dry-run은 실제 부하를 실행하지 않고 `FastPortLoadRunner` 명령만 출력한다.
+Dry-run은 실제 부하를 실행하지 않고 `FastPortTestLoadRunner` 명령만 출력한다.
 
 ```bash
-./FastPortLoadValidation/bin/Debug/net10.0/FastPortLoadValidation \
+./FastPortTestLoadValidation/bin/Debug/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \
   --output artifacts/load-validation/dry-run \
@@ -87,13 +87,13 @@ Dry-run은 실제 부하를 실행하지 않고 `FastPortLoadRunner` 명령만 �
 기대 출력:
 
 ```bash
-dotnet run -c Release --project FastPortLoadRunner -- --host 127.0.0.1 --port 6628 --sessions 10000 --payload random:4096-16384 --rate 1 --ramp-up 120s --duration 5m --metrics-interval 1s --output artifacts/load-validation/dry-run/s5-random-10k.metrics.jsonl
+dotnet run -c Release --project FastPortTestLoadRunner -- --host 127.0.0.1 --port 6628 --sessions 10000 --payload random:4096-16384 --rate 1 --ramp-up 120s --duration 5m --metrics-interval 1s --output artifacts/load-validation/dry-run/s5-random-10k.metrics.jsonl
 ```
 
 Release build binary로 확인하려면:
 
 ```bash
-./FastPortLoadValidation/bin/Release/net10.0/FastPortLoadValidation \
+./FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \
   --dry-run
@@ -108,17 +108,17 @@ Release build binary로 확인하려면:
 터미널 1:
 
 ```bash
-dotnet run -c Release --project FastPortSmokeServer
+dotnet run -c Release --project FastPortTestSmokeServer
 ```
 
-서버가 `6628`이 아닌 다른 port를 사용해야 하면 `FastPortSmokeServer/appsettings.json`의 `FastPortSmokeServer:Port`를 조정하고, validation 실행 시 같은 port를 `--port`로 넘긴다.
+서버가 `6628`이 아닌 다른 port를 사용해야 하면 `FastPortTestSmokeServer/appsettings.json`의 `FastPortTestSmokeServer:Port`를 조정하고, validation 실행 시 같은 port를 `--port`로 넘긴다.
 
 ### 5.2 Smoke profile 실행
 
 터미널 2:
 
 ```bash
-dotnet run -c Release --project FastPortLoadValidation -- \
+dotnet run -c Release --project FastPortTestLoadValidation -- \
   --profile smoke \
   --output artifacts/load-validation/smoke-local
 ```
@@ -166,13 +166,13 @@ artifacts/load-validation/smoke-local/
 터미널 1:
 
 ```bash
-dotnet run -c Release --project FastPortSmokeServer
+dotnet run -c Release --project FastPortTestSmokeServer
 ```
 
 터미널 2:
 
 ```bash
-dotnet run -c Release --project FastPortLoadValidation -- \
+dotnet run -c Release --project FastPortTestLoadValidation -- \
   --profile staged \
   --output artifacts/load-validation/staged-local \
   --continue-on-failure
@@ -193,7 +193,7 @@ Stage matrix:
 먼저 낮은 단계부터 실행한다.
 
 ```bash
-dotnet run -c Release --project FastPortLoadValidation -- \
+dotnet run -c Release --project FastPortTestLoadValidation -- \
   --profile staged \
   --stage s1-fixed-1k \
   --output artifacts/load-validation/s1-local
@@ -202,7 +202,7 @@ dotnet run -c Release --project FastPortLoadValidation -- \
 10,000 session 단일 stage:
 
 ```bash
-dotnet run -c Release --project FastPortLoadValidation -- \
+dotnet run -c Release --project FastPortTestLoadValidation -- \
   --profile staged \
   --stage s5-random-10k \
   --output artifacts/load-validation/s5-local
@@ -287,7 +287,7 @@ sed -n '1,200p' artifacts/load-validation/staged-local/summary.md
 
 가능 원인:
 
-- `FastPortSmokeServer`가 실행 중이 아님
+- `FastPortTestSmokeServer`가 실행 중이 아님
 - port가 맞지 않음
 - LoadRunner process가 시작 직후 실패함
 
@@ -340,15 +340,15 @@ sed -n '1,160p' artifacts/load-validation/<run-id>/<stage-id>.stdout.log
 대응:
 
 - Smoke profile 실행
-- `FastPortSmokeServer`가 최신 코드인지 확인
-- `FastPortLoadRunner` output log 확인
+- `FastPortTestSmokeServer`가 최신 코드인지 확인
+- `FastPortTestLoadRunner` output log 확인
 
 ## 10. High-load 실행 전 체크리스트
 
 - [ ] Release build 완료
 - [ ] `dotnet test FastPortCharp.sln --no-build` 통과
 - [ ] `--dry-run`으로 command 확인
-- [ ] `FastPortSmokeServer` 단독 실행 확인
+- [ ] `FastPortTestSmokeServer` 단독 실행 확인
 - [ ] Smoke profile pass
 - [ ] `ulimit -n` 확인
 - [ ] 1k stage pass 후 3k, 5k, 10k 순서로 진행

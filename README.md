@@ -59,7 +59,7 @@ FastPortSharp is a framework for high-performance network communication. It achi
 | DI Container | Microsoft.Extensions.DependencyInjection |
 | Hosting | Microsoft.Extensions.Hosting |
 | Concurrency | **Channel\<T\>**, .NET 10 Lock |
-| Testing | MSTest, FastPortLoadRunner |
+| Testing | MSTest, FastPortTestLoadRunner |
 
 ---
 
@@ -85,7 +85,7 @@ FastPortSharp is a framework for high-performance network communication. It achi
 ### Running Load Tests
 
 ```bash
-dotnet run -c Release --project FastPortLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
+dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -220,8 +220,8 @@ FastPortSharp/
 ├── 📂 FastPortServer/             # TCP server application
 ├── 📂 FastPortClient/             # TCP client application
 ├── 📂 Protocols/                  # Protocol Buffers definitions
-├── 📂 FastPortLoadRunner/         # TCP load test runner
-├── 📂 LibCommonTest/              # Unit tests
+├── 📂 FastPortTestLoadRunner/         # TCP load test runner
+├── 📂 FastPortTests/              # Unit tests
 └── 📂 docs/                       # Documentation
     ├── latency-performance-report.md           # Pre-optimization performance report
     ├── latency-performance-report-after-lock.md # Lock-optimized report
@@ -354,7 +354,7 @@ dotnet run --project FastPortClient -c Release
 ### Run Tests
 
 ```bash
-dotnet test LibCommonTest
+dotnet test FastPortTests
 ```
 
 ---
