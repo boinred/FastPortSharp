@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTestLoadRunner;
 
@@ -19,6 +19,10 @@ internal sealed class MetricsCollector(int targetSessions)
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByCode = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByClass = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, OperationDurationSamples> _operationDurations = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _receiveCloseCountsByOperation = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _receiveCloseCountsByReason = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _receiveCloseCountsByClass = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _phaseCompletionCounts = new(StringComparer.Ordinal);
     private long _connectedSessions;
     private long _totalSentPackets;
     private long _totalReceivedPackets;
@@ -40,6 +44,7 @@ internal sealed class MetricsCollector(int targetSessions)
     private long _pacingWindowDecreaseCount;
     private long _minObservedPacingWindow;
     private long _maxObservedPacingWindow;
+    private long _maxOutstandingRequestsAtReceiveClose;
 
     public void RecordConnectAttempt()
     {
@@ -189,6 +194,24 @@ internal sealed class MetricsCollector(int targetSessions)
         samples.Add(elapsed);
     }
 
+    public void RecordReceiveClose(string operation, string reason, long outstandingRequests)
+    {
+        string normalizedOperation = NormalizeKey(operation);
+        string normalizedReason = NormalizeKey(reason);
+        string classKey = $"{normalizedOperation}|{normalizedReason}";
+
+        IncrementCounter(_receiveCloseCountsByOperation, normalizedOperation);
+        IncrementCounter(_receiveCloseCountsByReason, normalizedReason);
+        IncrementCounter(_receiveCloseCountsByClass, classKey);
+        UpdateMax(ref _maxOutstandingRequestsAtReceiveClose, Math.Max(0, outstandingRequests));
+    }
+
+    public void RecordPhaseCompletion(string phase, string reason)
+    {
+        string classKey = $"{NormalizeKey(phase)}|{NormalizeKey(reason)}";
+        IncrementCounter(_phaseCompletionCounts, classKey);
+    }
+
     public MetricsSnapshot CreateSnapshot(MetricsSnapshot? previous = null)
     {
         DateTimeOffset timestamp = DateTimeOffset.Now;
@@ -255,7 +278,12 @@ internal sealed class MetricsCollector(int targetSessions)
             MinObservedPacingWindow: Interlocked.Read(ref _minObservedPacingWindow),
             MaxObservedPacingWindow: Interlocked.Read(ref _maxObservedPacingWindow),
             SessionRtt: CreateSessionRttSummary(),
-            OperationDurations: CreateOperationDurationSummary());
+            OperationDurations: CreateOperationDurationSummary(),
+            ReceiveCloseCountsByOperation: CopyCounters(_receiveCloseCountsByOperation),
+            ReceiveCloseCountsByReason: CopyCounters(_receiveCloseCountsByReason),
+            ReceiveCloseCountsByClass: CopyCounters(_receiveCloseCountsByClass),
+            MaxOutstandingRequestsAtReceiveClose: Interlocked.Read(ref _maxOutstandingRequestsAtReceiveClose),
+            PhaseCompletionCounts: CopyCounters(_phaseCompletionCounts));
     }
 
     private void RecordSocketErrorClassification(string phase, string exceptionType, string socketErrorCode)
@@ -584,7 +612,12 @@ internal sealed record MetricsSnapshot(
     long MinObservedPacingWindow = 0,
     long MaxObservedPacingWindow = 0,
     SessionRttSummarySnapshot? SessionRtt = null,
-    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null);
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByOperation = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByReason = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByClass = null,
+    long MaxOutstandingRequestsAtReceiveClose = 0,
+    IReadOnlyDictionary<string, long>? PhaseCompletionCounts = null);
 
 internal interface IMetricsReporter
 {

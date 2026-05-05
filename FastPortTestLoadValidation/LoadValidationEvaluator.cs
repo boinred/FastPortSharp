@@ -1,4 +1,4 @@
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTestLoadValidation;
 
@@ -89,6 +89,10 @@ internal sealed class LoadValidationEvaluator
 
         IReadOnlyDictionary<string, long>? socketErrorCountsByPhase = CopyCounters(finalSample?.SocketErrorCountsByPhase);
         IReadOnlyDictionary<string, long>? socketErrorCountsByClass = CopyCounters(finalSample?.SocketErrorCountsByClass);
+        IReadOnlyDictionary<string, long>? receiveCloseCountsByOperation = CopyCounters(finalSample?.ReceiveCloseCountsByOperation);
+        IReadOnlyDictionary<string, long>? receiveCloseCountsByReason = CopyCounters(finalSample?.ReceiveCloseCountsByReason);
+        IReadOnlyDictionary<string, long>? receiveCloseCountsByClass = CopyCounters(finalSample?.ReceiveCloseCountsByClass);
+        IReadOnlyDictionary<string, long>? phaseCompletionCounts = CopyCounters(finalSample?.PhaseCompletionCounts);
         AddSocketClassFailures(stage.Thresholds, socketErrorCountsByClass, failures);
 
         long totalSentPackets = finalSample?.TotalSentPackets ?? 0;
@@ -170,7 +174,12 @@ internal sealed class LoadValidationEvaluator
             MaxSessionRttMaxSessionP99Ms: MaxSessionRttValue(sessionRttSamples, sample => sample.MaxSessionP99Ms),
             MaxSessionRttMaxSessionMaxMs: MaxSessionRttValue(sessionRttSamples, sample => sample.MaxSessionMaxMs),
             SlowestSessions: SelectSlowestSessions(sessionRttSamples),
-            OperationDurations: CopyOperationDurations(finalSample?.OperationDurations));
+            OperationDurations: CopyOperationDurations(finalSample?.OperationDurations),
+            ReceiveCloseCountsByOperation: receiveCloseCountsByOperation,
+            ReceiveCloseCountsByReason: receiveCloseCountsByReason,
+            ReceiveCloseCountsByClass: receiveCloseCountsByClass,
+            MaxOutstandingRequestsAtReceiveClose: finalSample?.MaxOutstandingRequestsAtReceiveClose ?? 0,
+            PhaseCompletionCounts: phaseCompletionCounts);
     }
 
     private static int MaxSessionRttCount(

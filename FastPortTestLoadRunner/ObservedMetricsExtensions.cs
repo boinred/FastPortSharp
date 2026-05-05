@@ -1,4 +1,4 @@
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTestLoadRunner;
 
@@ -47,6 +47,11 @@ internal static class ObservedMetricsExtensions
             snapshot.MinObservedPacingWindow,
             snapshot.MaxObservedPacingWindow,
             snapshot.SessionRtt,
-            snapshot.OperationDurations);
+            snapshot.OperationDurations,
+            snapshot.ReceiveCloseCountsByOperation,
+            snapshot.ReceiveCloseCountsByReason,
+            snapshot.ReceiveCloseCountsByClass,
+            snapshot.MaxOutstandingRequestsAtReceiveClose,
+            snapshot.PhaseCompletionCounts);
     }
 }

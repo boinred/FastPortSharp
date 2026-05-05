@@ -1,5 +1,6 @@
 using System.Text.Json;
 using LibNetworks.Telemetry;
+using LibTestTelemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 

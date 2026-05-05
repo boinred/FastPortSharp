@@ -1,6 +1,7 @@
 using System.Text.Json;
+using LibNetworks.Telemetry;
 
-namespace LibNetworks.Telemetry;
+namespace LibTestTelemetry;
 
 public sealed record ObservedMetricsSnapshot(
     DateTimeOffset Timestamp,
@@ -98,7 +99,12 @@ public sealed record ClientObservedMetricsSnapshot(
     long MinObservedPacingWindow = 0,
     long MaxObservedPacingWindow = 0,
     SessionRttSummarySnapshot? SessionRtt = null,
-    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null);
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByOperation = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByReason = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByClass = null,
+    long MaxOutstandingRequestsAtReceiveClose = 0,
+    IReadOnlyDictionary<string, long>? PhaseCompletionCounts = null);
 
 public sealed record ServerObservedMetricsSnapshot(
     DateTimeOffset Timestamp,

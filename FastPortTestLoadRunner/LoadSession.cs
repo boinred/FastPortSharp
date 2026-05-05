@@ -73,12 +73,15 @@ internal sealed class LoadSession(
         try
         {
             await runAsync();
+            metricsCollector.RecordPhaseCompletion(phase, "completed");
         }
         catch (OperationCanceledException)
         {
+            metricsCollector.RecordPhaseCompletion(phase, "cancelled");
         }
         catch (Exception ex)
         {
+            metricsCollector.RecordPhaseCompletion(phase, "faulted");
             metricsCollector.RecordSocketError(phase, ex);
             throw new LoadSessionPhaseException(phase, ex);
         }
@@ -244,7 +247,7 @@ internal sealed class LoadSession(
         return true;
     }
 
-    private async Task<bool> ReadExactAsync(
+    internal async Task<bool> ReadExactAsync(
         NetworkStream stream,
         Memory<byte> buffer,
         string operation,
@@ -259,6 +262,8 @@ internal sealed class LoadSession(
                 int read = await stream.ReadAsync(buffer[totalRead..], cancellationToken);
                 if (read <= 0)
                 {
+                    string reason = totalRead == 0 ? "eof" : "partial-eof";
+                    metricsCollector.RecordReceiveClose(operation, reason, OutstandingRequests);
                     return false;
                 }
 

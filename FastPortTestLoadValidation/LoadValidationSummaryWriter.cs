@@ -1,5 +1,5 @@
 using System.Text.Json;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTestLoadValidation;
 
@@ -108,6 +108,33 @@ internal sealed class LoadValidationSummaryWriter
                 {
                     lines.Add($"- {stage.StageId}: socket {pair.Key} = {pair.Value}");
                 }
+            }
+
+            if (stage.ReceiveCloseCountsByClass is { Count: > 0 })
+            {
+                foreach (KeyValuePair<string, long> pair in stage.ReceiveCloseCountsByClass
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(5))
+                {
+                    lines.Add($"- {stage.StageId}: receive close {pair.Key} = {pair.Value}");
+                }
+            }
+
+            if (stage.PhaseCompletionCounts is { Count: > 0 })
+            {
+                foreach (KeyValuePair<string, long> pair in stage.PhaseCompletionCounts
+                    .OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(5))
+                {
+                    lines.Add($"- {stage.StageId}: phase {pair.Key} = {pair.Value}");
+                }
+            }
+
+            if (stage.MaxOutstandingRequestsAtReceiveClose > 0)
+            {
+                lines.Add($"- {stage.StageId}: max outstanding requests at receive close = {stage.MaxOutstandingRequestsAtReceiveClose}");
             }
 
             if (stage.SessionRttTrackedSessionCount > 0)

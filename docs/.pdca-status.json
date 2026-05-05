@@ -1,10 +1,8 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-05T05:45:00Z",
-  "activeFeatures": [
-    "extract-telemetry-contracts-from-network-core"
-  ],
-  "primaryFeature": "extract-telemetry-contracts-from-network-core",
+  "lastUpdated": "2026-05-05T11:54:29Z",
+  "activeFeatures": [],
+  "primaryFeature": null,
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -861,10 +859,16 @@
       "archivePath": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning"
     },
     "extract-telemetry-contracts-from-network-core": {
-      "phase": "do",
-      "matchRate": null,
-      "iterationCount": 0,
-      "documents": {},
+      "phase": "archived",
+      "matchRate": 100,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core/extract-telemetry-contracts-from-network-core.plan.md",
+        "design": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core/extract-telemetry-contracts-from-network-core.design.md",
+        "do": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core/extract-telemetry-contracts-from-network-core.do.md",
+        "analysis": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core/extract-telemetry-contracts-from-network-core.analysis.md",
+        "report": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core/extract-telemetry-contracts-from-network-core.report.md"
+      },
       "taskChain": [
         {
           "phase": "plan",
@@ -880,24 +884,36 @@
         },
         {
           "phase": "do",
-          "status": "active",
-          "createdAt": "2026-05-04T23:50:00.495Z"
+          "status": "completed",
+          "createdAt": "2026-05-04T23:50:00.495Z",
+          "completedAt": "2026-05-05T08:38:03.380Z"
         },
         {
           "phase": "check",
-          "status": "pending",
-          "createdAt": "2026-05-04T23:50:00.495Z"
+          "status": "completed",
+          "createdAt": "2026-05-04T23:50:00.495Z",
+          "completedAt": "2026-05-05T08:51:16.921Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-05-05T08:51:16.921Z",
+          "completedAt": "2026-05-05T09:05:00.000Z"
         },
         {
           "phase": "report",
-          "status": "pending",
-          "createdAt": "2026-05-04T23:50:00.495Z"
+          "status": "completed",
+          "createdAt": "2026-05-04T23:50:00.495Z",
+          "completedAt": "2026-05-05T11:49:07.718Z"
         }
       ],
       "timestamps": {
         "started": "2026-05-04T23:50:00.497Z",
-        "lastUpdated": "2026-05-04T23:58:44.062Z"
-      }
+        "lastUpdated": "2026-05-05T11:54:29Z"
+      },
+      "completedAt": "2026-05-05T11:49:07.710Z",
+      "archivedAt": "2026-05-05T11:54:29Z",
+      "archivePath": "docs/archive/2026-05/extract-telemetry-contracts-from-network-core"
     },
     "clarify-test-tool-project-names": {
       "phase": "archived",
@@ -948,6 +964,113 @@
       "completedAt": "2026-05-05T00:55:51.202Z",
       "archivedAt": "2026-05-05T01:10:49Z",
       "archivePath": "docs/archive/2026-05/clarify-test-tool-project-names"
+    },
+    "cloud-receive-timeout-rtt-tail-stability": {
+      "phase": "archived",
+      "matchRate": 94,
+      "iterationCount": 2,
+      "documents": {
+        "plan": "docs/archive/2026-05/cloud-receive-timeout-rtt-tail-stability/cloud-receive-timeout-rtt-tail-stability.plan.md",
+        "design": "docs/archive/2026-05/cloud-receive-timeout-rtt-tail-stability/cloud-receive-timeout-rtt-tail-stability.design.md",
+        "do": "docs/archive/2026-05/cloud-receive-timeout-rtt-tail-stability/cloud-receive-timeout-rtt-tail-stability.do.md",
+        "analysis": "docs/archive/2026-05/cloud-receive-timeout-rtt-tail-stability/cloud-receive-timeout-rtt-tail-stability.analysis.md",
+        "report": "docs/archive/2026-05/cloud-receive-timeout-rtt-tail-stability/cloud-receive-timeout-rtt-tail-stability.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T05:49:00.950Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T05:57:29.752Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T06:13:23.911Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T06:20:40.493Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T06:45:57.957Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-05-05T05:47:45.472Z",
+          "completedAt": "2026-05-05T06:54:29.906Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-05T05:47:45.474Z",
+        "lastUpdated": "2026-05-05T07:01:20Z"
+      },
+      "completedAt": "2026-05-05T06:54:29.902Z",
+      "archivedAt": "2026-05-05T07:01:20Z"
+    },
+    "cloud-staged-rtt-tail-validation": {
+      "phase": "archived",
+      "matchRate": 91,
+      "iterationCount": 1,
+      "documents": {
+        "plan": "docs/archive/2026-05/cloud-staged-rtt-tail-validation/cloud-staged-rtt-tail-validation.plan.md",
+        "design": "docs/archive/2026-05/cloud-staged-rtt-tail-validation/cloud-staged-rtt-tail-validation.design.md",
+        "do": "docs/archive/2026-05/cloud-staged-rtt-tail-validation/cloud-staged-rtt-tail-validation.do.md",
+        "analysis": "docs/archive/2026-05/cloud-staged-rtt-tail-validation/cloud-staged-rtt-tail-validation.analysis.md",
+        "report": "docs/archive/2026-05/cloud-staged-rtt-tail-validation/cloud-staged-rtt-tail-validation.report.md"
+      },
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-05T07:20:35.441Z",
+          "completedAt": "2026-05-05T07:21:24.713Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-05T07:20:35.441Z",
+          "completedAt": "2026-05-05T07:42:34.321Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-05T07:20:35.441Z",
+          "completedAt": "2026-05-05T07:44:15.494Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-05T07:20:35.441Z",
+          "completedAt": "2026-05-05T08:00:39.484Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-05-05T07:20:35.441Z",
+          "completedAt": "2026-05-05T08:06:18.698Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-05T07:20:35.442Z",
+        "lastUpdated": "2026-05-05T08:20:47Z"
+      },
+      "completedAt": "2026-05-05T08:06:18.690Z",
+      "archivedAt": "2026-05-05T08:20:47Z",
+      "archivePath": "docs/archive/2026-05/cloud-staged-rtt-tail-validation"
     }
   },
   "pipeline": {
@@ -958,7 +1081,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-05T03:10:02Z"
+    "lastActivity": "2026-05-05T11:49:07.718Z"
   },
   "history": [
     {
@@ -2325,6 +2448,200 @@
       "action": "archive",
       "archivePath": "docs/archive/2026-05/cloud-server-runner-split-load-validation",
       "timestamp": "2026-05-05T05:45:00Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-05T05:49:00.945Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-05T05:49:00.948Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-05T05:54:03.490Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-05T05:56:00.885Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-05T05:57:29.748Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-05T05:57:29.750Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T06:13:23.906Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T06:13:23.909Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T06:20:40.487Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T06:20:40.489Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "check",
+      "to": "report",
+      "timestamp": "2026-05-05T06:45:57.949Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "act",
+      "nextPhase": "report",
+      "timestamp": "2026-05-05T06:45:57.954Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T06:54:29.904Z"
+    },
+    {
+      "feature": "cloud-receive-timeout-rtt-tail-stability",
+      "from": "completed",
+      "to": "archived",
+      "timestamp": "2026-05-05T07:01:20Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-05T07:21:24.709Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-05T07:21:24.710Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-05T07:41:34.208Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-05T07:42:34.318Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-05T07:42:34.320Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T07:44:15.489Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T07:44:15.493Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T08:00:39.478Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T08:00:39.481Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T08:06:18.695Z"
+    },
+    {
+      "feature": "cloud-staged-rtt-tail-validation",
+      "from": "completed",
+      "to": "archived",
+      "timestamp": "2026-05-05T08:20:47Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T08:38:03.376Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T08:38:03.379Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T08:51:16.916Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T08:51:16.918Z"
+    },
+    {
+      "feature": "extract-telemetry-contracts-from-network-core",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T11:49:07.716Z"
     }
   ]
 }

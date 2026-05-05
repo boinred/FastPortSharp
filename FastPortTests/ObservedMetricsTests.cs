@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FastPortTestLoadRunner;
 using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTests;
 
@@ -247,6 +248,15 @@ public sealed class ObservedMetricsTests
             OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
             {
                 ["receive-body"] = new(Count: 3, AverageMs: 4.5, MaxMs: 9.5)
+            },
+            ReceiveCloseCountsByClass: new Dictionary<string, long>
+            {
+                ["receive-body|partial-eof"] = 2
+            },
+            MaxOutstandingRequestsAtReceiveClose: 4,
+            PhaseCompletionCounts: new Dictionary<string, long>
+            {
+                ["receive|completed"] = 1
             });
 
         string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromClient(client));
@@ -268,6 +278,11 @@ public sealed class ObservedMetricsTests
         Assert.IsNotNull(observed.ClientObserved.OperationDurations);
         Assert.AreEqual(3, observed.ClientObserved.OperationDurations["receive-body"].Count);
         Assert.AreEqual(9.5, observed.ClientObserved.OperationDurations["receive-body"].MaxMs, 0.001);
+        Assert.IsNotNull(observed.ClientObserved.ReceiveCloseCountsByClass);
+        Assert.AreEqual(2, observed.ClientObserved.ReceiveCloseCountsByClass["receive-body|partial-eof"]);
+        Assert.AreEqual(4, observed.ClientObserved.MaxOutstandingRequestsAtReceiveClose);
+        Assert.IsNotNull(observed.ClientObserved.PhaseCompletionCounts);
+        Assert.AreEqual(1, observed.ClientObserved.PhaseCompletionCounts["receive|completed"]);
         Assert.IsNotNull(observed.ClientObserved.SessionRtt);
         Assert.AreEqual(2, observed.ClientObserved.SessionRtt.TrackedSessionCount);
         Assert.AreEqual(1, observed.ClientObserved.SessionRtt.EligibleSessionCount);
@@ -371,6 +386,15 @@ public sealed class ObservedMetricsTests
             OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
             {
                 ["send-write"] = new(Count: 4, AverageMs: 1.5, MaxMs: 3.5)
+            },
+            ReceiveCloseCountsByClass: new Dictionary<string, long>
+            {
+                ["receive-header|eof"] = 1
+            },
+            MaxOutstandingRequestsAtReceiveClose: 6,
+            PhaseCompletionCounts: new Dictionary<string, long>
+            {
+                ["send|cancelled"] = 1
             });
 
         ClientObservedMetricsSnapshot observed = raw.ToClientObservedMetricsSnapshot();
@@ -403,6 +427,11 @@ public sealed class ObservedMetricsTests
         Assert.IsNotNull(observed.OperationDurations);
         Assert.AreEqual(4, observed.OperationDurations["send-write"].Count);
         Assert.AreEqual(3.5, observed.OperationDurations["send-write"].MaxMs, 0.001);
+        Assert.IsNotNull(observed.ReceiveCloseCountsByClass);
+        Assert.AreEqual(1, observed.ReceiveCloseCountsByClass["receive-header|eof"]);
+        Assert.AreEqual(6, observed.MaxOutstandingRequestsAtReceiveClose);
+        Assert.IsNotNull(observed.PhaseCompletionCounts);
+        Assert.AreEqual(1, observed.PhaseCompletionCounts["send|cancelled"]);
         Assert.IsNotNull(observed.SessionRtt);
         Assert.AreEqual(1, observed.SessionRtt.TrackedSessionCount);
         Assert.AreEqual(3, observed.SessionRtt.SlowestSessions[0].SessionId);

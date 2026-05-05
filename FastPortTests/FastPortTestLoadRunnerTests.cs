@@ -1,12 +1,13 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using System.Net.Sockets;
 using FastPort.Protocols.Commons;
 using FastPort.Protocols.Tests;
 using FastPortTestLoadRunner;
 using Google.Protobuf;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTests;
 
@@ -261,6 +262,89 @@ public sealed class FastPortTestLoadRunnerTests
     }
 
     [TestMethod]
+    public async Task LoadSession_ReadExactAsync_RecordsHeaderEofClose()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: null, collector);
+        using TcpClient client = new();
+        using TcpClient server = await ConnectTcpPairAsync(client);
+        using NetworkStream stream = client.GetStream();
+
+        server.Close();
+
+        bool read = await session.ReadExactAsync(
+                stream,
+                new byte[2],
+                "receive-header",
+                CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.IsFalse(read);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByOperation!["receive-header"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByReason!["eof"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByClass!["receive-header|eof"]);
+        Assert.AreEqual(0, snapshot.MaxOutstandingRequestsAtReceiveClose);
+    }
+
+    [TestMethod]
+    public async Task LoadSession_ReadExactAsync_RecordsBodyEofClose()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: null, collector);
+        session.IncrementOutstandingRequests();
+        using TcpClient client = new();
+        using TcpClient server = await ConnectTcpPairAsync(client);
+        using NetworkStream stream = client.GetStream();
+
+        server.Close();
+
+        bool read = await session.ReadExactAsync(
+                stream,
+                new byte[2],
+                "receive-body",
+                CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.IsFalse(read);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByOperation!["receive-body"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByReason!["eof"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByClass!["receive-body|eof"]);
+        Assert.AreEqual(1, snapshot.MaxOutstandingRequestsAtReceiveClose);
+    }
+
+    [TestMethod]
+    public async Task LoadSession_ReadExactAsync_RecordsPartialBodyEofClose()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: null, collector);
+        session.IncrementOutstandingRequests();
+        using TcpClient client = new();
+        using TcpClient server = await ConnectTcpPairAsync(client);
+        using NetworkStream clientStream = client.GetStream();
+        using NetworkStream serverStream = server.GetStream();
+
+        await serverStream.WriteAsync(new byte[] { 1 });
+        await serverStream.FlushAsync();
+        server.Close();
+
+        bool read = await session.ReadExactAsync(
+                clientStream,
+                new byte[2],
+                "receive-body",
+                CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.IsFalse(read);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByOperation!["receive-body"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByReason!["partial-eof"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByClass!["receive-body|partial-eof"]);
+        Assert.AreEqual(1, snapshot.MaxOutstandingRequestsAtReceiveClose);
+    }
+
+    [TestMethod]
     public async Task OutstandingRequestPacer_FixedWindow_WaitsForResponseSignal()
     {
         var collector = new MetricsCollector(targetSessions: 1);
@@ -440,6 +524,28 @@ public sealed class FastPortTestLoadRunnerTests
     }
 
     [TestMethod]
+    public void MetricsCollector_RecordReceiveCloseAndPhaseCompletion_TracksClassifications()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+
+        collector.RecordReceiveClose("receive-body", "partial-eof", outstandingRequests: 7);
+        collector.RecordReceiveClose("receive-header", "eof", outstandingRequests: 2);
+        collector.RecordPhaseCompletion("receive", "completed");
+        collector.RecordPhaseCompletion("send", "cancelled");
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByOperation!["receive-body"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByOperation["receive-header"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByReason!["partial-eof"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByReason["eof"]);
+        Assert.AreEqual(1, snapshot.ReceiveCloseCountsByClass!["receive-body|partial-eof"]);
+        Assert.AreEqual(7, snapshot.MaxOutstandingRequestsAtReceiveClose);
+        Assert.AreEqual(1, snapshot.PhaseCompletionCounts!["receive|completed"]);
+        Assert.AreEqual(1, snapshot.PhaseCompletionCounts["send|cancelled"]);
+    }
+
+    [TestMethod]
     public void MetricsCollector_RecordRtt_TracksSessionRttSummary()
     {
         var collector = new MetricsCollector(targetSessions: 2);
@@ -577,6 +683,23 @@ public sealed class FastPortTestLoadRunnerTests
             metricsCollector ?? new MetricsCollector(targetSessions: 1));
     }
 
+    private static async Task<TcpClient> ConnectTcpPairAsync(TcpClient client)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, port: 0);
+        listener.Start();
+        try
+        {
+            var endpoint = (IPEndPoint)listener.LocalEndpoint;
+            Task<TcpClient> acceptTask = listener.AcceptTcpClientAsync();
+            await client.ConnectAsync(endpoint.Address, endpoint.Port);
+            return await acceptTask;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private static long TimestampAfter(long timestamp, double elapsedMs)
     {
         return timestamp + (long)Math.Round(elapsedMs * Stopwatch.Frequency / 1000.0, MidpointRounding.AwayFromZero);
@@ -696,6 +819,16 @@ public sealed class FastPortTestLoadRunnerTests
             OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
             {
                 ["receive-body"] = new(Count: 2, AverageMs: 4.5, MaxMs: 8.5)
+            },
+            ReceiveCloseCountsByClass: new Dictionary<string, long>
+            {
+                ["receive-body|partial-eof"] = 1
+            },
+            MaxOutstandingRequestsAtReceiveClose: 3,
+            PhaseCompletionCounts: new Dictionary<string, long>
+            {
+                ["receive|completed"] = 1,
+                ["send|cancelled"] = 1
             });
 
         string json = JsonMetricsReporter.SerializeSnapshot(snapshot);
@@ -723,6 +856,9 @@ public sealed class FastPortTestLoadRunnerTests
         Assert.AreEqual(1.5, clientObserved.GetProperty("pacingAverageWaitMs").GetDouble(), 0.0001);
         Assert.AreEqual(8, clientObserved.GetProperty("maxObservedPacingWindow").GetInt64());
         Assert.AreEqual(8.5, clientObserved.GetProperty("operationDurations").GetProperty("receive-body").GetProperty("maxMs").GetDouble(), 0.0001);
+        Assert.AreEqual(1, clientObserved.GetProperty("receiveCloseCountsByClass").GetProperty("receive-body|partial-eof").GetInt64());
+        Assert.AreEqual(3, clientObserved.GetProperty("maxOutstandingRequestsAtReceiveClose").GetInt64());
+        Assert.AreEqual(1, clientObserved.GetProperty("phaseCompletionCounts").GetProperty("receive|completed").GetInt64());
         Assert.AreEqual(2, clientObserved.GetProperty("sessionRtt").GetProperty("trackedSessionCount").GetInt32());
         Assert.AreEqual(8, clientObserved.GetProperty("sessionRtt").GetProperty("minSamplesPerSession").GetInt32());
         Assert.IsFalse(clientObserved.GetProperty("sessionRtt").TryGetProperty("minSampleCountForTail", out _));

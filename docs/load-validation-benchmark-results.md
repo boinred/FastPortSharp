@@ -336,6 +336,35 @@ Interpretation:
 
 The first cloud split 10K result is not comparable as a win/loss against same-machine local runs because the network path changed. It is useful as a failed external-path baseline: client send writes remain fast, server send pressure is low, but receive waits, disconnects, and RTT tail dominate. The next optimization should focus on receive timeout/reset behavior, connection lifecycle cleanup, and cloud RTT tail rather than server send-buffer pressure.
 
+## Cloud Staged RTT Tail Validation
+
+Artifact summary:
+
+- Smoke: `artifacts/load-validation/cloud-staged-rtt-tail-validation/smoke/summary.md`
+- 1K fixed: `artifacts/load-validation/cloud-staged-rtt-tail-validation/s1-fixed-1k/summary.md`
+- 1K random: `artifacts/load-validation/cloud-staged-rtt-tail-validation/s2-random-1k/summary.md`
+- 3K random: `artifacts/load-validation/cloud-staged-rtt-tail-validation/s3-random-3k/summary.md`
+
+These runs validate the cloud server/local runner path after the receive close and phase completion diagnostics were added. The server was restarted before each load stage.
+
+| Metric | `s1-fixed-1k` | `s2-random-1k` | `s3-random-3k` |
+|--------|--------------:|---------------:|---------------:|
+| Result | Passed | Passed | Passed by hard guardrail |
+| Peak sessions | `1000/1000` | `1000/1000` | `2994/3000` |
+| Final disconnects | `0` | `0` | `0` |
+| Socket error rate | `0.00%` | `0.00%` | `0.003%` |
+| Max TPS | `1,214.22` | `1,045.30` | `1,097.13` |
+| Max pending requests | `982` | `1,820` | `10,372` |
+| RTT P95 | `1,139.18ms` | `4,560.84ms` | `30,431.21ms` |
+| RTT P99 | `2,799.12ms` | `10,673.63ms` | `107,050.72ms` |
+| Session RTT p95-of-p95 | `2,474.44ms` | `11,679.07ms` | `118,358.76ms` |
+| Slowest session P95 | `31,025.53ms` | `74,855.55ms` | `208,252.42ms` |
+| Receive header max | `32,634.68ms` | `47,584.00ms` | `212,445.14ms` |
+| Receive body max | `16,485.75ms` | `66,810.64ms` | `205,681.72ms` |
+| Send write max | `14.74ms` | `14.89ms` | `69.44ms` |
+
+The staged ladder should stop at `s3-random-3k` for now. Although the validation summary still passes by hard guardrails, the 3K random run already reproduces the cloud tail/lifecycle shape: `connect|SocketException|TimedOut = 6`, RTT P99 above `100s`, operation receive waits above `200s`, and server sessions lingering after runner completion (`currentSessions = 768` immediately after completion, then `50` after an additional delay). 5K/10K would likely amplify the same failure shape rather than answer a new question.
+
 ## Verification Commands
 
 The current implementation was checked with:
@@ -355,3 +384,4 @@ The current implementation was checked with:
 - follow-up focused 10K Channel send queue with ArrayPool coalesced batching: `artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md`
 - cloud server/local runner smoke validation: `artifacts/load-validation/cloud-server-runner-split/smoke/summary.md`
 - cloud server/local runner focused 10K validation: `artifacts/load-validation/cloud-server-runner-split/s5-random-10k/summary.md`
+- cloud staged RTT tail validation: `artifacts/load-validation/cloud-staged-rtt-tail-validation/s3-random-3k/summary.md`

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FastPortTestLoadValidation;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTests;
 
@@ -327,6 +327,9 @@ public sealed class FastPortTestLoadValidationTests
             maxObservedPacingWindow: 8,
             socketErrorCountsByPhase: new Dictionary<string, long> { ["receive"] = 2 },
             socketErrorCountsByClass: new Dictionary<string, long> { ["receive|SocketException|ConnectionReset"] = 2 },
+            receiveCloseCountsByClass: new Dictionary<string, long> { ["receive-body|partial-eof"] = 3 },
+            maxOutstandingRequestsAtReceiveClose: 9,
+            phaseCompletionCounts: new Dictionary<string, long> { ["receive|completed"] = 1, ["send|cancelled"] = 1 },
             sessionRtt: sessionRtt,
             operationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
             {
@@ -387,6 +390,10 @@ public sealed class FastPortTestLoadValidationTests
         Assert.AreEqual(8, summary.MaxObservedPacingWindow);
         Assert.AreEqual(2, summary.SocketErrorCountsByPhase!["receive"]);
         Assert.AreEqual(2, summary.SocketErrorCountsByClass!["receive|SocketException|ConnectionReset"]);
+        Assert.AreEqual(3, summary.ReceiveCloseCountsByClass!["receive-body|partial-eof"]);
+        Assert.AreEqual(9, summary.MaxOutstandingRequestsAtReceiveClose);
+        Assert.AreEqual(1, summary.PhaseCompletionCounts!["receive|completed"]);
+        Assert.AreEqual(1, summary.PhaseCompletionCounts["send|cancelled"]);
         Assert.AreEqual(20, summary.OperationDurations!["receive-body"].Count);
         Assert.AreEqual(30, summary.OperationDurations["receive-body"].MaxMs);
         Assert.AreEqual(10, summary.SessionRttTrackedSessionCount);
@@ -535,6 +542,16 @@ public sealed class FastPortTestLoadValidationTests
                     OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
                     {
                         ["receive-body"] = new(Count: 20, AverageMs: 4.5, MaxMs: 30)
+                    },
+                    ReceiveCloseCountsByClass: new Dictionary<string, long>
+                    {
+                        ["receive-body|partial-eof"] = 2
+                    },
+                    MaxOutstandingRequestsAtReceiveClose: 4,
+                    PhaseCompletionCounts: new Dictionary<string, long>
+                    {
+                        ["receive|completed"] = 1,
+                        ["send|cancelled"] = 1
                     })
             ]);
         var writer = new LoadValidationSummaryWriter();
@@ -559,6 +576,9 @@ public sealed class FastPortTestLoadValidationTests
         StringAssert.Contains(markdown, "Session RTT");
         StringAssert.Contains(markdown, "eligible=1/2");
         StringAssert.Contains(markdown, "session RTT excluded low-sample sessions = 1");
+        StringAssert.Contains(markdown, "receive close receive-body|partial-eof = 2");
+        StringAssert.Contains(markdown, "phase receive|completed = 1");
+        StringAssert.Contains(markdown, "max outstanding requests at receive close = 4");
         StringAssert.Contains(markdown, "operation receive-body count=20 avg=4.50ms max=30.00ms");
         StringAssert.Contains(markdown, "slow session 7");
     }
@@ -633,6 +653,9 @@ public sealed class FastPortTestLoadValidationTests
         long maxObservedPacingWindow = 0,
         IReadOnlyDictionary<string, long>? socketErrorCountsByPhase = null,
         IReadOnlyDictionary<string, long>? socketErrorCountsByClass = null,
+        IReadOnlyDictionary<string, long>? receiveCloseCountsByClass = null,
+        long maxOutstandingRequestsAtReceiveClose = 0,
+        IReadOnlyDictionary<string, long>? phaseCompletionCounts = null,
         SessionRttSummarySnapshot? sessionRtt = null,
         IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? operationDurations = null)
     {
@@ -673,7 +696,10 @@ public sealed class FastPortTestLoadValidationTests
             SocketErrorCountsByPhase: socketErrorCountsByPhase,
             SocketErrorCountsByClass: socketErrorCountsByClass,
             SessionRtt: sessionRtt,
-            OperationDurations: operationDurations);
+            OperationDurations: operationDurations,
+            ReceiveCloseCountsByClass: receiveCloseCountsByClass,
+            MaxOutstandingRequestsAtReceiveClose: maxOutstandingRequestsAtReceiveClose,
+            PhaseCompletionCounts: phaseCompletionCounts);
     }
 
     private static ServerObservedMetricsSnapshot CreateServerSample(

@@ -35,6 +35,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestSmokeServer", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadValidation", "FastPortTestLoadValidation\FastPortTestLoadValidation.csproj", "{86357368-E11D-48ED-9CE8-1B4A5DF2527D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibTestTelemetry", "LibTestTelemetry\LibTestTelemetry.csproj", "{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -153,6 +155,18 @@ Global
 		{86357368-E11D-48ED-9CE8-1B4A5DF2527D}.Release|x64.Build.0 = Release|Any CPU
 		{86357368-E11D-48ED-9CE8-1B4A5DF2527D}.Release|x86.ActiveCfg = Release|Any CPU
 		{86357368-E11D-48ED-9CE8-1B4A5DF2527D}.Release|x86.Build.0 = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|x64.Build.0 = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Debug|x86.Build.0 = Debug|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x64.ActiveCfg = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x64.Build.0 = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x86.ActiveCfg = Release|Any CPU
+		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

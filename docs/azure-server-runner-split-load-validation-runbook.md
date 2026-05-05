@@ -155,6 +155,27 @@ export FASTPORT_SERVER_PORT=6628
 scripts/cloud/runner-connectivity.sh
 ```
 
+## Before Every Load Run
+
+Start each smoke or 10K validation from a clean server process. Reusing a server process after a failed load run can leave stale sessions and pending sends that distort the next result.
+
+On the server VM:
+
+```bash
+cd FastPortSharp
+tmux kill-session -t fastport-server || true
+tmux new -d -s fastport-server 'scripts/cloud/server-start.sh'
+```
+
+Then verify the listener and the latest server metrics:
+
+```bash
+ss -ltnp | grep 6628
+tail -n 1 artifacts/load-validation/cloud-server-runner-split/server/server.metrics.jsonl | jq '.serverObserved | {currentSessions, pendingSendRequests, maxPendingSendRequests, sendBackpressureEvents, sendRejectedRequests, socketErrorCount}'
+```
+
+Before starting the runner, `currentSessions` should be `0` or explicitly explained. If it is not `0`, restart the server again and keep the stale value with the run notes.
+
 ## Local Runner
 
 Set server public IP or DNS:
@@ -170,10 +191,12 @@ Run smoke first:
 
 ```bash
 cd FastPortSharp
+scripts/cloud/ssh-readiness.sh
+scripts/cloud/runner-connectivity.sh
 scripts/cloud/runner-smoke.sh
 ```
 
-Run focused 10K only after smoke passes and VM size is confirmed sufficient:
+Run focused 10K only after smoke passes, server metrics are clean, and VM size is confirmed sufficient:
 
 ```bash
 scripts/cloud/runner-10k.sh

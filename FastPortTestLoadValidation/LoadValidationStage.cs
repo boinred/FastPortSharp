@@ -1,4 +1,4 @@
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 
 namespace FastPortTestLoadValidation;
 
@@ -125,7 +125,12 @@ internal sealed record LoadValidationStageSummary(
     double MaxSessionRttMaxSessionP99Ms = 0,
     double MaxSessionRttMaxSessionMaxMs = 0,
     IReadOnlyList<SlowSessionRttSnapshot>? SlowestSessions = null,
-    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null);
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByOperation = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByReason = null,
+    IReadOnlyDictionary<string, long>? ReceiveCloseCountsByClass = null,
+    long MaxOutstandingRequestsAtReceiveClose = 0,
+    IReadOnlyDictionary<string, long>? PhaseCompletionCounts = null);
 
 internal sealed record LoadValidationRunSummary(
     string RunId,

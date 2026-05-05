@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
-    <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+    <ProjectReference Include="..\LibTestTelemetry\LibTestTelemetry.csproj" />
     <ProjectReference Include="..\Protocols\Protocols.csproj" />
   </ItemGroup>
 

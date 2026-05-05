@@ -1,4 +1,4 @@
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
