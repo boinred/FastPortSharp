@@ -218,6 +218,13 @@ This feature's Act loop has reached the practical stop condition:
 
 The next pass should move to a new or already-active target: server/test-server response processing, or cloud split validation to remove same-machine scheduling noise before further pacing work.
 
+2026-05-05 recheck after later send-queue work:
+
+- The latest available post-queue adaptive artifact, `artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md`, still does not satisfy the current hard guardrails if interpreted with the stricter evaluator added by this feature.
+- It reaches `9,975 / 10,000` peak sessions, but still has `2` final disconnects and `receive|IOException|TimedOut = 1,266`.
+- That result is better than the failed threshold-only artifacts for peak session retention, but it is not enough to reopen client threshold tuning as a safe path.
+- The feature remains below the report threshold at `86%`; the unresolved gap is root cause and target selection, not missing implementation of the original client-side design.
+
 Iteration 1 applied the design fallback candidate:
 
 ```text
@@ -269,4 +276,5 @@ artifacts/load-validation/adaptive-pacing-header-pressure-s5/summary.md
 - [x] Test and reject the older stability-restore adaptive defaults.
 - [x] Test and reject the header-wait pressure adaptive feedback candidate.
 - [x] Stop the current client-side iterate loop after exceeding the iteration limit without a safe retained candidate.
+- [x] Recheck the latest post-send-queue adaptive artifact under current hard-guardrail interpretation.
 - [ ] Switch target to server/test-server response processing or cloud split validation.

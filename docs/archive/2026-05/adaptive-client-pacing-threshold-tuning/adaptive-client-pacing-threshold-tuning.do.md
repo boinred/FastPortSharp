@@ -469,3 +469,31 @@ Decision:
 - do not reapply static threshold-only or header-wait-only pacing feedback under this feature;
 - keep the retained defaults at `MaxWindow=8`, `RttTargetMs=14000`, `RttHighMs=24000`, `IncreaseEveryResponses=128`;
 - move the next optimization lane to server/test-server response processing or cloud split validation.
+
+## Iteration 9: Post-Queue-Refactor Recheck
+
+The 2026-05-05 iterate request was treated as a recheck after later send-queue and test-tool renaming work, not as a new threshold candidate.
+
+Reason:
+
+- `BaseSession` send-queue work happened after the adaptive threshold experiments, so the old adaptive failure needed to be reinterpreted against newer artifacts.
+- The latest available adaptive-focused post-queue artifact is still not clean under the hard guardrails:
+
+```text
+artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md
+```
+
+| Metric | Value | Hard-Guardrail Interpretation |
+|--------|------:|-------------------------------|
+| Peak sessions | `9,975 / 10,000` | Better than the failed threshold artifacts, but not full retention. |
+| Final disconnects | `2` | Fails current `MaxFinalDisconnectCount = 0`. |
+| `receive\|IOException\|TimedOut` | `1,266` | Fails current receive-timeout class threshold. |
+| Max TPS | `7,901.40` | Worse than prior adaptive reference. |
+| RTT P95 / P99 | `17,796.60ms / 27,398.15ms` | P99 remains above the intended tail target. |
+
+Decision:
+
+- no additional client threshold-only or header-wait-only candidate is justified in this feature;
+- keep the hard validation guardrails and operation-duration diagnostics;
+- treat the retained adaptive defaults as diagnostic, not as a proven improvement;
+- close this feature only after writing a report that explicitly records the failed optimization outcome, or split the next fix into server/test-server response processing or cloud split validation.

@@ -1,12 +1,11 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-05T01:10:49Z",
+  "lastUpdated": "2026-05-05T02:03:40Z",
   "activeFeatures": [
     "cloud-server-runner-split-load-validation",
-    "adaptive-client-pacing-threshold-tuning",
     "extract-telemetry-contracts-from-network-core"
   ],
-  "primaryFeature": "adaptive-client-pacing-threshold-tuning",
+  "primaryFeature": "cloud-server-runner-split-load-validation",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -792,14 +791,15 @@
       "archivePath": "docs/archive/2026-05/throughput-pacing-server-processing-decomposition"
     },
     "adaptive-client-pacing-threshold-tuning": {
-      "phase": "check",
+      "phase": "archived",
       "matchRate": 86,
-      "iterationCount": 8,
+      "iterationCount": 9,
       "documents": {
-        "plan": "docs/01-plan/features/adaptive-client-pacing-threshold-tuning.plan.md",
-        "design": "docs/02-design/features/adaptive-client-pacing-threshold-tuning.design.md",
-        "do": "docs/02-design/features/adaptive-client-pacing-threshold-tuning.do.md",
-        "analysis": "docs/03-analysis/adaptive-client-pacing-threshold-tuning.analysis.md"
+        "plan": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning/adaptive-client-pacing-threshold-tuning.plan.md",
+        "design": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning/adaptive-client-pacing-threshold-tuning.design.md",
+        "do": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning/adaptive-client-pacing-threshold-tuning.do.md",
+        "analysis": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning/adaptive-client-pacing-threshold-tuning.analysis.md",
+        "report": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning/adaptive-client-pacing-threshold-tuning.report.md"
       },
       "taskChain": [
         {
@@ -822,24 +822,30 @@
         },
         {
           "phase": "check",
-          "status": "active",
-          "createdAt": "2026-05-03T00:46:43Z"
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-05T01:45:10Z"
         },
         {
           "phase": "act",
-          "status": "pending",
-          "createdAt": "2026-05-03T00:46:43Z"
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-05T01:45:10Z"
         },
         {
           "phase": "report",
-          "status": "pending",
-          "createdAt": "2026-05-03T00:46:43Z"
+          "status": "completed",
+          "createdAt": "2026-05-03T00:46:43Z",
+          "completedAt": "2026-05-05T02:00:51.380Z"
         }
       ],
       "timestamps": {
         "started": "2026-05-03T00:46:43Z",
-        "lastUpdated": "2026-05-04T22:55:47.747Z"
-      }
+        "lastUpdated": "2026-05-05T02:03:40Z"
+      },
+      "completedAt": "2026-05-05T02:00:51.377Z",
+      "archivedAt": "2026-05-05T02:03:40Z",
+      "archivePath": "docs/archive/2026-05/adaptive-client-pacing-threshold-tuning"
     },
     "extract-telemetry-contracts-from-network-core": {
       "phase": "do",
@@ -939,7 +945,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-05T01:10:49Z"
+    "lastActivity": "2026-05-05T02:03:40Z"
   },
   "history": [
     {
@@ -2219,6 +2225,13 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-05-05T00:55:51.204Z"
+    },
+    {
+      "feature": "adaptive-client-pacing-threshold-tuning",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T02:00:51.378Z"
     }
   ]
 }
