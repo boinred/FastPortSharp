@@ -1,4 +1,4 @@
-# Azure Server/Runner Split Load Validation Runbook
+# Azure Server With Local Runner Load Validation Runbook
 
 > Feature: `cloud-server-runner-split-load-validation`
 > Date: 2026-05-05
@@ -8,7 +8,7 @@
 
 Use Azure only after explicit cost confirmation.
 
-The current environment has one active `Standard_B2s` reserved VM instance in `koreacentral`. Treat that as the server VM candidate. The reservation quantity is `1`, so it does not cover a separate runner VM.
+The current environment has one active `Standard_B2s` reserved VM instance in `koreacentral`. Treat that as the server VM candidate. The default runner is the local Mac, not a second cloud VM.
 
 Do not put tenant IDs, subscription IDs, private keys, public keys, IP addresses, or credentials into committed files.
 
@@ -37,7 +37,8 @@ Set local-only variables:
 export FASTPORT_AZURE_LOCATION="koreacentral"
 export FASTPORT_AZURE_RESOURCE_GROUP="fastport-load-rg"
 export FASTPORT_AZURE_SERVER_SIZE="Standard_B2s"
-export FASTPORT_AZURE_RUNNER_SIZE="<runner size after review>"
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
 export FASTPORT_AZURE_ADMIN_USER="azureuser"
 export FASTPORT_AZURE_SSH_PUBLIC_KEY_PATH="$HOME/.ssh/id_ed25519.pub"
 ```
@@ -50,34 +51,41 @@ scripts/cloud/azure-discover.sh
 
 This script does not create resources.
 
+After the server VM is created, verify the expected metadata without printing concrete IP values:
+
+```bash
+export FASTPORT_AZURE_SERVER_VM="fastport-server-vm"
+export FASTPORT_RUNNER_MODE="local"
+scripts/cloud/azure-vm-readiness.sh
+```
+
 ## Target Topology
 
 | Role | Suggested name | Size | Responsibility |
 |------|----------------|------|----------------|
 | server | `fastport-server-vm` | `Standard_B2s` | Runs `FastPortTestSmokeServer` Release and writes `server.metrics.jsonl` |
-| runner | `fastport-runner-vm` | TBD | Runs `FastPortTestLoadValidation` Release and collects summary/client metrics |
+| runner | local Mac | existing local machine | Runs `FastPortTestLoadValidation` Release and collects summary/client metrics |
 
 Network target:
 
-- Same Azure region for server and runner.
-- Same VNet/subnet for the first pass.
-- Runner connects to server private IP on TCP `6628`.
+- Server is in Azure `koreacentral`.
+- Runner connects from the local Mac to the server public IP or DNS on TCP `6628`.
 - SSH TCP `22` is allowed only from the local admin IP.
-- TCP `6628` is not opened to the public internet.
+- TCP `6628` is allowed only from the local public IP.
+- A cloud runner VM is optional later if local-runner results cannot isolate the server bottleneck.
 
 ## Manual Approval Gates
 
 Before creating anything:
 
 1. Confirm the server VM is created as `Standard_B2s` in `koreacentral`.
-2. Confirm selected runner SKU availability and expected cost.
-3. Confirm cleanup command sequence.
-4. Confirm public inbound rules are restricted.
-5. Confirm generated public IPs and disks will be deleted if the test is discarded.
+2. Confirm cleanup command sequence.
+3. Confirm SSH and TCP `6628` inbound rules are restricted to the local public IP.
+4. Confirm generated public IPs and disks will be deleted if the test is discarded.
 
 ## VM Preparation
 
-Run on each VM:
+Run on the server VM:
 
 ```bash
 sudo apt-get update
@@ -102,6 +110,24 @@ Capture readiness:
 scripts/cloud/os-readiness.sh
 ```
 
+From the local machine, verify server SSH and local runner prerequisites:
+
+```bash
+export FASTPORT_SERVER_SSH_TARGET="azureuser@<server public ip or dns>"
+export FASTPORT_RUNNER_MODE="local"
+scripts/cloud/ssh-readiness.sh
+```
+
+The runtime scripts also write redacted cloud manifests under the configured output directory:
+
+```text
+artifacts/load-validation/cloud-server-runner-split/manifest.server.json
+artifacts/load-validation/cloud-server-runner-split/manifest.runner-smoke.json
+artifacts/load-validation/cloud-server-runner-split/manifest.runner-10k.json
+```
+
+These manifests record role, provider, location, VM size candidates, build configuration, git SHA, .NET version, and command name. They intentionally redact server host/IP details and do not record tenant IDs, subscription IDs, keys, or credentials.
+
 ## Server VM
 
 Run:
@@ -118,12 +144,25 @@ Verify listening socket:
 ss -ltnp | grep 6628
 ```
 
-## Runner VM
-
-Set server private IP:
+Then verify the local runner can reach the server public endpoint:
 
 ```bash
-export FASTPORT_SERVER_HOST="<server private ip>"
+cd FastPortSharp
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
+export FASTPORT_SERVER_PORT=6628
+scripts/cloud/runner-connectivity.sh
+```
+
+## Local Runner
+
+Set server public IP or DNS:
+
+```bash
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
 export FASTPORT_SERVER_PORT=6628
 ```
 
@@ -140,12 +179,30 @@ Run focused 10K only after smoke passes and VM size is confirmed sufficient:
 scripts/cloud/runner-10k.sh
 ```
 
+## Artifact Collection
+
+After smoke or 10K completes, collect server artifacts and copy local runner artifacts into the collected layout:
+
+```bash
+export FASTPORT_SERVER_SSH_TARGET="azureuser@<server public ip or dns>"
+export FASTPORT_RUNNER_MODE="local"
+scripts/cloud/collect-artifacts.sh
+```
+
+The collection script copies available server metrics plus local runner summaries, runner metrics, and redacted manifests under:
+
+```text
+artifacts/load-validation/cloud-server-runner-split/collected/
+```
+
+Do not commit generated artifacts. Use copied summary values only when updating `docs/load-validation-benchmark-results.md`.
+
 ## Cleanup
 
 After validation:
 
 - Stop server process.
-- Stop or delete Azure VMs and disks if they are not intentionally kept.
+- Stop or delete the Azure server VM and disk if it is not intentionally kept.
 - Confirm public IPs and NSG rules are removed if no longer needed.
 - Do not commit generated artifacts.
 

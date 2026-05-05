@@ -32,12 +32,22 @@ require_integer() {
 
 FASTPORT_OCI_REGION="${FASTPORT_OCI_REGION:-us-chicago-1}"
 FASTPORT_OCI_SHAPE="${FASTPORT_OCI_SHAPE:-VM.Standard.A1.Flex}"
+FASTPORT_RUNNER_MODE="${FASTPORT_RUNNER_MODE:-local}"
 FASTPORT_SERVER_OCPUS="${FASTPORT_SERVER_OCPUS:-2}"
 FASTPORT_SERVER_MEMORY_GB="${FASTPORT_SERVER_MEMORY_GB:-12}"
-FASTPORT_RUNNER_OCPUS="${FASTPORT_RUNNER_OCPUS:-2}"
-FASTPORT_RUNNER_MEMORY_GB="${FASTPORT_RUNNER_MEMORY_GB:-12}"
+if [[ "$FASTPORT_RUNNER_MODE" == "cloud" ]]; then
+  FASTPORT_RUNNER_OCPUS="${FASTPORT_RUNNER_OCPUS:-2}"
+  FASTPORT_RUNNER_MEMORY_GB="${FASTPORT_RUNNER_MEMORY_GB:-12}"
+else
+  FASTPORT_RUNNER_OCPUS="${FASTPORT_RUNNER_OCPUS:-0}"
+  FASTPORT_RUNNER_MEMORY_GB="${FASTPORT_RUNNER_MEMORY_GB:-0}"
+fi
 FASTPORT_SERVER_BOOT_VOLUME_GB="${FASTPORT_SERVER_BOOT_VOLUME_GB:-50}"
-FASTPORT_RUNNER_BOOT_VOLUME_GB="${FASTPORT_RUNNER_BOOT_VOLUME_GB:-50}"
+if [[ "$FASTPORT_RUNNER_MODE" == "cloud" ]]; then
+  FASTPORT_RUNNER_BOOT_VOLUME_GB="${FASTPORT_RUNNER_BOOT_VOLUME_GB:-50}"
+else
+  FASTPORT_RUNNER_BOOT_VOLUME_GB="${FASTPORT_RUNNER_BOOT_VOLUME_GB:-0}"
+fi
 
 FASTPORT_FREE_TIER_REGION="us-chicago-1"
 FASTPORT_FREE_TIER_SHAPE="VM.Standard.A1.Flex"
@@ -72,17 +82,25 @@ assert_free_tier_config() {
   (( total_boot_volume <= FASTPORT_FREE_TIER_MAX_BOOT_VOLUME_GB )) ||
     fail "refusing boot volume total ${total_boot_volume}GB; max planned free-tier block volume total is ${FASTPORT_FREE_TIER_MAX_BOOT_VOLUME_GB}GB"
 
-  (( FASTPORT_SERVER_OCPUS > 0 && FASTPORT_RUNNER_OCPUS > 0 )) ||
-    fail "server and runner OCPUs must both be greater than zero"
+  (( FASTPORT_SERVER_OCPUS > 0 )) ||
+    fail "server OCPUs must be greater than zero"
 
-  (( FASTPORT_SERVER_MEMORY_GB > 0 && FASTPORT_RUNNER_MEMORY_GB > 0 )) ||
-    fail "server and runner memory must both be greater than zero"
+  (( FASTPORT_SERVER_MEMORY_GB > 0 )) ||
+    fail "server memory must be greater than zero"
+
+  if [[ "$FASTPORT_RUNNER_MODE" == "cloud" ]]; then
+    (( FASTPORT_RUNNER_OCPUS > 0 )) ||
+      fail "cloud runner OCPUs must be greater than zero"
+    (( FASTPORT_RUNNER_MEMORY_GB > 0 )) ||
+      fail "cloud runner memory must be greater than zero"
+  fi
 }
 
 print_free_tier_config() {
   info "FastPort cloud validation free-tier config:"
   info "  region: $FASTPORT_OCI_REGION"
   info "  shape: $FASTPORT_OCI_SHAPE"
+  info "  runner mode: $FASTPORT_RUNNER_MODE"
   info "  server: ${FASTPORT_SERVER_OCPUS} OCPU / ${FASTPORT_SERVER_MEMORY_GB}GB RAM / ${FASTPORT_SERVER_BOOT_VOLUME_GB}GB boot"
   info "  runner: ${FASTPORT_RUNNER_OCPUS} OCPU / ${FASTPORT_RUNNER_MEMORY_GB}GB RAM / ${FASTPORT_RUNNER_BOOT_VOLUME_GB}GB boot"
   info "  total: $((FASTPORT_SERVER_OCPUS + FASTPORT_RUNNER_OCPUS)) OCPU / $((FASTPORT_SERVER_MEMORY_GB + FASTPORT_RUNNER_MEMORY_GB))GB RAM / $((FASTPORT_SERVER_BOOT_VOLUME_GB + FASTPORT_RUNNER_BOOT_VOLUME_GB))GB boot"

@@ -22,12 +22,16 @@ require_command az
 
 FASTPORT_AZURE_LOCATION="${FASTPORT_AZURE_LOCATION:-koreacentral}"
 FASTPORT_AZURE_SERVER_SIZE="${FASTPORT_AZURE_SERVER_SIZE:-Standard_B2s}"
-FASTPORT_AZURE_RUNNER_SIZE="${FASTPORT_AZURE_RUNNER_SIZE:-Standard_B2s}"
+FASTPORT_RUNNER_MODE="${FASTPORT_RUNNER_MODE:-local}"
+FASTPORT_AZURE_RUNNER_SIZE="${FASTPORT_AZURE_RUNNER_SIZE:-}"
 
 info "FastPort Azure discovery config:"
 info "  location: $FASTPORT_AZURE_LOCATION"
 info "  server size candidate: $FASTPORT_AZURE_SERVER_SIZE"
-info "  runner size candidate: $FASTPORT_AZURE_RUNNER_SIZE"
+info "  runner mode: $FASTPORT_RUNNER_MODE"
+if [[ "$FASTPORT_RUNNER_MODE" == "cloud" ]]; then
+  info "  runner size candidate: ${FASTPORT_AZURE_RUNNER_SIZE:-unset}"
+fi
 info ""
 
 info "Azure account summary:"
@@ -67,4 +71,4 @@ az vm list-skus \
   -o table
 
 warn "This discovery script is read-only. It does not create Azure resources."
-warn "The active reservation covers one Standard_B2s candidate, not the whole server/runner topology."
+warn "The default topology uses the active Standard_B2s candidate for the server and the local Mac as runner."

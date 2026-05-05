@@ -11,6 +11,7 @@ internal sealed record LoadValidationOptions(
     string? ServerMetricsPath,
     TimeSpan MergeTolerance,
     LoadValidationPacingOptions Pacing,
+    bool RunnerNoBuild,
     bool DryRun,
     bool ContinueOnFailure)
 {
@@ -39,6 +40,7 @@ internal sealed record LoadValidationOptions(
         int pacingIncreaseEveryResponses = LoadValidationPacingOptions.DefaultIncreaseEveryResponses;
         bool dryRun = false;
         bool continueOnFailure = false;
+        bool runnerNoBuild = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -50,6 +52,9 @@ internal sealed record LoadValidationOptions(
                     continue;
                 case "--continue-on-failure":
                     continueOnFailure = true;
+                    continue;
+                case "--runner-no-build":
+                    runnerNoBuild = true;
                     continue;
             }
 
@@ -237,6 +242,7 @@ internal sealed record LoadValidationOptions(
             serverMetricsPath,
             mergeTolerance,
             pacing,
+            runnerNoBuild,
             dryRun,
             continueOnFailure);
         errorMessage = string.Empty;
@@ -263,6 +269,7 @@ internal sealed record LoadValidationOptions(
           --stage <id>                   Run only one stage from the profile.
           --runner-project <path>        FastPortTestLoadRunner project path. Default: FastPortTestLoadRunner
           --configuration <name>         dotnet configuration. Default: Release
+          --runner-no-build              Run FastPortTestLoadRunner with dotnet run --no-build.
           --server-metrics <path>        Optional server observed JSONL path to merge into stage summaries.
           --merge-tolerance-ms <ms>      Timestamp merge tolerance for client/server samples. Default: 1500
           --max-pending-requests-per-session <count>

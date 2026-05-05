@@ -255,6 +255,7 @@ Session RTT interpretation:
 | Adaptive client pacing | Added event-driven fixed/adaptive outstanding request pacing with pacing metrics and manifest options. | Lower client send-buffer pressure without cap `4` receive-timeout regression. | Adaptive 10K reduced NoBuffer to `1,415`, removed material receive timeouts, and kept RTT P99 under `20,000ms`; RTT P95/drift still need tuning. |
 | Adaptive pacing threshold tuning | Changed adaptive-window defaults to max window `8`, RTT target `14,000ms`, RTT high `24,000ms`, increase every `128`; added hard guardrails, duplex phase cancellation, and client operation-duration telemetry; rejected the older `16/12s/20s/256` stability-restore candidate and the header-wait pressure candidate. | Allow limited window recovery while exposing real receive-path failures and separating client write, response header wait, and response body read durations. | Retained focused 10K still fails hard guardrails with `9,802 / 10,000` peak sessions and `2,152` final disconnects; rejected candidates worsened receive timeouts/disconnects despite reducing send-side NoBuffer. |
 | BaseSession send queue | Replaced the send hot-path `IBuffers`/signal path with a Channel item queue, explicit byte budget, FIFO batching, and ArrayPool-backed coalesced multi-segment sends. | Reduce send-path lock contention while preserving logical completion accounting and small-packet coalescing. | Focused 10K passed at `9,975 / 10,000`; final disconnects, server send backpressure, send-side NoBuffer, and drift improved, but TPS, RTT P99, socket error rate, pending send depth, and receive timeouts still miss acceptance targets. |
+| Cloud server / local runner split | Ran the smoke server on Azure `Standard_B2s` and the load runner from the local Mac against the public endpoint. | Remove same-machine local noise and create a more realistic external RTT/load path. | Smoke passed, but focused 10K failed at `9,337 / 10,000` peak sessions with `752` final disconnects, receive timeouts/resets, and very high RTT tail. |
 
 ## Current Run Details
 
@@ -295,6 +296,46 @@ The current BaseSession Channel send queue candidate is functionally correct and
 
 It should not be treated as a clean performance win. Against `s5-adaptive-pacing-window`, the latest run still regresses max TPS, pending request depth, pending send requests, socket error rate, RTT P95/P99, and receive timeouts. The next decision should be to report this feature as a structural refactor with known benchmark tradeoffs, then split a narrower follow-up for send throughput and receive-timeout tail behavior.
 
+## Cloud Server / Local Runner Baseline
+
+Artifact summary:
+
+- `artifacts/load-validation/cloud-server-runner-split/s5-random-10k/summary.md`
+- Collected server artifacts: `artifacts/load-validation/cloud-server-runner-split/collected/server/`
+- Started: `2026-05-05T14:09:26.7729900+09:00`
+- Completed: `2026-05-05T14:16:32.8300100+09:00`
+- Stage: `s5-random-10k`
+- Target: `10,000`
+- Peak: `9,337`
+- Peak ratio: `93.37%`
+- Final disconnects: `752`
+- Max TPS: `1,085.41`
+- Max pending request count: `29,294`
+- Max drift: `32.97ms`
+- RTT P95: `106,216.65ms`
+- RTT P99: `274,206.02ms`
+- Session RTT p95-of-p95: `222,702.93ms`
+- Socket error rate: `0.28%`
+- Socket classification: `receive|IOException|ConnectionReset = 495`
+- Socket classification: `receive|IOException|TimedOut = 257`
+- Socket classification: `connect|SocketException|TimedOut = 56`
+- Operation duration: `send-write avg=0.12ms max=24.07ms`
+- Operation duration: `receive-header avg=3,269.27ms max=384,958.03ms`
+- Operation duration: `receive-body avg=2,571.06ms max=396,937.01ms`
+
+Server-side collected metrics show a different pressure shape than the client-side failure:
+
+- Max server current sessions: `9,159`
+- Server socket errors: `0`
+- Server send backpressure events: `0`
+- Server rejected sends: `1`
+- Max pending server send requests: `155`
+- Max server send buffer bytes: `62,049`
+
+Interpretation:
+
+The first cloud split 10K result is not comparable as a win/loss against same-machine local runs because the network path changed. It is useful as a failed external-path baseline: client send writes remain fast, server send pressure is low, but receive waits, disconnects, and RTT tail dominate. The next optimization should focus on receive timeout/reset behavior, connection lifecycle cleanup, and cloud RTT tail rather than server send-buffer pressure.
+
 ## Verification Commands
 
 The current implementation was checked with:
@@ -312,3 +353,5 @@ The current implementation was checked with:
 - follow-up focused 10K Channel send queue: `artifacts/load-validation/s5-send-channel-queue-adaptive/summary.md`
 - follow-up focused 10K Channel send queue with scatter/gather batching and chunk cap: `artifacts/load-validation/s5-send-channel-queue-batch-chunk-adaptive/summary.md`
 - follow-up focused 10K Channel send queue with ArrayPool coalesced batching: `artifacts/load-validation/s5-send-channel-queue-batch-pool-adaptive/summary.md`
+- cloud server/local runner smoke validation: `artifacts/load-validation/cloud-server-runner-split/smoke/summary.md`
+- cloud server/local runner focused 10K validation: `artifacts/load-validation/cloud-server-runner-split/s5-random-10k/summary.md`

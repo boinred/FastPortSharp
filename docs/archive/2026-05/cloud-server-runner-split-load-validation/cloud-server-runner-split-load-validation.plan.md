@@ -9,9 +9,9 @@
 
 ### 1.1 Purpose
 
-`cloud-server-runner-split-load-validation`은 로컬 단일 머신 10K 검증의 환경 노이즈를 줄이기 위해, cloud VM에서 server와 runner를 분리해 Release 기준 부하 검증 baseline을 만드는 feature다.
+`cloud-server-runner-split-load-validation`은 로컬 단일 머신 10K 검증의 환경 노이즈를 줄이기 위해 시작했지만, 2026-05-05 방향 수정 후 기본 topology를 cloud server + local runner로 둔다.
 
-목표는 즉시 성능 최적화를 넣는 것이 아니라, 같은 Mac 안에서 server/runner를 함께 실행할 때 섞이는 영향을 제거하고 다음 성능 판단을 더 신뢰할 수 있게 만드는 것이다.
+목표는 즉시 성능 최적화를 넣는 것이 아니라, 실제 외부 클라이언트가 cloud server에 접속하는 경로를 먼저 검증하고 다음 성능 판단을 더 신뢰할 수 있게 만드는 것이다. Cloud runner VM은 서버/네트워크/로컬 runner 병목이 애매할 때 추가하는 controlled baseline 옵션으로 남긴다.
 
 ### 1.2 Background
 
@@ -40,11 +40,11 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 
 ### 2.1 Primary Goals
 
-- [ ] Azure에서 server VM과 runner VM을 분리한 validation topology를 정의한다.
+- [ ] Azure에서 server VM만 실행하고 local Mac에서 runner를 실행하는 validation topology를 정의한다.
 - [ ] `FastPortTestSmokeServer`를 cloud server VM에서 Release로 실행하는 절차를 정리한다.
-- [ ] `FastPortTestLoadValidation` 또는 `FastPortTestLoadRunner`를 runner VM에서 Release로 실행하는 절차를 정리한다.
+- [ ] `FastPortTestLoadValidation` 또는 `FastPortTestLoadRunner`를 local Mac에서 Release로 실행하는 절차를 정리한다.
 - [ ] server telemetry JSONL과 client/runner metrics JSONL을 수집하고 병합하는 artifact contract를 정한다.
-- [ ] same-machine 10K 결과와 cloud split-run 결과를 비교할 기준 지표를 정한다.
+- [ ] same-machine 10K 결과와 cloud-server/local-runner 결과를 비교할 기준 지표를 정한다.
 - [ ] runner 병목 여부를 판정할 수 있는 최소 관측 항목을 정한다.
 
 ### 2.2 Non-Goals
@@ -64,12 +64,12 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 
 - Cloud validation topology 설계:
   - Server VM 1대
-  - Runner VM 1대
-  - 같은 region, 가능하면 같은 VCN/subnet 또는 low-latency path
+  - Local Mac runner 1대
+  - Server public endpoint restricted to the local public IP
 - Azure 우선 검토:
   - `koreacentral`
   - reserved `Standard_B2s` 1대를 server 후보로 사용
-  - runner는 별도 SKU/비용 확인 후 선택
+  - runner VM은 기본 대상에서 제외하고, 병목 분리가 필요할 때만 별도 SKU/비용 확인 후 선택
   - 첫 실행은 full 10K가 아니라 smoke/lower-stage부터 시작
 - Server 실행 절차:
   - Release build
@@ -79,7 +79,7 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 - Runner 실행 절차:
   - Release build
   - `FastPortTestLoadValidation`
-  - server private IP 또는 stable endpoint target
+  - server public IP 또는 DNS target
   - staged/focused profile selection
 - OS/runtime readiness checklist:
   - `ulimit -n`
@@ -89,7 +89,7 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
   - CPU/memory/network observation
 - Artifact layout:
   - server metrics JSONL
-  - client metrics JSONL
+  - local client/runner metrics JSONL
   - combined metrics JSONL
   - summary JSON/Markdown
   - manifest with commit SHA, instance shape, region, build configuration, command line
@@ -101,16 +101,16 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 - Multi-runner orchestration beyond noting when one runner becomes the bottleneck.
 - Production deployment hardening.
 - GitHub Actions based cloud deployment automation.
-- Public internet latency benchmarking across regions.
+- Cross-region/public internet latency benchmarking beyond the local-to-cloud path.
 - Cloud cost optimization beyond avoiding non-free resources for the first pass.
 - Secrets management beyond local OCI CLI/API key hygiene.
 
 ## 4. Success Criteria
 
-- [ ] Plan identifies the exact server/runner split topology and why it reduces local test noise.
-- [ ] Design can produce a repeatable command sequence for preparing two Azure VMs.
+- [ ] Plan identifies the exact cloud-server/local-runner topology and why it reflects external client access.
+- [ ] Design can produce a repeatable command sequence for preparing one Azure server VM.
 - [ ] Design can produce a repeatable command sequence for Release build and server/runner execution.
-- [ ] Validation artifacts include enough metadata to compare cloud split-run with same-machine runs.
+- [ ] Validation artifacts include enough metadata to compare cloud-server/local-runner with same-machine runs.
 - [ ] Result interpretation can distinguish at least:
   - server bottleneck
   - runner bottleneck
@@ -118,8 +118,8 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
   - cloud instance capacity/cost limit
 - [ ] No secrets or local cloud credentials are written into committed repo files.
 - [ ] Next decision is clear:
-  - keep cloud split-run as baseline,
-  - add more runner VMs,
+  - keep cloud-server/local-runner as external baseline,
+  - add a cloud runner VM for controlled comparison,
   - tune server/runtime,
   - or continue local-only diagnostics.
 
@@ -137,10 +137,10 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 
 | Risk | Impact | Probability | Mitigation |
 |------|--------|-------------|------------|
-| Azure reserved instance covers only one `Standard_B2s` VM | Runner cost/capacity remains unresolved | Medium | Use reserved VM as server first; select runner SKU only after cost/size review |
+| Azure reserved instance covers only one `Standard_B2s` VM | Runner VM is not covered | Low | Do not use a runner VM by default; run runner locally first |
 | Pay-as-you-go subscription creates unintended cost | Cloud bill impact | Medium | Keep scripts read-only until user creates resources or explicitly approves provisioning |
-| Runner VM becomes bottleneck first | Server result still ambiguous | High | Track runner CPU/memory/socket errors; split runner later if needed |
-| Public network path distorts RTT | RTT not comparable to local run | Medium | Prefer same-region/private IP path where possible; record endpoint type |
+| Local runner or local network becomes bottleneck first | Server result still ambiguous | High | Track local runner CPU/memory/socket errors; add cloud runner later if needed |
+| Public network path distorts RTT | RTT includes real external path, but not pure server capacity | Medium | Record `endpointType=public-ip` and `runnerMode=local`; use cloud runner later for controlled baseline |
 | Instance shape too weak for 10K | False low benchmark | Medium | Treat first cloud run as baseline, not production capacity claim |
 | Security list/NSG/firewall misconfiguration | Runner cannot connect | Medium | Include explicit inbound port and private path checks in design |
 | Secrets accidentally committed | Security risk | Low | Do not write tenant/subscription IDs, IPs, keys, or credentials to docs |
@@ -160,7 +160,7 @@ repo에는 OCI/Azure user IDs, tenant/subscription IDs, private keys, public key
 ## 8. Open Questions
 
 - Should the first cloud run target full 10K immediately, or start with 1K/3K/5K/10K staged validation?
-- Should the server be exposed through public IP for simplicity, or private IP through same VCN runner for cleaner latency?
+- Should a cloud runner VM be added later if local-runner results cannot isolate server capacity?
 - Which server port should be standardized for cloud validation?
 - Should server telemetry export path be local disk on server VM and copied back, or streamed/collected by runner?
 - What runner CPU/network threshold should define "runner bottleneck"?

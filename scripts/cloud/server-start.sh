@@ -13,8 +13,12 @@ export FastPortTestSmokeServer__Host=0.0.0.0
 export FastPortTestSmokeServer__Port="$FASTPORT_SERVER_PORT"
 export Telemetry__Output="$FASTPORT_SERVER_METRICS"
 export Telemetry__IntervalSeconds=1
+export FASTPORT_CLOUD_COMMAND="${FASTPORT_CLOUD_COMMAND:-scripts/cloud/server-start.sh}"
+
+scripts/cloud/write-manifest.sh server
 
 echo "Starting FastPortTestSmokeServer on 0.0.0.0:$FASTPORT_SERVER_PORT"
 echo "Server metrics: $FASTPORT_SERVER_METRICS"
 
-dotnet run -c Release --project FastPortTestSmokeServer
+dotnet build FastPortTestSmokeServer/FastPortTestSmokeServer.csproj -c Release
+dotnet run --no-build -c Release --project FastPortTestSmokeServer

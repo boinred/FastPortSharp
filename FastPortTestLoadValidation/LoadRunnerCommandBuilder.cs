@@ -10,7 +10,16 @@ internal sealed class LoadRunnerCommandBuilder
         string metricsPath = GetMetricsPath(options.OutputDirectory, stage);
         var arguments = new List<string>
         {
-            "run",
+            "run"
+        };
+
+        if (options.RunnerNoBuild)
+        {
+            arguments.Add("--no-build");
+        }
+
+        arguments.AddRange(
+        [
             "-c",
             options.Configuration,
             "--project",
@@ -34,7 +43,7 @@ internal sealed class LoadRunnerCommandBuilder
             FormatDuration(stage.MetricsInterval),
             "--output",
             metricsPath
-        };
+        ]);
 
         AddPacingArguments(arguments, options.Pacing);
 

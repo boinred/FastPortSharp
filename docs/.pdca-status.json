@@ -1,11 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-05T02:03:40Z",
+  "lastUpdated": "2026-05-05T05:45:00Z",
   "activeFeatures": [
-    "cloud-server-runner-split-load-validation",
     "extract-telemetry-contracts-from-network-core"
   ],
-  "primaryFeature": "cloud-server-runner-split-load-validation",
+  "primaryFeature": "extract-telemetry-contracts-from-network-core",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -697,13 +696,15 @@
       "archivePath": "docs/archive/2026-04/loadrunner-10k-session-rtt-validation"
     },
     "cloud-server-runner-split-load-validation": {
-      "phase": "do",
-      "matchRate": null,
-      "iterationCount": 0,
+      "phase": "archived",
+      "matchRate": 94,
+      "iterationCount": 3,
       "documents": {
-        "plan": "docs/01-plan/features/cloud-server-runner-split-load-validation.plan.md",
-        "design": "docs/02-design/features/cloud-server-runner-split-load-validation.design.md",
-        "do": "docs/02-design/features/cloud-server-runner-split-load-validation.do.md"
+        "plan": "docs/archive/2026-05/cloud-server-runner-split-load-validation/cloud-server-runner-split-load-validation.plan.md",
+        "design": "docs/archive/2026-05/cloud-server-runner-split-load-validation/cloud-server-runner-split-load-validation.design.md",
+        "do": "docs/archive/2026-05/cloud-server-runner-split-load-validation/cloud-server-runner-split-load-validation.do.md",
+        "analysis": "docs/archive/2026-05/cloud-server-runner-split-load-validation/cloud-server-runner-split-load-validation.analysis.md",
+        "report": "docs/archive/2026-05/cloud-server-runner-split-load-validation/cloud-server-runner-split-load-validation.report.md"
       },
       "taskChain": [
         {
@@ -720,24 +721,36 @@
         },
         {
           "phase": "do",
-          "status": "active",
-          "createdAt": "2026-04-30T23:13:52.312Z"
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-05-05T02:32:52.510Z"
         },
         {
           "phase": "check",
-          "status": "pending",
-          "createdAt": "2026-04-30T23:13:52.312Z"
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-05-05T05:20:00Z"
+        },
+        {
+          "phase": "act",
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-05-05T05:20:00Z"
         },
         {
           "phase": "report",
-          "status": "pending",
-          "createdAt": "2026-04-30T23:13:52.312Z"
+          "status": "completed",
+          "createdAt": "2026-04-30T23:13:52.312Z",
+          "completedAt": "2026-05-05T05:35:00Z"
         }
       ],
       "timestamps": {
         "started": "2026-04-30T23:13:52.312Z",
-        "lastUpdated": "2026-04-30T23:31:37.256Z"
-      }
+        "lastUpdated": "2026-05-05T05:45:00Z"
+      },
+      "completedAt": "2026-05-05T05:35:00Z",
+      "archivedAt": "2026-05-05T05:45:00Z",
+      "archivePath": "docs/archive/2026-05/cloud-server-runner-split-load-validation"
     },
     "throughput-pacing-server-processing-decomposition": {
       "phase": "archived",
@@ -945,7 +958,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-05T02:03:40Z"
+    "lastActivity": "2026-05-05T03:10:02Z"
   },
   "history": [
     {
@@ -2232,6 +2245,86 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-05-05T02:00:51.378Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T02:32:52.503Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T02:32:52.509Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "analyze",
+      "phase": "check",
+      "matchRate": 88,
+      "analysisPath": "docs/03-analysis/cloud-server-runner-split-load-validation.analysis.md",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T02:37:54Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T02:46:58.597Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T02:46:58.600Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "iterate",
+      "phase": "act",
+      "matchRate": 89,
+      "reason": "Added Azure VM readiness, SSH readiness, runner connectivity, and artifact collection helpers; runtime cloud execution remains pending.",
+      "timestamp": "2026-05-05T02:47:12Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "analyze",
+      "phase": "check",
+      "matchRate": 89,
+      "analysisPath": "docs/03-analysis/cloud-server-runner-split-load-validation.analysis.md",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T02:52:33Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "direction_update",
+      "phase": "check",
+      "reason": "Changed default topology to cloud server with local runner; cloud runner is now optional controlled baseline.",
+      "timestamp": "2026-05-05T03:10:02Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "runtime_validation",
+      "phase": "check",
+      "matchRate": 94,
+      "reason": "Azure server/local runner smoke passed; focused 10K completed as a failed cloud baseline with collected artifacts.",
+      "timestamp": "2026-05-05T05:20:00Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-05T05:35:00Z"
+    },
+    {
+      "feature": "cloud-server-runner-split-load-validation",
+      "action": "archive",
+      "archivePath": "docs/archive/2026-05/cloud-server-runner-split-load-validation",
+      "timestamp": "2026-05-05T05:45:00Z"
     }
   ]
 }

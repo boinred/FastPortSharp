@@ -145,6 +145,7 @@ public sealed class FastPortTestLoadValidationTests
                 RttTargetMs: 1000,
                 RttHighMs: 2000,
                 IncreaseEveryResponses: 3),
+            RunnerNoBuild: true,
             DryRun: false,
             ContinueOnFailure: false);
         LoadValidationStage stage = LoadValidationProfiles.Get("staged").Stages[^1];
@@ -153,6 +154,7 @@ public sealed class FastPortTestLoadValidationTests
         LoadRunnerCommand command = builder.Build(options, stage);
 
         Assert.AreEqual("dotnet", command.FileName);
+        CollectionAssert.Contains(command.Arguments.ToArray(), "--no-build");
         CollectionAssert.Contains(command.Arguments.ToArray(), "--sessions");
         CollectionAssert.Contains(command.Arguments.ToArray(), "10000");
         CollectionAssert.Contains(command.Arguments.ToArray(), "random:4096-16384");

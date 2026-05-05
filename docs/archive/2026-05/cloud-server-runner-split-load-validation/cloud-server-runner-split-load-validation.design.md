@@ -7,9 +7,9 @@
 
 ## 1. Overview
 
-`cloud-server-runner-split-load-validation`은 cloud에서 server VM과 runner VM을 분리해 FastPortSharp의 Release 기준 load validation baseline을 만드는 설계다.
+`cloud-server-runner-split-load-validation`은 cloud server VM에 local Mac runner가 외부에서 접속하는 FastPortSharp Release 기준 load validation baseline을 만드는 설계다. Feature 이름은 기존 PDCA 흐름을 유지하지만, 현재 기본 topology는 server-only cloud다.
 
-이번 feature는 engine 최적화가 아니다. 같은 로컬 머신에서 `FastPortTestSmokeServer`와 `FastPortTestLoadValidation`을 함께 실행할 때 섞이는 CPU scheduler, loopback, ephemeral port, file descriptor, 다른 앱의 간섭을 줄이고, 다음 성능 판단의 기준선을 더 안정적으로 만드는 것이 목적이다.
+이번 feature는 engine 최적화가 아니다. 실제 외부 클라이언트가 cloud server public endpoint에 접속하는 경로를 먼저 검증하고, 서버/로컬 runner/네트워크 영향을 명시적으로 기록하는 것이 목적이다.
 
 2026-05-05 update: OCI A1 capacity 문제로 인해 현재 구현 대상 provider를 Azure로 전환한다. 아래 OCI 설계는 보류된 historical context이며, 실제 Do phase는 Azure CLI 기반 discovery와 Azure VM 준비 절차를 우선한다.
 
@@ -29,7 +29,7 @@ Azure CLI 접근도 로컬에서 확인된 상태다.
 - Candidate location: `koreacentral`
 - Active reservation: `Standard_B2s`, `koreacentral`, quantity `1`, utilization `0%`
 
-The reserved instance should be treated as a server candidate, not a complete server/runner cost plan. The runner VM still needs an explicit size and cost decision before creation.
+The reserved instance should be treated as the server candidate. A runner VM is not part of the default topology anymore; it remains an optional controlled-baseline follow-up if local-runner results cannot isolate the bottleneck.
 
 OCI 공식 Always Free 문서에 따르면 Always Free compute는 tenancy home region에서 만들어야 하며, Ampere A1 `VM.Standard.A1.Flex`는 월 `3,000 OCPU hours`와 `18,000 GB hours`가 무료 범위다. Always Free tenancy에서는 이것이 총 `4 OCPU / 24GB`에 해당한다. 단, `out of host capacity`는 정상적인 capacity 리스크로 보고 fallback을 둔다.
 
@@ -57,21 +57,23 @@ Azure koreacentral
                   |     Runs: FastPortTestSmokeServer Release
                   |     Listens: 0.0.0.0:6628
                   |     Telemetry: server.metrics.jsonl
-                  |
-                  +-- fastport-runner-vm
-                        Size: TBD after cost/SKU review
-                        Runs: FastPortTestLoadValidation Release
-                        Connects to: server private IP:6628
-                        Artifacts: summary + client metrics + combined metrics
+
+Local Mac
+  |
+  | FastPortTestLoadValidation Release
+  | Connects to server public IP/DNS:6628
+  | Artifacts: summary + client metrics + copied server metrics
+  v
+fastport-server-vm public endpoint
 ```
 
-Azure network rules should mirror the original OCI design:
+Azure network rules:
 
 | Direction | Rule | Reason |
 |-----------|------|--------|
-| Local admin -> server/runner | TCP 22 from local public IP only | SSH deployment and log retrieval |
-| runner -> server | TCP 6628 from runner private IP or subnet CIDR | Load validation traffic |
-| public internet -> 6628 | deny | Avoid public load-test exposure |
+| Local admin -> server | TCP 22 from local public IP only | SSH deployment and log retrieval |
+| Local runner -> server | TCP 6628 from local public IP only | External-client load validation traffic |
+| Public internet except local IP -> 6628 | deny | Avoid public load-test exposure |
 
 ### 2.0.1 Azure Resource Strategy
 
@@ -81,7 +83,8 @@ The first Azure implementation pass is discovery and manual preparation, not pro
 |------|----------------|
 | First region candidate | `koreacentral` |
 | Server size candidate | `Standard_B2s` reserved instance |
-| Runner size candidate | TBD after cost/SKU review |
+| Runner mode | `local` |
+| Optional runner size candidate | TBD only if controlled cloud-runner baseline is needed |
 | Resource group name | `fastport-load-rg` |
 | VNet/subnet | `fastport-load-vnet` / `fastport-load-subnet` |
 | NSG | `fastport-load-nsg` |
@@ -89,16 +92,17 @@ The first Azure implementation pass is discovery and manual preparation, not pro
 Do not create resources until:
 
 - the user creates the server VM or explicitly approves a CLI sequence;
-- the selected runner size and expected cost are known;
 - cleanup commands are ready;
 - public inbound rules are restricted.
 
 ### 2.1 Target Topology
 
+The OCI topology is historical fallback context. If OCI capacity becomes available, keep the same server-only cloud default and run the runner locally first.
+
 ```text
 Local Mac
   |
-  | SSH / artifact copy
+  | SSH / artifact copy + FastPortTestLoadValidation
   v
 OCI us-chicago-1 VCN
   |
@@ -110,13 +114,6 @@ OCI us-chicago-1 VCN
         |     Runs: FastPortTestSmokeServer Release
         |     Listens: 0.0.0.0:6628
         |     Telemetry: server.metrics.jsonl
-        |
-        +-- fastport-runner-a1
-              Shape: VM.Standard.A1.Flex
-              Suggested first pass: 2 OCPU / 12GB
-              Runs: FastPortTestLoadValidation Release
-              Connects to: server private IP:6628
-              Artifacts: summary + client metrics + combined metrics
 ```
 
 ### 2.2 Network Boundary
@@ -125,20 +122,20 @@ Use one VCN and one subnet for the first pass.
 
 | Direction | Rule | Reason |
 |-----------|------|--------|
-| Local admin -> server/runner | TCP 22 from local public IP only | SSH deployment and log retrieval |
-| runner -> server | TCP 6628 from VCN CIDR or runner private IP | Load validation traffic |
+| Local admin -> server | TCP 22 from local public IP only | SSH deployment and log retrieval |
+| Local runner -> server | TCP 6628 from local public IP only | Load validation traffic |
 | server -> runner | ephemeral response traffic | TCP response path |
-| public internet -> 6628 | deny | Avoid public load-test exposure |
+| public internet except local IP -> 6628 | deny | Avoid public load-test exposure |
 
-The runner should target the server private IP. This keeps validation inside the OCI region/VCN and avoids public internet RTT as the default benchmark path.
+The local runner should target the server public IP or DNS. This is the default external-client baseline. A cloud runner/private-IP path can be added later only for controlled bottleneck isolation.
 
 ### 2.3 Runtime Boundary
 
 | Process | Host | Responsibility |
 |---------|------|----------------|
 | `FastPortTestSmokeServer` | server VM | Test echo server, server telemetry export |
-| `FastPortTestLoadValidation` | runner VM | Stage orchestration, LoadRunner command generation, summary evaluation |
-| `FastPortTestLoadRunner` | runner VM | Actual TCP client sessions and client observed JSONL |
+| `FastPortTestLoadValidation` | local Mac | Stage orchestration, LoadRunner command generation, summary evaluation |
+| `FastPortTestLoadRunner` | local Mac | Actual TCP client sessions and client observed JSONL |
 
 `FastPortServer` remains a basic engine host/sample and is not used for this load validation path.
 
@@ -151,13 +148,13 @@ First-pass target:
 | VM | Shape | OCPU | Memory | Notes |
 |----|-------|-----:|-------:|-------|
 | server | `VM.Standard.A1.Flex` | 2 | 12GB | Runs server and telemetry export |
-| runner | `VM.Standard.A1.Flex` | 2 | 12GB | Runs validation and client load |
+| runner | local Mac | - | - | Runs validation and client load |
 
-This consumes the full Always Free A1 equivalent of `4 OCPU / 24GB`. If capacity is unavailable, the fallback order is:
+This consumes only the server portion of the Always Free A1 envelope. If capacity is unavailable, the fallback order is:
 
 1. Retry another availability domain in `us-chicago-1`.
 2. Use smaller A1 shapes for smoke/staged lower session validation.
-3. Use one A1 VM for server and one AMD micro VM only for smoke connectivity checks.
+3. Use a smaller A1 server shape for smoke/lower-stage validation.
 4. Postpone full cloud baseline until capacity is available.
 
 The AMD micro shape is not considered suitable for 10K runner or server load.
@@ -188,7 +185,7 @@ Do not commit these values.
 export FASTPORT_AZURE_LOCATION="koreacentral"
 export FASTPORT_AZURE_RESOURCE_GROUP="fastport-load-rg"
 export FASTPORT_AZURE_SERVER_SIZE="Standard_B2s"
-export FASTPORT_AZURE_RUNNER_SIZE="<runner size after review>"
+export FASTPORT_RUNNER_MODE="local"
 export FASTPORT_AZURE_ADMIN_USER="azureuser"
 export FASTPORT_AZURE_SSH_PUBLIC_KEY_PATH="$HOME/.ssh/id_ed25519.pub"
 ```
@@ -289,7 +286,8 @@ scripts/cloud/
   azure-discover.sh
   oci-discover.sh
   deploy-server.sh
-  deploy-runner.sh
+  ssh-readiness.sh
+  runner-connectivity.sh
   run-smoke.sh
   run-10k.sh
   collect-artifacts.sh
@@ -344,40 +342,37 @@ export Telemetry__IntervalSeconds=1
 dotnet run -c Release --project FastPortTestSmokeServer
 ```
 
-### 5.4 Runner VM Runtime
+### 5.4 Local Runner Runtime
 
 Start with progressive staged validation before full 10K interpretation.
 
 Smoke:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
-  --profile smoke \
-  --host <server-private-ip> \
-  --port 6628 \
-  --output artifacts/load-validation/cloud-server-runner-split/smoke \
-  --server-metrics artifacts/load-validation/cloud-server-runner-split/server.metrics.jsonl
+export FASTPORT_RUNNER_MODE=local
+export FASTPORT_ENDPOINT_TYPE=public-ip
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
+export FASTPORT_SERVER_PORT=6628
+scripts/cloud/runner-smoke.sh
 ```
 
 Focused 10K:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
-  --profile staged \
-  --stage s5-random-10k \
-  --host <server-private-ip> \
-  --port 6628 \
-  --pacing-policy adaptive-window \
-  --output artifacts/load-validation/cloud-server-runner-split/s5-random-10k \
-  --server-metrics artifacts/load-validation/cloud-server-runner-split/server.metrics.jsonl
+export FASTPORT_RUNNER_MODE=local
+export FASTPORT_ENDPOINT_TYPE=public-ip
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
+export FASTPORT_SERVER_PORT=6628
+scripts/cloud/runner-10k.sh
 ```
 
-Important: the runner VM needs access to the server metrics file for merge. First-pass options:
+Important: the local runner will not have live access to the server metrics file unless it is copied from the server VM. First-pass options:
 
-1. Copy `server.metrics.jsonl` from server VM to runner VM before evaluation, or
-2. run validation without `--server-metrics` first, then add a small post-run copy + merge step in implementation.
+1. Run validation without `--server-metrics` first.
+2. Copy `server.metrics.jsonl` from the server VM after the run.
+3. Merge or compare the server and local runner timelines from collected artifacts.
 
-The design prefers option 1 only if the server metrics path is synchronized before `FastPortTestLoadValidation` reads it. Otherwise, implementation should add a documented two-step workflow.
+The design prefers this two-step workflow for the first public-endpoint validation.
 
 ## 6. Artifact Design
 
@@ -418,6 +413,7 @@ artifacts/load-validation/cloud-server-runner-split/
 - .NET SDK/runtime versions
 - server role metadata
 - runner role metadata
+- runner mode: `local` or `cloud`
 - OCI region
 - endpoint type: `private-ip` or `public-ip`
 - server command
@@ -435,7 +431,7 @@ Do not include:
 
 ## 7. OS Readiness Checks
 
-Run on both server and runner before validation.
+Run on the server VM and local runner before validation.
 
 ```bash
 uname -a
@@ -496,12 +492,12 @@ Current same-machine baseline:
 
 | Observation | Likely Meaning | Next Action |
 |-------------|----------------|-------------|
-| Runner CPU saturated, server not saturated | runner bottleneck | split runner or lower per-run target |
+| Local runner CPU/socket saturated, server not saturated | local runner bottleneck | reduce target or add cloud runner controlled baseline |
 | Server pending send/backpressure grows | server send path bottleneck | continue send/drain optimization |
-| RTT improves materially vs local | local same-machine noise was significant | use cloud split-run as baseline |
-| RTT worsens but server/runner look healthy | network/path effect | verify private IP path and VCN rules |
+| RTT reflects stable public path | external-client baseline is usable | keep cloud-server/local-runner baseline |
+| RTT worsens but server/local runner look healthy | public network/path effect | record as external path cost; optionally add cloud runner baseline |
 | NoBuffer shifts to runner errors | runner socket pressure | runner OS/runtime tuning |
-| 10K fails at connection ramp | OS/security/network limit | inspect fd, port range, backlog, NSG |
+| 10K fails at connection ramp | OS/security/network limit | inspect fd, port range, backlog, NSG/local network |
 
 ## 9. Implementation Order
 
@@ -509,8 +505,8 @@ Current same-machine baseline:
 2. Add or update cloud validation runbook under `docs/`.
 3. Add optional manifest template or checklist for cloud run metadata.
 4. Verify OCI resource discovery commands locally.
-5. Provision or prepare server/runner VMs manually or by documented CLI sequence.
-6. Run smoke validation over private IP.
+5. Provision or prepare the server VM manually or by documented CLI sequence.
+6. Run smoke validation from the local runner over the restricted public endpoint.
 7. Run staged/focused validation.
 8. Copy artifacts back and update benchmark docs with selected summary.
 9. Analyze result and decide whether next feature returns to throughput decomposition or runner scaling.
@@ -543,7 +539,7 @@ Current same-machine baseline:
 ### 10.4 Runtime Checks
 
 - server process starts and listens on `0.0.0.0:6628`
-- runner can connect to server private IP on `6628`
+- local runner can connect to server public IP/DNS on `6628`
 - smoke validation passes
 - server telemetry file grows during the run
 - focused validation produces summary and metrics artifacts
@@ -554,20 +550,20 @@ Current same-machine baseline:
 - Do not commit `~/.oci/config` or any OCI keys.
 - Do not write OCIDs into docs unless they are intentionally public placeholders.
 - Restrict SSH to local public IP.
-- Restrict port `6628` to runner private IP or VCN CIDR.
-- Prefer private IP target for benchmark runs.
+- Restrict port `6628` to the local public IP for the default run.
+- Prefer public IP target only for external-client baseline runs; use a cloud runner later for controlled private-IP comparison.
 - Delete or stop cloud instances after experiments if they are not confirmed Always Free eligible.
 
 ## 12. Design Decisions
 
 | Decision | Choice | Reason |
 |----------|--------|--------|
-| First cloud topology | 1 server VM + 1 runner VM | Removes same-machine contention while staying simple |
+| First cloud topology | 1 server VM + local runner | Matches the external-client access path and uses the existing reservation only for server |
 | Current target provider | Azure | OCI A1 capacity is blocked; Azure CLI account/resource access is verified |
 | First target region | `koreacentral` | Active `Standard_B2s` reservation exists in this region |
 | First server shape | `Standard_B2s` | Existing reserved instance, quantity `1`, currently unused |
-| First runner shape | TBD | Needs explicit cost/SKU review because reservation covers only one VM |
-| First endpoint | server private IP | Avoid public internet path as default benchmark |
+| First runner mode | local Mac | Avoids extra cloud cost and reflects real external access |
+| First endpoint | server public IP/DNS restricted to local IP | Default benchmark is external-client path |
 | First server project | `FastPortTestSmokeServer` | Existing load-test server with telemetry export |
 | First runner project | `FastPortTestLoadValidation` | Existing stage orchestration and summary output |
 | Deployment automation | local scripts, Azure CLI, SSH | Safer for a public repo than GitHub Actions cloud deployment |

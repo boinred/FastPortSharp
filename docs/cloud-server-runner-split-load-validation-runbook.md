@@ -1,4 +1,4 @@
-# Cloud Server/Runner Split Load Validation Runbook
+# Cloud Server With Local Runner Load Validation Runbook
 
 > Feature: `cloud-server-runner-split-load-validation`
 > Date: 2026-05-01
@@ -6,16 +6,15 @@
 
 ## Rule
 
-Use Oracle Cloud Free Tier resources only.
+Use Oracle Cloud Free Tier resources only for the server VM. The default runner is the local Mac.
 
 This runbook refuses the first-pass target if it would exceed the planned free-tier envelope:
 
 - Region: `us-chicago-1`
 - Shape: `VM.Standard.A1.Flex`
 - Total compute: max `4 OCPU / 24GB RAM`
-- Suggested split:
+- Suggested first server:
   - server: `2 OCPU / 12GB RAM`
-  - runner: `2 OCPU / 12GB RAM`
 - Planned boot volume total: max `200GB`
 
 Do not put OCI OCIDs, private keys, public keys, IP addresses, or credentials into committed files.
@@ -53,8 +52,8 @@ export FASTPORT_OCI_REGION="us-chicago-1"
 export FASTPORT_OCI_SHAPE="VM.Standard.A1.Flex"
 export FASTPORT_SERVER_OCPUS=2
 export FASTPORT_SERVER_MEMORY_GB=12
-export FASTPORT_RUNNER_OCPUS=2
-export FASTPORT_RUNNER_MEMORY_GB=12
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
 ```
 
 Run read-only OCI discovery:
@@ -72,19 +71,18 @@ Create or verify these resources manually in OCI Console or with separately revi
 | Role | Name | Shape | OCPU | Memory |
 |------|------|-------|-----:|-------:|
 | server | `fastport-server-a1` | `VM.Standard.A1.Flex` | 2 | 12GB |
-| runner | `fastport-runner-a1` | `VM.Standard.A1.Flex` | 2 | 12GB |
+| runner | local Mac | existing local machine | - | - |
 
 Network target:
 
 - Same region: `us-chicago-1`
-- Same VCN/subnet for first pass
-- Runner connects to server private IP on TCP `6628`
+- Runner connects from the local Mac to the server public IP or DNS on TCP `6628`
 - SSH TCP `22` is allowed only from the local admin IP
-- TCP `6628` is not opened to the public internet
+- TCP `6628` is allowed only from the local public IP
 
 ## VM Preparation
 
-Run on each VM:
+Run on the server VM:
 
 Ubuntu:
 
@@ -117,6 +115,24 @@ Capture readiness:
 scripts/cloud/os-readiness.sh
 ```
 
+From the local machine, verify server SSH and local runner prerequisites:
+
+```bash
+export FASTPORT_SERVER_SSH_TARGET="<server ssh target>"
+export FASTPORT_RUNNER_MODE="local"
+scripts/cloud/ssh-readiness.sh
+```
+
+The runtime scripts also write redacted manifests under the configured output directory:
+
+```text
+artifacts/load-validation/cloud-server-runner-split/manifest.server.json
+artifacts/load-validation/cloud-server-runner-split/manifest.runner-smoke.json
+artifacts/load-validation/cloud-server-runner-split/manifest.runner-10k.json
+```
+
+These manifests record role, provider, region, size candidates, build configuration, git SHA, .NET version, and command name. They intentionally redact host/IP details and do not record OCIDs, keys, or credentials.
+
 ## Server VM
 
 Run:
@@ -139,12 +155,25 @@ Verify listening socket:
 ss -ltnp | grep 6628
 ```
 
-## Runner VM
-
-Set server private IP:
+Then verify the local runner can reach the server public endpoint:
 
 ```bash
-export FASTPORT_SERVER_HOST="<server private ip>"
+cd FastPortSharp
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
+export FASTPORT_SERVER_PORT=6628
+scripts/cloud/runner-connectivity.sh
+```
+
+## Local Runner
+
+Set server public IP or DNS:
+
+```bash
+export FASTPORT_RUNNER_MODE="local"
+export FASTPORT_ENDPOINT_TYPE="public-ip"
+export FASTPORT_SERVER_HOST="<server public ip or dns>"
 export FASTPORT_SERVER_PORT=6628
 ```
 
@@ -175,9 +204,23 @@ Preferred follow-up:
 
 1. Stop server after the run.
 2. Copy `server.metrics.jsonl` from server VM.
-3. Copy runner artifacts from runner VM.
+3. Copy local runner artifacts into the collected layout.
 4. Keep the artifacts under local `artifacts/load-validation/cloud-server-runner-split/`.
 5. Update `docs/load-validation-benchmark-results.md` only with selected summary values.
+
+Use the local collection helper after smoke or 10K completes:
+
+```bash
+export FASTPORT_SERVER_SSH_TARGET="<server ssh target>"
+export FASTPORT_RUNNER_MODE="local"
+scripts/cloud/collect-artifacts.sh
+```
+
+Collected artifacts are placed under:
+
+```text
+artifacts/load-validation/cloud-server-runner-split/collected/
+```
 
 ## Result Interpretation
 
@@ -187,17 +230,17 @@ Use this order:
 2. 10K reached target sessions.
 3. Runner CPU/socket pressure is not saturated before server pressure.
 4. Server send backlog and backpressure are compared with the same-machine baseline.
-5. RTT P95/P99 is interpreted with endpoint type noted as `private-ip`.
+5. RTT P95/P99 is interpreted with endpoint type noted as `public-ip` and runner mode noted as `local`.
 
-If runner CPU or socket pressure is saturated first, do not treat the result as a server benchmark. Split the runner or reduce target sessions for the next pass.
+If local runner CPU, local socket pressure, or the local network is saturated first, do not treat the result as a pure server benchmark. Add a cloud runner controlled baseline or reduce target sessions for the next pass.
 
 ## Cleanup
 
 After validation:
 
 - Stop server process.
-- Stop or delete OCI instances if they are not confirmed Always Free eligible.
-- Do not leave port `6628` public.
+- Stop or delete the server instance if it is not confirmed Always Free eligible.
+- Do not leave port `6628` open beyond the local public IP.
 - Do not commit generated artifacts.
 
 ## References
