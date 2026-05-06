@@ -118,9 +118,9 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
         m_ServerTelemetry.RecordSessionDisconnected();
     }
 
-    protected override void OnNetworkSocketError(SocketError? socketError, Exception? exception)
+    protected override void OnNetworkSocketError(string phase, SocketError? socketError, Exception? exception)
     {
-        m_ServerTelemetry.RecordSocketError();
+        m_ServerTelemetry.RecordSocketError(phase, socketError, exception);
     }
 
     protected override void OnNetworkPacketReceived(BasePacket packet)
@@ -141,6 +141,11 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
     protected override void OnNetworkSendCompleted()
     {
         m_ServerTelemetry.RecordSendCompleted();
+    }
+
+    protected override void OnNetworkSendAbandoned(int count)
+    {
+        m_ServerTelemetry.RecordSendAbandoned(count);
     }
 
     protected override void OnNetworkSendBackpressure()

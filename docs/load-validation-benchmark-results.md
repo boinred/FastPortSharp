@@ -1,6 +1,6 @@
 # Load Validation Benchmark Results
 
-> Last updated: 2026-05-05
+> Last updated: 2026-05-06
 
 `artifacts/load-validation/` is git ignored, so selected load-validation results are summarized here when they are used as a baseline or comparison point.
 
@@ -236,6 +236,24 @@ Session RTT interpretation:
 - The global RTT P95 is `19,210.39ms`, while the P95 of per-session P95 is `18,211.02ms`. These are close enough to indicate that the problem is not limited to a tiny set of sessions.
 - The max session P95 is `38,710.49ms`, so there are still concentrated outliers. However, the broader distribution is already high before the Top 5 outliers.
 - The next feature should focus on throughput/pacing/server processing decomposition first. Socket error correlation remains useful, but the per-session evidence points to broad pressure before isolated starvation.
+
+## Packet Assembly Copy Follow-up
+
+This diagnostic checks whether 8 KiB socket receive fragmentation is likely to be the current focused 10K bottleneck.
+
+| Scenario | Packet Size | Fragment Shape | Observed Cost |
+|----------|------------:|----------------|---------------|
+| One-shot receive | `16 KiB` | Full packet in one append | About `1.08us` per packet, about `16.6 KiB` allocation per packet. |
+| 8 KiB fragmented receive | `16 KiB` | Two 8 KiB fragments | About `1.11us` per packet, about `16.7 KiB` allocation per packet. |
+| One-shot receive | `64 KiB` | Full packet in one append | About `5.36us` per packet, about `65.8 KiB` allocation per packet. |
+| 8 KiB fragmented receive | `64 KiB` | Eight 8 KiB fragments | About `5.34us` per packet, about `66.0 KiB` allocation per packet. |
+
+Follow-up interpretation:
+
+- The 8 KiB receive boundary itself is not a material cost in the local in-memory probe.
+- The measurable cost is the payload-sized copy/allocation when `ArrayPoolCircularBuffers` extracts a completed packet and `BasePacket` copies the payload into a new byte array.
+- This is unlikely to explain the current 100s RTT tail by itself, so pacing, stuck-session cleanup, and phase-duration decomposition remain higher-priority diagnostics.
+- Treat `BasePacket` payload ownership/copy reduction and server-side parse/assembly duration telemetry as follow-up optimization candidates before changing packet ownership semantics.
 
 ## Implemented Improvements
 

@@ -16,13 +16,13 @@ public class FastPortTestSmokeServer(
         serverTelemetry.RecordAccept();
     }
 
-    protected override void OnAcceptFailed(SocketError? socketError, Exception? exception)
+    protected override void OnAcceptFailed(string phase, SocketError? socketError, Exception? exception)
     {
         serverTelemetry.RecordAcceptError();
     }
 
-    protected override void OnListenerSocketError(SocketError? socketError, Exception? exception)
+    protected override void OnListenerSocketError(string phase, SocketError? socketError, Exception? exception)
     {
-        serverTelemetry.RecordSocketError();
+        serverTelemetry.RecordSocketError($"listener-{phase}", socketError, exception);
     }
 }

@@ -39,12 +39,24 @@ public abstract class BaseListener : BaseSocket
     {
     }
 
-    // Accept 실패 hook: telemetry contract 제외, socket error/exception context
+    // Accept 실패 hook: phase 포함 accept failure classification 연결점
+    protected virtual void OnAcceptFailed(string phase, SocketError? socketError, Exception? exception)
+    {
+        OnAcceptFailed(socketError, exception);
+    }
+
+    // Accept 실패 hook: 기존 subclass 호환용 socket error/exception context
     protected virtual void OnAcceptFailed(SocketError? socketError, Exception? exception)
     {
     }
 
-    // Listener socket error hook: accept 실패와 별도 카운터 분리
+    // Listener socket error hook: phase 포함 socket error classification 연결점
+    protected virtual void OnListenerSocketError(string phase, SocketError? socketError, Exception? exception)
+    {
+        OnListenerSocketError(socketError, exception);
+    }
+
+    // Listener socket error hook: 기존 subclass 호환용 accept 실패와 별도 카운터 분리
     protected virtual void OnListenerSocketError(SocketError? socketError, Exception? exception)
     {
     }
@@ -54,7 +66,7 @@ public abstract class BaseListener : BaseSocket
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
             // Invalid endpoint: accept 실패 관측, telemetry 타입 비의존
-            OnAcceptFailed(null, null);
+            OnAcceptFailed("start-endpoint", null, null);
             m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
             return false;
         }
@@ -73,8 +85,8 @@ public abstract class BaseListener : BaseSocket
         catch (System.Exception ex)
         {
             // Bind/Listen 예외: accept 실패 및 listener socket error 동시 관측
-            OnAcceptFailed(null, ex);
-            OnListenerSocketError(null, ex);
+            OnAcceptFailed("start-bind-listen", null, ex);
+            OnListenerSocketError("start-bind-listen", null, ex);
             m_Logger.LogError($"BaseListener, Start, Exception : {ex}");
         }
 
@@ -112,8 +124,8 @@ public abstract class BaseListener : BaseSocket
         catch (Exception ex)
         {
             // AcceptAsync 시작 실패: subclass hook 기반 외부 관측
-            OnAcceptFailed(null, ex);
-            OnListenerSocketError(null, ex);
+            OnAcceptFailed("accept-start", null, ex);
+            OnListenerSocketError("accept-start", null, ex);
             m_Logger.LogError($"BaseListener, Accept, Exception : {ex}");
         }
 
@@ -126,8 +138,8 @@ public abstract class BaseListener : BaseSocket
         if (args.SocketError != SocketError.Success)
         {
             // Accept completion socket error: accept 실패 및 socket error
-            OnAcceptFailed(args.SocketError, null);
-            OnListenerSocketError(args.SocketError, null);
+            OnAcceptFailed("accept-completion", args.SocketError, null);
+            OnListenerSocketError("accept-completion", args.SocketError, null);
             m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {args.SocketError}");
             return; 
         }
@@ -135,7 +147,7 @@ public abstract class BaseListener : BaseSocket
         if (null == clientSocket)
         {
             // Completion without socket: session 생성 불가, accept 실패
-            OnAcceptFailed(null, null);
+            OnAcceptFailed("accept-completion-null-socket", null, null);
             m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, Socket is not valid.");
             return;
         }

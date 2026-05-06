@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Net.Sockets;
+
 namespace LibTestTelemetry;
 
 public interface IServerTelemetry
@@ -16,6 +19,8 @@ public interface IServerTelemetry
 
     void RecordSendCompleted();
 
+    void RecordSendAbandoned(int count);
+
     void RecordSendBackpressure();
 
     void RecordSendRejected(int bytes, int queuedBytes);
@@ -25,6 +30,8 @@ public interface IServerTelemetry
     void RecordSendBufferSample(int queuedBytes);
 
     void RecordSocketError();
+
+    void RecordSocketError(string phase, SocketError? socketError, Exception? exception);
 
     void RecordParseError();
 
@@ -48,6 +55,7 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     private long _sendRequests;
     private long _pendingSendRequests;
     private long _maxPendingSendRequests;
+    private long _sendAbandonedRequests;
     private long _sendBackpressureEvents;
     private long _sendRejectedRequests;
     private long _sendRejectedBytes;
@@ -57,6 +65,10 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     private long _maxSendBufferBytes;
     private long _acceptErrors;
     private long _socketErrors;
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByPhase = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByType = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByCode = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> _socketErrorCountsByClass = new(StringComparer.Ordinal);
     private long _parseErrors;
     private long _protocolErrors;
 
@@ -120,6 +132,17 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         DecrementIfPositive(ref _pendingSendRequests);
     }
 
+    public void RecordSendAbandoned(int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        Interlocked.Add(ref _sendAbandonedRequests, count);
+        DecrementByAtMost(ref _pendingSendRequests, count);
+    }
+
     public void RecordSendBackpressure()
     {
         Interlocked.Increment(ref _sendBackpressureEvents);
@@ -160,7 +183,16 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
 
     public void RecordSocketError()
     {
+        RecordSocketError("unknown", null, null);
+    }
+
+    public void RecordSocketError(string phase, SocketError? socketError, Exception? exception)
+    {
         Interlocked.Increment(ref _socketErrors);
+        RecordSocketErrorClassification(
+            phase,
+            GetExceptionType(exception),
+            GetSocketErrorCode(socketError, exception));
     }
 
     public void RecordParseError()
@@ -203,13 +235,18 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             SendRequests: Interlocked.Read(ref _sendRequests),
             PendingSendRequests: Interlocked.Read(ref _pendingSendRequests),
             MaxPendingSendRequests: Interlocked.Read(ref _maxPendingSendRequests),
+            SendAbandonedRequests: Interlocked.Read(ref _sendAbandonedRequests),
             SendBackpressureEvents: Interlocked.Read(ref _sendBackpressureEvents),
             SendRejectedRequests: Interlocked.Read(ref _sendRejectedRequests),
             SendRejectedBytes: Interlocked.Read(ref _sendRejectedBytes),
             SendDrainYieldCount: Interlocked.Read(ref _sendDrainYieldCount),
             MaxSendDrainYieldQueuedBytes: Interlocked.Read(ref _maxSendDrainYieldQueuedBytes),
             SendBufferBytes: Interlocked.Read(ref _sendBufferBytes),
-            MaxSendBufferBytes: Interlocked.Read(ref _maxSendBufferBytes));
+            MaxSendBufferBytes: Interlocked.Read(ref _maxSendBufferBytes),
+            SocketErrorCountsByPhase: CopyCounters(_socketErrorCountsByPhase),
+            SocketErrorCountsByType: CopyCounters(_socketErrorCountsByType),
+            SocketErrorCountsByCode: CopyCounters(_socketErrorCountsByCode),
+            SocketErrorCountsByClass: CopyCounters(_socketErrorCountsByClass));
     }
 
     public void Reset()
@@ -223,6 +260,7 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         Interlocked.Exchange(ref _sendRequests, 0);
         Interlocked.Exchange(ref _pendingSendRequests, 0);
         Interlocked.Exchange(ref _maxPendingSendRequests, 0);
+        Interlocked.Exchange(ref _sendAbandonedRequests, 0);
         Interlocked.Exchange(ref _sendBackpressureEvents, 0);
         Interlocked.Exchange(ref _sendRejectedRequests, 0);
         Interlocked.Exchange(ref _sendRejectedBytes, 0);
@@ -232,8 +270,74 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         Interlocked.Exchange(ref _maxSendBufferBytes, 0);
         Interlocked.Exchange(ref _acceptErrors, 0);
         Interlocked.Exchange(ref _socketErrors, 0);
+        _socketErrorCountsByPhase.Clear();
+        _socketErrorCountsByType.Clear();
+        _socketErrorCountsByCode.Clear();
+        _socketErrorCountsByClass.Clear();
         Interlocked.Exchange(ref _parseErrors, 0);
         Interlocked.Exchange(ref _protocolErrors, 0);
+    }
+
+    private void RecordSocketErrorClassification(string phase, string exceptionType, string socketErrorCode)
+    {
+        string normalizedPhase = NormalizeKey(phase);
+        string normalizedType = NormalizeKey(exceptionType);
+        string normalizedCode = NormalizeKey(socketErrorCode);
+        string classKey = $"{normalizedPhase}|{normalizedType}|{normalizedCode}";
+
+        IncrementCounter(_socketErrorCountsByPhase, normalizedPhase);
+        IncrementCounter(_socketErrorCountsByType, normalizedType);
+        IncrementCounter(_socketErrorCountsByCode, normalizedCode);
+        IncrementCounter(_socketErrorCountsByClass, classKey);
+    }
+
+    private static void IncrementCounter(ConcurrentDictionary<string, long> counters, string key)
+    {
+        counters.AddOrUpdate(key, 1, (_, current) => current + 1);
+    }
+
+    private static IReadOnlyDictionary<string, long> CopyCounters(ConcurrentDictionary<string, long> counters)
+    {
+        return counters
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    private static string GetExceptionType(Exception? exception)
+    {
+        return exception?.GetType().Name ?? "none";
+    }
+
+    private static string GetSocketErrorCode(SocketError? socketError, Exception? exception)
+    {
+        if (socketError.HasValue)
+        {
+            return socketError.Value.ToString();
+        }
+
+        SocketException? socketException = FindSocketException(exception);
+        return socketException?.SocketErrorCode.ToString() ?? "none";
+    }
+
+    private static SocketException? FindSocketException(Exception? exception)
+    {
+        Exception? current = exception;
+        while (current is not null)
+        {
+            if (current is SocketException socketException)
+            {
+                return socketException;
+            }
+
+            current = current.InnerException;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeKey(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
     }
 
     private static void UpdateMax(ref long target, long value)
@@ -263,6 +367,27 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         }
         while (Interlocked.CompareExchange(ref target, current - 1, current) != current);
     }
+
+    private static void DecrementByAtMost(ref long target, long count)
+    {
+        long current;
+        do
+        {
+            current = Interlocked.Read(ref target);
+            if (current <= 0)
+            {
+                return;
+            }
+
+            long decrement = Math.Min(current, count);
+            long next = current - decrement;
+            if (Interlocked.CompareExchange(ref target, next, current) == current)
+            {
+                return;
+            }
+        }
+        while (true);
+    }
 }
 
 public sealed record ServerTelemetrySnapshot(
@@ -288,4 +413,9 @@ public sealed record ServerTelemetrySnapshot(
     long SendDrainYieldCount = 0,
     long MaxSendDrainYieldQueuedBytes = 0,
     long SendBufferBytes = 0,
-    long MaxSendBufferBytes = 0);
+    long MaxSendBufferBytes = 0,
+    long SendAbandonedRequests = 0,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);

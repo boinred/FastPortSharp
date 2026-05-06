@@ -144,6 +144,8 @@ public sealed class BaseSessionSendPolicyTests
             Assert.AreEqual(0, transientSnapshot.SentPackets);
             Assert.AreEqual(0, transientSnapshot.SentBytes);
             Assert.AreEqual(4, transientSnapshot.SendBufferBytes);
+            Assert.AreEqual(1, transientSnapshot.SocketErrorCountsByPhase!["send-transient"]);
+            Assert.AreEqual(1, transientSnapshot.SocketErrorCountsByCode!["NoBufferSpaceAvailable"]);
 
             allowSuccessfulSend.SetResult();
             ServerTelemetrySnapshot completedSnapshot = await WaitForSnapshotAsync(
@@ -366,6 +368,51 @@ public sealed class BaseSessionSendPolicyTests
         await session.WaitSession();
     }
 
+    [TestMethod]
+    public async Task BaseSession_RequestDisconnect_AbandonsPendingSendRequests()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var sendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64),
+            async (_, sendBuffers, cancellationToken) =>
+            {
+                sendStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return sendBuffers.Length;
+            });
+
+        try
+        {
+            Assert.IsTrue(session.TrySendBytes(new byte[2]));
+            await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+            ServerTelemetrySnapshot pendingSnapshot = await WaitForSnapshotAsync(
+                telemetry,
+                current => current.PendingSendRequests == 1 && current.SendBufferBytes == 4,
+                TimeSpan.FromSeconds(3));
+
+            Assert.AreEqual(1, pendingSnapshot.PendingSendRequests);
+            Assert.AreEqual(0, pendingSnapshot.SendAbandonedRequests);
+
+            session.RequestDisconnect();
+            await session.WaitSession();
+
+            ServerTelemetrySnapshot disconnectedSnapshot = telemetry.CreateSnapshot();
+            Assert.AreEqual(0, disconnectedSnapshot.PendingSendRequests);
+            Assert.AreEqual(1, disconnectedSnapshot.SendAbandonedRequests);
+            Assert.AreEqual(0, disconnectedSnapshot.SendBufferBytes);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
     private sealed class TestSession : BaseSession
     {
         private readonly IServerTelemetry _telemetry;
@@ -400,9 +447,9 @@ public sealed class BaseSessionSendPolicyTests
             _telemetry.RecordSessionDisconnected();
         }
 
-        protected override void OnNetworkSocketError(SocketError? socketError, Exception? exception)
+        protected override void OnNetworkSocketError(string phase, SocketError? socketError, Exception? exception)
         {
-            _telemetry.RecordSocketError();
+            _telemetry.RecordSocketError(phase, socketError, exception);
         }
 
         protected override void OnNetworkPacketReceived(BasePacket packet)
@@ -423,6 +470,11 @@ public sealed class BaseSessionSendPolicyTests
         protected override void OnNetworkSendCompleted()
         {
             _telemetry.RecordSendCompleted();
+        }
+
+        protected override void OnNetworkSendAbandoned(int count)
+        {
+            _telemetry.RecordSendAbandoned(count);
         }
 
         protected override void OnNetworkSendBackpressure()

@@ -139,7 +139,13 @@ public sealed record ServerObservedMetricsSnapshot(
     double SendDrainYieldCountPerSecond = 0,
     long MaxSendDrainYieldQueuedBytes = 0,
     long SendBufferBytes = 0,
-    long MaxSendBufferBytes = 0)
+    long MaxSendBufferBytes = 0,
+    long SendAbandonedRequests = 0,
+    double SendAbandonedRequestsPerSecond = 0,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null)
 {
     public static ServerObservedMetricsSnapshot FromTelemetry(
         ServerTelemetrySnapshot current,
@@ -183,7 +189,13 @@ public sealed record ServerObservedMetricsSnapshot(
             SendDrainYieldCountPerSecond: Rate(current.SendDrainYieldCount, previous?.SendDrainYieldCount, elapsedSeconds),
             MaxSendDrainYieldQueuedBytes: current.MaxSendDrainYieldQueuedBytes,
             SendBufferBytes: current.SendBufferBytes,
-            MaxSendBufferBytes: current.MaxSendBufferBytes);
+            MaxSendBufferBytes: current.MaxSendBufferBytes,
+            SendAbandonedRequests: current.SendAbandonedRequests,
+            SendAbandonedRequestsPerSecond: Rate(current.SendAbandonedRequests, previous?.SendAbandonedRequests, elapsedSeconds),
+            SocketErrorCountsByPhase: current.SocketErrorCountsByPhase,
+            SocketErrorCountsByType: current.SocketErrorCountsByType,
+            SocketErrorCountsByCode: current.SocketErrorCountsByCode,
+            SocketErrorCountsByClass: current.SocketErrorCountsByClass);
     }
 
     private static double Rate(long current, long? previous, double elapsedSeconds)

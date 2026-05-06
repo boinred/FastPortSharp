@@ -2,6 +2,7 @@ using System.Text.Json;
 using LibTestTelemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net.Sockets;
 
 namespace FastPortTests;
 
@@ -39,6 +40,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSendRequested(200, queuedBytes: 768);
         telemetry.RecordSent(100);
         telemetry.RecordSendCompleted();
+        telemetry.RecordSendAbandoned(1);
         telemetry.RecordSendBackpressure();
         telemetry.RecordSendDrainYield(700);
         telemetry.RecordSendRejected(300, queuedBytes: 900);
@@ -46,8 +48,9 @@ public sealed class ServerTelemetryTests
         ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
 
         Assert.AreEqual(2, snapshot.SendRequests);
-        Assert.AreEqual(1, snapshot.PendingSendRequests);
+        Assert.AreEqual(0, snapshot.PendingSendRequests);
         Assert.AreEqual(2, snapshot.MaxPendingSendRequests);
+        Assert.AreEqual(1, snapshot.SendAbandonedRequests);
         Assert.AreEqual(1, snapshot.SendBackpressureEvents);
         Assert.AreEqual(1, snapshot.SendRejectedRequests);
         Assert.AreEqual(300, snapshot.SendRejectedBytes);
@@ -71,7 +74,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSendBackpressure();
         telemetry.RecordSendRejected(512, queuedBytes: 1024);
         telemetry.RecordSendDrainYield(256);
-        telemetry.RecordSocketError();
+        telemetry.RecordSocketError("send", SocketError.ConnectionReset, new SocketException((int)SocketError.ConnectionReset));
         telemetry.RecordParseError();
         telemetry.RecordProtocolError();
         telemetry.RecordAcceptError();
@@ -89,6 +92,7 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.SendRequests);
         Assert.AreEqual(0, snapshot.PendingSendRequests);
         Assert.AreEqual(0, snapshot.MaxPendingSendRequests);
+        Assert.AreEqual(0, snapshot.SendAbandonedRequests);
         Assert.AreEqual(0, snapshot.SendBackpressureEvents);
         Assert.AreEqual(0, snapshot.SendRejectedRequests);
         Assert.AreEqual(0, snapshot.SendRejectedBytes);
@@ -97,6 +101,10 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.SendBufferBytes);
         Assert.AreEqual(0, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(0, snapshot.SocketErrors);
+        Assert.AreEqual(0, snapshot.SocketErrorCountsByPhase!.Count);
+        Assert.AreEqual(0, snapshot.SocketErrorCountsByType!.Count);
+        Assert.AreEqual(0, snapshot.SocketErrorCountsByCode!.Count);
+        Assert.AreEqual(0, snapshot.SocketErrorCountsByClass!.Count);
         Assert.AreEqual(0, snapshot.ParseErrors);
         Assert.AreEqual(0, snapshot.ProtocolErrors);
         Assert.AreEqual(0, snapshot.AcceptErrors);
@@ -114,6 +122,22 @@ public sealed class ServerTelemetryTests
         ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
 
         Assert.AreEqual(1.0 / 3.0, snapshot.SocketErrorRate, 0.0001);
+    }
+
+    [TestMethod]
+    public void ServerTelemetryCollector_SocketErrorClassification_TracksPhaseTypeCodeAndClass()
+    {
+        var telemetry = new ServerTelemetryCollector();
+
+        telemetry.RecordSocketError("send", SocketError.ConnectionReset, new SocketException((int)SocketError.ConnectionReset));
+
+        ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
+
+        Assert.AreEqual(1, snapshot.SocketErrors);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByPhase!["send"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByType!["SocketException"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByCode!["ConnectionReset"]);
+        Assert.AreEqual(1, snapshot.SocketErrorCountsByClass!["send|SocketException|ConnectionReset"]);
     }
 
     [TestMethod]
