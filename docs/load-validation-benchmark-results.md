@@ -255,6 +255,20 @@ Follow-up interpretation:
 - This is unlikely to explain the current 100s RTT tail by itself, so pacing, stuck-session cleanup, and phase-duration decomposition remain higher-priority diagnostics.
 - Treat `BasePacket` payload ownership/copy reduction and server-side parse/assembly duration telemetry as follow-up optimization candidates before changing packet ownership semantics.
 
+## Current Improvement Priority
+
+The priority after the 2026-05-06 cloud and packet-assembly diagnostics is:
+
+| Rank | Area | Reason | Completion Signal |
+|-----:|------|--------|-------------------|
+| 1 | `TimerQueue` and idle/stale session cleanup | Cloud validation showed server `currentSessions` can remain after the client runner exits. TCP keepalive alone cannot guarantee application-level cleanup within a known time window. | After runner completion, `currentSessions = 0` and `pendingSendRequests = 0` within the configured idle cleanup timeout. |
+| 2 | Receive timeout and RTT tail decomposition | The current 10K failure shape is dominated by client receive timeouts and 100s-class RTT tail, not server socket errors. | Separate timings for connect, send, receive header, receive body, server receive, parse, and send phases. |
+| 3 | Cloud 10K stability revalidation | Local and cloud results diverged, so the Azure server/local runner path is the practical stability target. | Smoke passes and staged 1K/3K/5K/10K ladder clearly identifies the first failing scale. |
+| 4 | Server disconnect reason and idle timeout telemetry | TimerQueue cleanup must be distinguishable from fault disconnects, or the next analysis will blur normal cleanup and errors. | Export idle-timeout disconnect count/reason plus session age or last-receive age. |
+| 5 | Pending send and send rejection reason detail | Pending send residue is no longer the primary issue, but rejected sends still need reason classification when they appear. | Split rejection by disconnected-after-enqueue, queue-full, and other policy reasons. |
+| 6 | Packet assembly copy/allocation optimization | The local probe shows 8 KiB fragmentation itself is low cost, but completed packet extraction still allocates/copies payload-sized buffers. | Add server-side parse/assembly duration telemetry, then decide whether payload ownership/copy reduction is justified. |
+| 7 | `remove-server-telemetry-from-network-base-classes` PDCA closure | The architecture cleanup remains useful, but it is lower priority than the current cloud lifecycle and RTT stability failures. | Finish analysis/report or explicitly defer until after TimerQueue validation. |
+
 ## Implemented Improvements
 
 | Area | Change | Expected Effect | Observed Result |

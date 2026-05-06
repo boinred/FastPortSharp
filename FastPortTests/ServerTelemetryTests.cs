@@ -63,6 +63,22 @@ public sealed class ServerTelemetryTests
     }
 
     [TestMethod]
+    public void ServerTelemetryCollector_DisconnectReason_TracksIdleTimeout()
+    {
+        var telemetry = new ServerTelemetryCollector();
+
+        telemetry.RecordSessionDisconnected("idle-timeout");
+        telemetry.RecordIdleTimeoutDisconnect(TimeSpan.FromMilliseconds(1234));
+
+        ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
+
+        Assert.AreEqual(1, snapshot.DisconnectedSessions);
+        Assert.AreEqual(1, snapshot.DisconnectCountsByReason!["idle-timeout"]);
+        Assert.AreEqual(1, snapshot.IdleTimeoutDisconnects);
+        Assert.AreEqual(1234, snapshot.MaxIdleTimeoutAgeMs);
+    }
+
+    [TestMethod]
     public void ServerTelemetryCollector_Reset_ClearsCounters()
     {
         var telemetry = new ServerTelemetryCollector();
@@ -74,6 +90,8 @@ public sealed class ServerTelemetryTests
         telemetry.RecordSendBackpressure();
         telemetry.RecordSendRejected(512, queuedBytes: 1024);
         telemetry.RecordSendDrainYield(256);
+        telemetry.RecordSessionDisconnected("idle-timeout");
+        telemetry.RecordIdleTimeoutDisconnect(TimeSpan.FromSeconds(1));
         telemetry.RecordSocketError("send", SocketError.ConnectionReset, new SocketException((int)SocketError.ConnectionReset));
         telemetry.RecordParseError();
         telemetry.RecordProtocolError();
@@ -101,6 +119,9 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.SendBufferBytes);
         Assert.AreEqual(0, snapshot.MaxSendBufferBytes);
         Assert.AreEqual(0, snapshot.SocketErrors);
+        Assert.AreEqual(0, snapshot.DisconnectCountsByReason!.Count);
+        Assert.AreEqual(0, snapshot.IdleTimeoutDisconnects);
+        Assert.AreEqual(0, snapshot.MaxIdleTimeoutAgeMs);
         Assert.AreEqual(0, snapshot.SocketErrorCountsByPhase!.Count);
         Assert.AreEqual(0, snapshot.SocketErrorCountsByType!.Count);
         Assert.AreEqual(0, snapshot.SocketErrorCountsByCode!.Count);

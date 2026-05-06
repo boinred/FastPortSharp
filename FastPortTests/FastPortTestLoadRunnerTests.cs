@@ -30,6 +30,7 @@ public sealed class FastPortTestLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(1), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(1), options.MetricsInterval);
         Assert.IsNull(options.OutputPath);
+        Assert.AreEqual(TimeSpan.FromSeconds(30), options.HeartbeatInterval);
         Assert.IsNull(options.MaxPendingRequestsPerSession);
         Assert.AreEqual(LoadPacingPolicy.None, options.Pacing.Policy);
     }
@@ -48,6 +49,7 @@ public sealed class FastPortTestLoadRunnerTests
             "--duration", "5m",
             "--metrics-interval", "2s",
             "--output", "metrics.jsonl",
+            "--heartbeat-interval", "15s",
             "--max-pending-requests-per-session", "4"
         ];
 
@@ -65,6 +67,7 @@ public sealed class FastPortTestLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(5), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(2), options.MetricsInterval);
         Assert.AreEqual("metrics.jsonl", options.OutputPath);
+        Assert.AreEqual(TimeSpan.FromSeconds(15), options.HeartbeatInterval);
         Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
         Assert.AreEqual(LoadPacingPolicy.FixedWindow, options.Pacing.Policy);
         Assert.AreEqual(4, options.Pacing.FixedWindow);
@@ -120,12 +123,27 @@ public sealed class FastPortTestLoadRunnerTests
     {
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--port", "70000"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--sessions", "0"], out _, out _));
-        Assert.IsFalse(LoadRunnerOptions.TryParse(["--rate", "0"], out _, out _));
+        Assert.IsTrue(LoadRunnerOptions.TryParse(["--rate", "0"], out var heartbeatOnlyOptions, out _));
+        Assert.AreEqual(0, heartbeatOnlyOptions.SendRatePerSession);
+        Assert.IsFalse(LoadRunnerOptions.TryParse(["--rate", "-1"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--duration", "5x"], out _, out _));
+        Assert.IsFalse(LoadRunnerOptions.TryParse(["--heartbeat-interval", "0s"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--payload", "random:16384-4096"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--max-pending-requests-per-session", "0"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--pacing-policy", "adaptive-window", "--max-pending-requests-per-session", "4"], out _, out _));
         Assert.IsFalse(LoadRunnerOptions.TryParse(["--pacing-policy", "adaptive-window", "--pacing-min-window", "8", "--pacing-initial-window", "4"], out _, out _));
+    }
+
+    [TestMethod]
+    public void LoadRunnerOptions_TryParse_DisablesHeartbeat()
+    {
+        bool result = LoadRunnerOptions.TryParse(
+            ["--heartbeat-interval", "none"],
+            out var options,
+            out var errorMessage);
+
+        Assert.IsTrue(result, errorMessage);
+        Assert.AreEqual(TimeSpan.Zero, options.HeartbeatInterval);
     }
 
     [TestMethod]
@@ -449,6 +467,27 @@ public sealed class FastPortTestLoadRunnerTests
     }
 
     [TestMethod]
+    public async Task LoadSession_ParseEchoResponse_DoesNotReleasePacingForHeartbeat()
+    {
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
+        await session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            CancellationToken.None);
+        Task waitTask = session.WaitForPendingRequestBudgetAsync(
+            TimeSpan.FromMilliseconds(1),
+            CancellationToken.None);
+
+        bool parsed = session.ParseEchoResponse(CreateHeartbeatResponseBody());
+        await Task.Delay(50);
+
+        Assert.IsTrue(parsed);
+        Assert.IsFalse(waitTask.IsCompleted);
+
+        Assert.IsTrue(session.ParseEchoResponse(CreateEchoResponseBody()));
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
+    [TestMethod]
     public void MetricsCollector_CreateSnapshot_TracksTotalsAndRates()
     {
         var collector = new MetricsCollector(targetSessions: 10);
@@ -672,6 +711,7 @@ public sealed class FastPortTestLoadRunnerTests
             Duration: TimeSpan.FromSeconds(1),
             MetricsInterval: TimeSpan.FromSeconds(1),
             OutputPath: null,
+            HeartbeatInterval: TimeSpan.FromSeconds(30),
             Pacing: maxPendingRequestsPerSession is int cap
                 ? LoadPacingOptions.Fixed(cap)
                 : LoadPacingOptions.None);
@@ -723,12 +763,22 @@ public sealed class FastPortTestLoadRunnerTests
 
     private static byte[] CreateEchoResponseBody()
     {
+        return CreateEchoResponseBody(requestId: 1, clientSendTimestamp: (ulong)Stopwatch.GetTimestamp());
+    }
+
+    private static byte[] CreateHeartbeatResponseBody()
+    {
+        return CreateEchoResponseBody(requestId: 0, clientSendTimestamp: 0);
+    }
+
+    private static byte[] CreateEchoResponseBody(ulong requestId, ulong clientSendTimestamp)
+    {
         var response = new EchoResponse
         {
             Header = new Header
             {
-                RequestId = 1,
-                ClientSendTs = (ulong)Stopwatch.GetTimestamp()
+                RequestId = requestId,
+                ClientSendTs = clientSendTimestamp
             },
             Data = ByteString.CopyFrom([1])
         };

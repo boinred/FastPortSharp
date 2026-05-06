@@ -369,6 +369,53 @@ public sealed class BaseSessionSendPolicyTests
     }
 
     [TestMethod]
+    public async Task BaseSession_RequestDisconnect_WithReason_RecordsDisconnectReason()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64));
+
+        session.RequestDisconnect(NetworkDisconnectReason.IdleTimeout);
+        await session.WaitSession();
+
+        ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
+        Assert.AreEqual(1, snapshot.DisconnectedSessions);
+        Assert.AreEqual(1, snapshot.DisconnectCountsByReason!["idle-timeout"]);
+    }
+
+    [TestMethod]
+    public async Task BaseSession_SuccessfulReceive_UpdatesLastReceivedTimestamp()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        var telemetry = new ServerTelemetryCollector();
+        var session = new TestSession(
+            pair.ServerSocket,
+            telemetry,
+            new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64));
+        long initialTimestamp = session.LastReceivedTimestamp;
+
+        try
+        {
+            session.StartReceive();
+            await pair.Client.GetStream().WriteAsync(new byte[] { 1 });
+
+            await WaitUntilAsync(
+                () => session.LastReceivedTimestamp > initialTimestamp,
+                TimeSpan.FromSeconds(3));
+
+            Assert.IsTrue(session.LastReceivedTimestamp > initialTimestamp);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
+    [TestMethod]
     public async Task BaseSession_RequestDisconnect_AbandonsPendingSendRequests()
     {
         using SocketPair pair = await SocketPair.CreateAsync();
@@ -442,9 +489,14 @@ public sealed class BaseSessionSendPolicyTests
             return TryRequestSendBuffers(bytes);
         }
 
-        protected override void OnNetworkSessionDisconnected()
+        public void StartReceive()
         {
-            _telemetry.RecordSessionDisconnected();
+            RequestReceived();
+        }
+
+        protected override void OnNetworkSessionDisconnected(NetworkDisconnectReason reason)
+        {
+            _telemetry.RecordSessionDisconnected(ToTelemetryReason(reason));
         }
 
         protected override void OnNetworkSocketError(string phase, SocketError? socketError, Exception? exception)
@@ -525,6 +577,21 @@ public sealed class BaseSessionSendPolicyTests
 
             return base.SendSocketAsync(socket, sendBuffers, cancellationToken);
         }
+
+        private static string ToTelemetryReason(NetworkDisconnectReason reason)
+        {
+            return reason switch
+            {
+                NetworkDisconnectReason.IdleTimeout => "idle-timeout",
+                NetworkDisconnectReason.RemoteClosed => "remote-closed",
+                NetworkDisconnectReason.ReceiveSocketError => "receive-socket-error",
+                NetworkDisconnectReason.ReceiveRequestError => "receive-request-error",
+                NetworkDisconnectReason.SendSocketError => "send-socket-error",
+                NetworkDisconnectReason.SendZeroBytes => "send-zero-bytes",
+                NetworkDisconnectReason.LocalShutdown => "local-shutdown",
+                _ => "unknown"
+            };
+        }
     }
 
     private sealed class SocketPair : IDisposable
@@ -580,6 +647,23 @@ public sealed class BaseSessionSendPolicyTests
         }
 
         return snapshot;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        using var timeoutSource = new CancellationTokenSource(timeout);
+
+        while (!timeoutSource.IsCancellationRequested)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(10, CancellationToken.None);
+        }
+
+        Assert.Fail("Condition was not met before timeout.");
     }
 
     private static void AssertSegmentPayload(ArraySegment<byte> segment, byte[] expectedPayload)

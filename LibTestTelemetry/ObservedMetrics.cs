@@ -145,7 +145,11 @@ public sealed record ServerObservedMetricsSnapshot(
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
-    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null)
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
+    IReadOnlyDictionary<string, long>? DisconnectCountsByReason = null,
+    long IdleTimeoutDisconnects = 0,
+    double IdleTimeoutDisconnectsPerSecond = 0,
+    long MaxIdleTimeoutAgeMs = 0)
 {
     public static ServerObservedMetricsSnapshot FromTelemetry(
         ServerTelemetrySnapshot current,
@@ -195,7 +199,11 @@ public sealed record ServerObservedMetricsSnapshot(
             SocketErrorCountsByPhase: current.SocketErrorCountsByPhase,
             SocketErrorCountsByType: current.SocketErrorCountsByType,
             SocketErrorCountsByCode: current.SocketErrorCountsByCode,
-            SocketErrorCountsByClass: current.SocketErrorCountsByClass);
+            SocketErrorCountsByClass: current.SocketErrorCountsByClass,
+            DisconnectCountsByReason: current.DisconnectCountsByReason,
+            IdleTimeoutDisconnects: current.IdleTimeoutDisconnects,
+            IdleTimeoutDisconnectsPerSecond: Rate(current.IdleTimeoutDisconnects, previous?.IdleTimeoutDisconnects, elapsedSeconds),
+            MaxIdleTimeoutAgeMs: current.MaxIdleTimeoutAgeMs);
     }
 
     private static double Rate(long current, long? previous, double elapsedSeconds)

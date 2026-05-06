@@ -11,6 +11,10 @@ public interface IServerTelemetry
 
     void RecordSessionDisconnected();
 
+    void RecordSessionDisconnected(string reason);
+
+    void RecordIdleTimeoutDisconnect(TimeSpan idleAge);
+
     void RecordReceived(int bytes);
 
     void RecordSent(int bytes);
@@ -48,6 +52,9 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
 
     private long _acceptedSessions;
     private long _disconnectedSessions;
+    private readonly ConcurrentDictionary<string, long> _disconnectCountsByReason = new(StringComparer.Ordinal);
+    private long _idleTimeoutDisconnects;
+    private long _maxIdleTimeoutAgeMs;
     private long _receivedPackets;
     private long _sentPackets;
     private long _receivedBytes;
@@ -84,7 +91,22 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
 
     public void RecordSessionDisconnected()
     {
+        RecordSessionDisconnected("unknown");
+    }
+
+    public void RecordSessionDisconnected(string reason)
+    {
         Interlocked.Increment(ref _disconnectedSessions);
+        IncrementCounter(_disconnectCountsByReason, NormalizeKey(reason));
+    }
+
+    public void RecordIdleTimeoutDisconnect(TimeSpan idleAge)
+    {
+        Interlocked.Increment(ref _idleTimeoutDisconnects);
+        if (idleAge > TimeSpan.Zero)
+        {
+            UpdateMax(ref _maxIdleTimeoutAgeMs, (long)idleAge.TotalMilliseconds);
+        }
     }
 
     public void RecordReceived(int bytes)
@@ -246,13 +268,19 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             SocketErrorCountsByPhase: CopyCounters(_socketErrorCountsByPhase),
             SocketErrorCountsByType: CopyCounters(_socketErrorCountsByType),
             SocketErrorCountsByCode: CopyCounters(_socketErrorCountsByCode),
-            SocketErrorCountsByClass: CopyCounters(_socketErrorCountsByClass));
+            SocketErrorCountsByClass: CopyCounters(_socketErrorCountsByClass),
+            DisconnectCountsByReason: CopyCounters(_disconnectCountsByReason),
+            IdleTimeoutDisconnects: Interlocked.Read(ref _idleTimeoutDisconnects),
+            MaxIdleTimeoutAgeMs: Interlocked.Read(ref _maxIdleTimeoutAgeMs));
     }
 
     public void Reset()
     {
         Interlocked.Exchange(ref _acceptedSessions, 0);
         Interlocked.Exchange(ref _disconnectedSessions, 0);
+        _disconnectCountsByReason.Clear();
+        Interlocked.Exchange(ref _idleTimeoutDisconnects, 0);
+        Interlocked.Exchange(ref _maxIdleTimeoutAgeMs, 0);
         Interlocked.Exchange(ref _receivedPackets, 0);
         Interlocked.Exchange(ref _sentPackets, 0);
         Interlocked.Exchange(ref _receivedBytes, 0);
@@ -418,4 +446,7 @@ public sealed record ServerTelemetrySnapshot(
     IReadOnlyDictionary<string, long>? SocketErrorCountsByPhase = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByType = null,
     IReadOnlyDictionary<string, long>? SocketErrorCountsByCode = null,
-    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null);
+    IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
+    IReadOnlyDictionary<string, long>? DisconnectCountsByReason = null,
+    long IdleTimeoutDisconnects = 0,
+    long MaxIdleTimeoutAgeMs = 0);

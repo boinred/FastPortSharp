@@ -30,11 +30,12 @@ dotnet run -c Release --project FastPortTestLoadRunner -- \
 | `--port` | 서버 포트 | `6628` |
 | `--sessions` | 동시 세션 수 | `1` |
 | `--payload` | `fixed:<bytes>` 또는 `random:<min>-<max>` | `fixed:8192` |
-| `--rate` | 세션당 초당 패킷 수 | `1` |
+| `--rate` | 세션당 초당 패킷 수. `0`이면 일반 패킷 없이 heartbeat만 전송 | `1` |
 | `--ramp-up` | 세션 증가 시간 | `10s` |
 | `--duration` | 테스트 지속 시간 | `1m` |
 | `--metrics-interval` | metrics 출력 주기 | `1s` |
 | `--output` | JSONL metrics 출력 파일 | 없음 |
+| `--heartbeat-interval` | 일반 패킷 송신이 없을 때 heartbeat를 보내는 간격. `none`으로 비활성화 | `30s` |
 
 ## 현재 구현
 
@@ -44,6 +45,7 @@ dotnet run -c Release --project FastPortTestLoadRunner -- \
 - 콘솔 metrics 출력
 - JSONL metrics 파일 출력
 - EchoRequest/EchoResponse 기반 RTT 측정
+- idle 연결 유지를 위한 테스트 클라이언트 heartbeat
 
 ## 다음 구현 범위
 

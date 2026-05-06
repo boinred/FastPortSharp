@@ -38,7 +38,10 @@ public sealed class ObservedMetricsTests
             SocketErrorCountsByPhase: new Dictionary<string, long> { ["send"] = 2 },
             SocketErrorCountsByType: new Dictionary<string, long> { ["SocketException"] = 2 },
             SocketErrorCountsByCode: new Dictionary<string, long> { ["ConnectionReset"] = 2 },
-            SocketErrorCountsByClass: new Dictionary<string, long> { ["send|SocketException|ConnectionReset"] = 2 });
+            SocketErrorCountsByClass: new Dictionary<string, long> { ["send|SocketException|ConnectionReset"] = 2 },
+            DisconnectCountsByReason: new Dictionary<string, long> { ["idle-timeout"] = 1 },
+            IdleTimeoutDisconnects: 1,
+            MaxIdleTimeoutAgeMs: 1234);
 
         ServerObservedMetricsSnapshot observed = ServerObservedMetricsSnapshot.FromTelemetry(raw);
 
@@ -65,6 +68,9 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(2, observed.SocketErrorCountsByType!["SocketException"]);
         Assert.AreEqual(2, observed.SocketErrorCountsByCode!["ConnectionReset"]);
         Assert.AreEqual(2, observed.SocketErrorCountsByClass!["send|SocketException|ConnectionReset"]);
+        Assert.AreEqual(1, observed.DisconnectCountsByReason!["idle-timeout"]);
+        Assert.AreEqual(1, observed.IdleTimeoutDisconnects);
+        Assert.AreEqual(1234, observed.MaxIdleTimeoutAgeMs);
         Assert.AreEqual(1, observed.AcceptErrorCount);
         Assert.AreEqual(2, observed.SocketErrorCount);
         Assert.AreEqual(3, observed.ParseErrorCount);
@@ -94,7 +100,8 @@ public sealed class ObservedMetricsTests
             SendRejectedRequests: 4,
             SendRejectedBytes: 400,
             SendDrainYieldCount: 8,
-            SendAbandonedRequests: 1);
+            SendAbandonedRequests: 1,
+            IdleTimeoutDisconnects: 2);
 
         var currentRaw = previousRaw with
         {
@@ -111,7 +118,8 @@ public sealed class ObservedMetricsTests
             SendRejectedRequests = 14,
             SendRejectedBytes = 1400,
             SendDrainYieldCount = 20,
-            SendAbandonedRequests = 5
+            SendAbandonedRequests = 5,
+            IdleTimeoutDisconnects = 8
         };
 
         ServerObservedMetricsSnapshot previous = ServerObservedMetricsSnapshot.FromTelemetry(previousRaw);
@@ -129,6 +137,7 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(500, current.SendRejectedBytesPerSecond);
         Assert.AreEqual(6, current.SendDrainYieldCountPerSecond);
         Assert.AreEqual(2, current.SendAbandonedRequestsPerSecond);
+        Assert.AreEqual(3, current.IdleTimeoutDisconnectsPerSecond);
     }
 
     [TestMethod]
@@ -190,7 +199,9 @@ public sealed class ObservedMetricsTests
             SendBackpressureEvents: 1,
             SendRejectedRequests: 2,
             SendRejectedBytes: 256,
-            SendDrainYieldCount: 3));
+            SendDrainYieldCount: 3,
+            IdleTimeoutDisconnects: 1,
+            MaxIdleTimeoutAgeMs: 1234));
 
         string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromServer(observed));
 
@@ -201,6 +212,8 @@ public sealed class ObservedMetricsTests
         Assert.IsTrue(json.Contains("\"sendRejectedRequests\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"sendDrainYieldCount\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"sendAbandonedRequests\"", StringComparison.Ordinal));
+        Assert.IsTrue(json.Contains("\"idleTimeoutDisconnects\"", StringComparison.Ordinal));
+        Assert.IsTrue(json.Contains("\"maxIdleTimeoutAgeMs\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"totalParsedPacketBytes\"", StringComparison.Ordinal));
         Assert.IsFalse(json.Contains("TotalSendCompletions", StringComparison.Ordinal));
 

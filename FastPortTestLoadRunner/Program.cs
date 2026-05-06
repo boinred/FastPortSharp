@@ -77,6 +77,7 @@ internal static class Program
         Console.WriteLine($"Duration            : {scenario.Duration}");
         Console.WriteLine($"Metrics interval    : {scenario.MetricsInterval}");
         Console.WriteLine($"Output              : {scenario.OutputPath ?? "console only"}");
+        Console.WriteLine($"Heartbeat interval  : {(scenario.HeartbeatInterval > TimeSpan.Zero ? scenario.HeartbeatInterval.ToString() : "disabled")}");
         Console.WriteLine($"Pacing              : {scenario.Pacing.ToDisplayString()}");
         Console.WriteLine();
     }

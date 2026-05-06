@@ -10,6 +10,7 @@ internal sealed record LoadRunnerOptions(
     TimeSpan Duration,
     TimeSpan MetricsInterval,
     string? OutputPath,
+    TimeSpan HeartbeatInterval,
     LoadPacingOptions Pacing)
 {
     public int? MaxPendingRequestsPerSession =>
@@ -27,6 +28,7 @@ internal sealed record LoadRunnerOptions(
             Duration,
             MetricsInterval,
             OutputPath,
+            HeartbeatInterval,
             Pacing);
     }
 
@@ -41,6 +43,7 @@ internal sealed record LoadRunnerOptions(
         TimeSpan duration = TimeSpan.FromMinutes(1);
         TimeSpan metricsInterval = TimeSpan.FromSeconds(1);
         string? outputPath = null;
+        TimeSpan heartbeatInterval = TimeSpan.FromSeconds(30);
         int? maxPendingRequestsPerSession = null;
         LoadPacingPolicy? pacingPolicy = null;
         int? pacingFixedWindow = null;
@@ -99,10 +102,10 @@ internal sealed record LoadRunnerOptions(
                     }
                     break;
                 case "--rate":
-                    if (!int.TryParse(value, out sendRatePerSession) || sendRatePerSession <= 0)
+                    if (!int.TryParse(value, out sendRatePerSession) || sendRatePerSession < 0)
                     {
                         options = default!;
-                        errorMessage = "--rate must be greater than zero.";
+                        errorMessage = "--rate must be greater than or equal to zero.";
                         return false;
                     }
                     break;
@@ -132,6 +135,15 @@ internal sealed record LoadRunnerOptions(
                     break;
                 case "--output":
                     outputPath = value;
+                    break;
+                case "--heartbeat-interval":
+                    if (!LoadRunnerOptionParsers.TryParseHeartbeatInterval(value, out heartbeatInterval))
+                    {
+                        options = default!;
+                        errorMessage = "--heartbeat-interval must be a duration like 30s, 1m, or 'none'.";
+                        return false;
+                    }
+
                     break;
                 case "--max-pending-requests-per-session":
                     if (!int.TryParse(value, out int parsedMaxPendingRequestsPerSession) || parsedMaxPendingRequestsPerSession <= 0)
@@ -251,6 +263,7 @@ internal sealed record LoadRunnerOptions(
             duration,
             metricsInterval,
             outputPath,
+            heartbeatInterval,
             pacing);
         errorMessage = string.Empty;
         return true;
@@ -268,11 +281,13 @@ internal sealed record LoadRunnerOptions(
           --sessions <count>             Concurrent session count. Default: 1
           --payload fixed:<bytes>        Fixed payload size. Example: fixed:8192
           --payload random:<min>-<max>   Random payload size range. Example: random:4096-16384
-          --rate <count>                 Packets per second per session. Default: 1
+          --rate <count>                 Packets per second per session. Use 0 for heartbeat-only idle sessions. Default: 1
           --ramp-up <duration>           Ramp-up duration. Examples: 30s, 1m. Default: 10s
           --duration <duration>          Test duration. Examples: 5m, 1h. Default: 1m
           --metrics-interval <duration>  Metrics reporting interval. Default: 1s
           --output <path>                Optional JSONL metrics output file.
+          --heartbeat-interval <duration|none>
+                                          Send heartbeat when no client packet was written for this interval. Default: 30s
           --max-pending-requests-per-session <count>
                                           Legacy shortcut for --pacing-policy fixed-window.
           --pacing-policy <policy>       none, fixed-window, or adaptive-window. Default: none
@@ -304,7 +319,24 @@ internal sealed record LoadScenario(
     TimeSpan Duration,
     TimeSpan MetricsInterval,
     string? OutputPath,
+    TimeSpan HeartbeatInterval,
     LoadPacingOptions Pacing);
+
+internal static class LoadRunnerOptionParsers
+{
+    public static bool TryParseHeartbeatInterval(string value, out TimeSpan interval)
+    {
+        if (string.Equals(value, "none", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            interval = TimeSpan.Zero;
+            return true;
+        }
+
+        return DurationParser.TryParse(value, out interval);
+    }
+}
 
 internal enum LoadPacingPolicy
 {

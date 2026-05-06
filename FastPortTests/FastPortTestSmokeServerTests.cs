@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using FastPortTestLoadRunner;
+using LibCommons.Timers;
 using LibNetworks.Sessions;
 using LibTestTelemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,6 +58,7 @@ public sealed class FastPortTestSmokeServerTests
             Duration: TimeSpan.FromSeconds(2),
             MetricsInterval: TimeSpan.FromSeconds(1),
             OutputPath: null,
+            HeartbeatInterval: TimeSpan.FromSeconds(30),
             Pacing: LoadPacingOptions.None);
 
         var metricsCollector = new MetricsCollector(scenario.Sessions);
@@ -180,6 +182,17 @@ public sealed class FastPortTestSmokeServerTests
                         Host = IPAddress.Loopback.ToString(),
                         Port = port
                     });
+                    services.AddSingleton(new FastPortTestSmokeServer.Sessions.SessionIdleTrackerOptions
+                    {
+                        Enabled = true,
+                        IdleTimeout = TimeSpan.FromMinutes(10),
+                        ScanInterval = TimeSpan.FromSeconds(5)
+                    });
+                    services.AddSingleton<IMonotonicTimeSource>(StopwatchMonotonicTimeSource.Instance);
+                    services.AddSingleton(TimerQueueOptions.Default);
+                    services.AddSingleton<TimerQueue>();
+                    services.AddSingleton<ITimerQueue>(provider => provider.GetRequiredService<TimerQueue>());
+                    services.AddSingleton<FastPortTestSmokeServer.Sessions.SessionIdleTracker>();
                     services.AddSingleton<IServerTelemetry>(telemetry);
                     services.AddSingleton<IServerTelemetryExporter, ServerTelemetryExporter>();
                     services.AddHostedService<FastPortTestSmokeServer.FastPortTestSmokeServerBackgroundService>();

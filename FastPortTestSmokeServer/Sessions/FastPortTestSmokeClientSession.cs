@@ -8,12 +8,13 @@ using System.Net.Sockets;
 
 namespace FastPortTestSmokeServer.Sessions;
 
-public class FastPortTestSmokeClientSession : BaseSessionClient
+public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSession
 {
     private static readonly IDGenerator m_IdGenerator = new IDGenerator();
 
     private readonly long m_Id = m_IdGenerator.GetNextGeneratedId();
     private readonly IServerTelemetry m_ServerTelemetry;
+    private readonly SessionIdleTracker m_SessionIdleTracker;
 
     private static readonly LatencyStats s_LatencyStats = new(new LatencyStatsOptions
     {
@@ -31,10 +32,12 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
         Socket socket,
         IBuffers receivedBuffers,
         IBuffers sendBuffers,
-        IServerTelemetry serverTelemetry)
+        IServerTelemetry serverTelemetry,
+        SessionIdleTracker sessionIdleTracker)
         : base(logger, socket, receivedBuffers, sendBuffers)
     {
         m_ServerTelemetry = serverTelemetry;
+        m_SessionIdleTracker = sessionIdleTracker;
     }
 
     public bool SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message)
@@ -113,9 +116,9 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
         return false;
     }
 
-    protected override void OnNetworkSessionDisconnected()
+    protected override void OnNetworkSessionDisconnected(NetworkDisconnectReason reason)
     {
-        m_ServerTelemetry.RecordSessionDisconnected();
+        m_ServerTelemetry.RecordSessionDisconnected(ToTelemetryReason(reason));
     }
 
     protected override void OnNetworkSocketError(string phase, SocketError? socketError, Exception? exception)
@@ -170,13 +173,34 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
 
     public override void OnAccepted()
     {
+        // Activity: accept 직후 idle scan 기준 시각 갱신
+        MarkNetworkActivity();
+        // Registry: TimerQueue 기반 idle cleanup 대상 등록
+        m_SessionIdleTracker.Register(this);
         base.OnAccepted();
         m_Logger.LogInformation("FastPortTestSmokeClientSession, OnAccepted. Id:{Id}", Id);
     }
 
     protected override void OnDisconnected()
     {
+        // Registry: disconnect 완료 시 stale tracker entry 제거
+        m_SessionIdleTracker.Unregister(Id);
         base.OnDisconnected();
         m_Logger.LogInformation("FastPortTestSmokeClientSession, OnDisconnected. Id:{Id}, RemoteEndPoint:{Address}", Id, GetSessionAddress());
+    }
+
+    private static string ToTelemetryReason(NetworkDisconnectReason reason)
+    {
+        return reason switch
+        {
+            NetworkDisconnectReason.RemoteClosed => "remote-closed",
+            NetworkDisconnectReason.ReceiveSocketError => "receive-socket-error",
+            NetworkDisconnectReason.ReceiveRequestError => "receive-request-error",
+            NetworkDisconnectReason.SendSocketError => "send-socket-error",
+            NetworkDisconnectReason.SendZeroBytes => "send-zero-bytes",
+            NetworkDisconnectReason.IdleTimeout => "idle-timeout",
+            NetworkDisconnectReason.LocalShutdown => "local-shutdown",
+            _ => "unknown"
+        };
     }
 }

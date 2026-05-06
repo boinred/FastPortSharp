@@ -3,6 +3,7 @@ using LibCommons;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -46,6 +47,9 @@ public abstract class BaseSession
     private readonly Channel<LibCommons.BasePacket> m_ReceivedPackets;
 
     private readonly System.Net.EndPoint? m_RemoteEndPoint;
+
+    // 상태: successful receive 또는 accepted 시점 기준 마지막 activity timestamp
+    private long m_LastReceivedTimestamp;
 
     // Disconnect 중복 호출 방지를 위한 플래그
     private int m_DisconnectRequested = 0;
@@ -138,12 +142,17 @@ public abstract class BaseSession
         OnEventSessionDisconnected += OnDisconnected;
 
         m_RemoteEndPoint = m_Socket.RemoteEndPoint!;
+        // 초기값: accept 직후 첫 scan에서 즉시 idle로 오판하지 않도록 생성 시각 기록
+        MarkNetworkActivity();
     }
 
     /// <summary>
     /// 세션이 연결 해제되었는지 여부
     /// </summary>
     public bool IsDisconnected => m_DisconnectRequested == 1;
+
+    // 상태: idle scanner가 읽는 마지막 receive/activity timestamp
+    public long LastReceivedTimestamp => Volatile.Read(ref m_LastReceivedTimestamp);
 
     public string GetSessionAddress() => m_RemoteEndPoint?.ToString() ?? " Unknown";
 
@@ -160,6 +169,12 @@ public abstract class BaseSession
     // Session disconnect hook: subclass 외부 telemetry 연결점
     protected virtual void OnNetworkSessionDisconnected()
     {
+    }
+
+    // Session disconnect hook: reason-aware telemetry 연결점
+    protected virtual void OnNetworkSessionDisconnected(NetworkDisconnectReason reason)
+    {
+        OnNetworkSessionDisconnected();
     }
 
     // Socket error hook: phase 포함 error classification 연결점
@@ -218,6 +233,18 @@ public abstract class BaseSession
     {
     }
 
+    // 용도: idle scanner와 receive path가 공유하는 monotonic timestamp 생성
+    protected virtual long GetNetworkTimestamp()
+    {
+        return Stopwatch.GetTimestamp();
+    }
+
+    // 용도: accepted/receive activity timestamp 갱신
+    protected void MarkNetworkActivity()
+    {
+        Volatile.Write(ref m_LastReceivedTimestamp, GetNetworkTimestamp());
+    }
+
     public async Task WaitSession()
     {
         // 소켓 및 패킷 처리 대기
@@ -236,7 +263,7 @@ public abstract class BaseSession
         if (e.BytesTransferred <= 0)
         {
             m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. BytesTransferred is zero.");
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.RemoteClosed);
 
             return;
         }
@@ -247,7 +274,7 @@ public abstract class BaseSession
             OnNetworkSocketError("receive-completion", e.SocketError, null);
             m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. SocketError : {e.SocketError}");
 
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.ReceiveSocketError);
 
             return;
         }
@@ -257,13 +284,15 @@ public abstract class BaseSession
         {
             m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. Buffer is null.");
 
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.Unknown);
 
             return;
         }
 
         // Process the received data
         var wroteSize = m_ReceivedBuffers.Write(buffer, e.Offset, e.BytesTransferred);
+        // Activity: packet 완성 여부와 무관하게 socket byte 수신 성공 시 idle 기준 갱신
+        MarkNetworkActivity();
         if (wroteSize > 0)
         {
             // Flow: receive bytes publish 이후 polling 없이 parser task 깨움
@@ -277,19 +306,24 @@ public abstract class BaseSession
         RequestReceived();
     }
 
-    public void RequestDisconnect()
+    public bool RequestDisconnect()
+    {
+        return RequestDisconnect(NetworkDisconnectReason.Unknown);
+    }
+
+    public bool RequestDisconnect(NetworkDisconnectReason reason)
     {
         // Interlocked.CompareExchange: 원자적 중복 호출 방지
         // 0에서 1로 변경 시도, 이미 1이면 다른 스레드가 먼저 호출한 것
         if (Interlocked.CompareExchange(ref m_DisconnectRequested, 1, 0) != 0)
         {
             m_Logger.LogDebug("BaseSession, RequestDisconnect, Already disconnecting or disconnected.");
-            return;
+            return false;
         }
 
         m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
         // Disconnect 처리: engine 담당, 관측 hook 분리
-        OnNetworkSessionDisconnected();
+        OnNetworkSessionDisconnected(reason);
         // Disconnect cleanup: 미완료 send request를 완료와 구분해 pending gauge에서 제거
         AbandonPendingSendRequests();
         // Disconnect cleanup: 미전송 queued byte gauge를 세션 종료 시점에 0으로 내림
@@ -341,6 +375,7 @@ public abstract class BaseSession
 
         // 이벤트 호출 (한 번만 호출됨)
         OnEventSessionDisconnected?.Invoke();
+        return true;
     }
 
     protected void RequestReceived()
@@ -369,14 +404,14 @@ public abstract class BaseSession
         catch (ObjectDisposedException)
         {
             // 소켓이 이미 Dispose된 경우
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.Unknown);
         }
         catch (SocketException ex)
         {
             m_Logger.LogDebug($"BaseSession, RequestReceived, SocketException : {ex.Message}");
             // Receive 요청 실패: socket error hook 기반 외부 관측
             OnNetworkSocketError("receive-request", ex.SocketErrorCode, ex);
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.ReceiveRequestError);
         }
     }
 
@@ -735,14 +770,14 @@ public abstract class BaseSession
                         // Non-transient send socket error: disconnect 전 hook 노출
                         OnNetworkSocketError("send", ex.SocketErrorCode, ex);
                         m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
-                        RequestDisconnect();
+                        RequestDisconnect(NetworkDisconnectReason.SendSocketError);
                         return;
                     }
 
                     if (sentSize <= 0)
                     {
                         m_Logger.LogInformation("BaseSession, DoWorkSendBuffers, Disconnected. Sent size is zero.");
-                        RequestDisconnect();
+                        RequestDisconnect(NetworkDisconnectReason.SendZeroBytes);
                         return;
                     }
 
@@ -777,7 +812,7 @@ public abstract class BaseSession
             m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
             // Send worker 외부 socket error: 동일 hook 집계
             OnNetworkSocketError("send-worker", ex.SocketErrorCode, ex);
-            RequestDisconnect();
+            RequestDisconnect(NetworkDisconnectReason.SendSocketError);
         }
     }
 
