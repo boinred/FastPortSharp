@@ -8,6 +8,7 @@ internal sealed class LoadRunnerCommandBuilder
     public LoadRunnerCommand Build(LoadValidationOptions options, LoadValidationStage stage)
     {
         string metricsPath = GetMetricsPath(options.OutputDirectory, stage);
+        string connectEventsPath = GetConnectEventsPath(options.OutputDirectory, stage);
         var arguments = new List<string>
         {
             "run"
@@ -42,7 +43,9 @@ internal sealed class LoadRunnerCommandBuilder
             "--metrics-interval",
             FormatDuration(stage.MetricsInterval),
             "--output",
-            metricsPath
+            metricsPath,
+            "--connect-events-output",
+            connectEventsPath
         ]);
 
         AddPacingArguments(arguments, options.Pacing);
@@ -88,6 +91,11 @@ internal sealed class LoadRunnerCommandBuilder
     public static string GetMetricsPath(string outputDirectory, LoadValidationStage stage)
     {
         return Path.Combine(outputDirectory, $"{stage.Id}.metrics.jsonl");
+    }
+
+    public static string GetConnectEventsPath(string outputDirectory, LoadValidationStage stage)
+    {
+        return Path.Combine(outputDirectory, $"{stage.Id}.connect-events.jsonl");
     }
 
     internal static string FormatSeconds(TimeSpan duration)

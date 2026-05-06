@@ -11,7 +11,8 @@ internal sealed record LoadRunnerOptions(
     TimeSpan MetricsInterval,
     string? OutputPath,
     TimeSpan HeartbeatInterval,
-    LoadPacingOptions Pacing)
+    LoadPacingOptions Pacing,
+    string? ConnectEventsOutputPath = null)
 {
     public int? MaxPendingRequestsPerSession =>
         Pacing.Policy == LoadPacingPolicy.FixedWindow ? Pacing.FixedWindow : null;
@@ -29,7 +30,8 @@ internal sealed record LoadRunnerOptions(
             MetricsInterval,
             OutputPath,
             HeartbeatInterval,
-            Pacing);
+            Pacing,
+            ConnectEventsOutputPath);
     }
 
     public static bool TryParse(string[] args, out LoadRunnerOptions options, out string errorMessage)
@@ -43,6 +45,7 @@ internal sealed record LoadRunnerOptions(
         TimeSpan duration = TimeSpan.FromMinutes(1);
         TimeSpan metricsInterval = TimeSpan.FromSeconds(1);
         string? outputPath = null;
+        string? connectEventsOutputPath = null;
         TimeSpan heartbeatInterval = TimeSpan.FromSeconds(30);
         int? maxPendingRequestsPerSession = null;
         LoadPacingPolicy? pacingPolicy = null;
@@ -135,6 +138,9 @@ internal sealed record LoadRunnerOptions(
                     break;
                 case "--output":
                     outputPath = value;
+                    break;
+                case "--connect-events-output":
+                    connectEventsOutputPath = value;
                     break;
                 case "--heartbeat-interval":
                     if (!LoadRunnerOptionParsers.TryParseHeartbeatInterval(value, out heartbeatInterval))
@@ -264,7 +270,8 @@ internal sealed record LoadRunnerOptions(
             metricsInterval,
             outputPath,
             heartbeatInterval,
-            pacing);
+            pacing,
+            connectEventsOutputPath);
         errorMessage = string.Empty;
         return true;
     }
@@ -286,6 +293,7 @@ internal sealed record LoadRunnerOptions(
           --duration <duration>          Test duration. Examples: 5m, 1h. Default: 1m
           --metrics-interval <duration>  Metrics reporting interval. Default: 1s
           --output <path>                Optional JSONL metrics output file.
+          --connect-events-output <path> Optional per-session connect event JSONL output file.
           --heartbeat-interval <duration|none>
                                           Send heartbeat when no client packet was written for this interval. Default: 30s
           --max-pending-requests-per-session <count>
@@ -320,7 +328,8 @@ internal sealed record LoadScenario(
     TimeSpan MetricsInterval,
     string? OutputPath,
     TimeSpan HeartbeatInterval,
-    LoadPacingOptions Pacing);
+    LoadPacingOptions Pacing,
+    string? ConnectEventsOutputPath = null);
 
 internal static class LoadRunnerOptionParsers
 {

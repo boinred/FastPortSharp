@@ -1,6 +1,10 @@
 ﻿namespace FastPortTestLoadRunner;
 
-internal sealed class LoadRunner(LoadScenario scenario, MetricsCollector metricsCollector, IReadOnlyCollection<IMetricsReporter> reporters)
+internal sealed class LoadRunner(
+    LoadScenario scenario,
+    MetricsCollector metricsCollector,
+    IReadOnlyCollection<IMetricsReporter> reporters,
+    IConnectEventSink? connectEventSink = null)
 {
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -32,7 +36,7 @@ internal sealed class LoadRunner(LoadScenario scenario, MetricsCollector metrics
         for (int i = 0; i < scenario.Sessions; i++)
         {
             var payloadGenerator = new PayloadGenerator(scenario.Payload, seed: Environment.TickCount ^ i);
-            var session = new LoadSession(i + 1, scenario, payloadGenerator, metricsCollector);
+            var session = new LoadSession(i + 1, scenario, payloadGenerator, metricsCollector, connectEventSink);
             sessionTasks.Add(Task.Run(() => session.RunAsync(cancellationToken), CancellationToken.None));
 
             if (connectDelay > TimeSpan.Zero && i + 1 < scenario.Sessions)

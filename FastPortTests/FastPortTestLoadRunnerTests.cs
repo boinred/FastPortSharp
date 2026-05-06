@@ -30,6 +30,7 @@ public sealed class FastPortTestLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(1), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(1), options.MetricsInterval);
         Assert.IsNull(options.OutputPath);
+        Assert.IsNull(options.ConnectEventsOutputPath);
         Assert.AreEqual(TimeSpan.FromSeconds(30), options.HeartbeatInterval);
         Assert.IsNull(options.MaxPendingRequestsPerSession);
         Assert.AreEqual(LoadPacingPolicy.None, options.Pacing.Policy);
@@ -49,6 +50,7 @@ public sealed class FastPortTestLoadRunnerTests
             "--duration", "5m",
             "--metrics-interval", "2s",
             "--output", "metrics.jsonl",
+            "--connect-events-output", "connect-events.jsonl",
             "--heartbeat-interval", "15s",
             "--max-pending-requests-per-session", "4"
         ];
@@ -67,6 +69,7 @@ public sealed class FastPortTestLoadRunnerTests
         Assert.AreEqual(TimeSpan.FromMinutes(5), options.Duration);
         Assert.AreEqual(TimeSpan.FromSeconds(2), options.MetricsInterval);
         Assert.AreEqual("metrics.jsonl", options.OutputPath);
+        Assert.AreEqual("connect-events.jsonl", options.ConnectEventsOutputPath);
         Assert.AreEqual(TimeSpan.FromSeconds(15), options.HeartbeatInterval);
         Assert.AreEqual(4, options.MaxPendingRequestsPerSession);
         Assert.AreEqual(LoadPacingPolicy.FixedWindow, options.Pacing.Policy);
@@ -225,6 +228,69 @@ public sealed class FastPortTestLoadRunnerTests
         cancellationSource.Cancel();
 
         await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () => await waitTask);
+    }
+
+    [TestMethod]
+    public async Task LoadSession_RunAsync_RecordsCancelledConnect()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: null, collector);
+        using var cancellationSource = new CancellationTokenSource();
+
+        // 상태: connect 시작 전 이미 취소된 run
+        cancellationSource.Cancel();
+
+        await session.RunAsync(cancellationSource.Token);
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+
+        Assert.AreEqual(1, snapshot.ConnectAttemptCount);
+        Assert.AreEqual(1, snapshot.ConnectFailureCount);
+        Assert.AreEqual(0, snapshot.ConnectedSessions);
+        Assert.AreEqual(0, snapshot.SocketErrorCount);
+        Assert.IsNotNull(snapshot.OperationDurations);
+        Assert.AreEqual(1, snapshot.OperationDurations["connect"].Count);
+        Assert.IsNotNull(snapshot.PhaseCompletionCounts);
+        Assert.AreEqual(1, snapshot.PhaseCompletionCounts["connect|cancelled"]);
+    }
+
+    [TestMethod]
+    public void JsonConnectEventReporter_Record_WritesSessionConnectEvent()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"fastport-connect-events-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            using (var reporter = new JsonConnectEventReporter(path))
+            {
+                reporter.Record(new ConnectSessionEvent(
+                    StartedAt: DateTimeOffset.UnixEpoch,
+                    CompletedAt: DateTimeOffset.UnixEpoch.AddMilliseconds(12),
+                    SessionId: 7,
+                    Host: "127.0.0.1",
+                    Port: 6628,
+                    Status: "completed",
+                    DurationMs: 12.5,
+                    LocalEndPoint: "127.0.0.1:50000",
+                    RemoteEndPoint: "127.0.0.1:6628",
+                    ExceptionType: null,
+                    SocketErrorCode: null));
+            }
+
+            string json = File.ReadAllText(path);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            Assert.AreEqual(7, root.GetProperty("sessionId").GetInt32());
+            Assert.AreEqual("completed", root.GetProperty("status").GetString());
+            Assert.AreEqual(12.5, root.GetProperty("durationMs").GetDouble(), 0.0001);
+            Assert.AreEqual("127.0.0.1:50000", root.GetProperty("localEndPoint").GetString());
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
     }
 
     [TestMethod]

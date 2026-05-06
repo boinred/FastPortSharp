@@ -30,7 +30,8 @@ internal static class Program
 
         var metricsCollector = new MetricsCollector(scenario.Sessions);
         var reporters = CreateReporters(scenario).ToArray();
-        var loadRunner = new LoadRunner(scenario, metricsCollector, reporters);
+        JsonConnectEventReporter? connectEventReporter = CreateConnectEventReporter(scenario);
+        var loadRunner = new LoadRunner(scenario, metricsCollector, reporters, connectEventReporter);
 
         try
         {
@@ -52,6 +53,8 @@ internal static class Program
             {
                 reporter.Dispose();
             }
+
+            connectEventReporter?.Dispose();
         }
     }
 
@@ -63,6 +66,16 @@ internal static class Program
         {
             yield return new JsonMetricsReporter(scenario.OutputPath);
         }
+    }
+
+    private static JsonConnectEventReporter? CreateConnectEventReporter(LoadScenario scenario)
+    {
+        if (string.IsNullOrWhiteSpace(scenario.ConnectEventsOutputPath))
+        {
+            return null;
+        }
+
+        return new JsonConnectEventReporter(scenario.ConnectEventsOutputPath);
     }
 
     private static void PrintPlan(LoadScenario scenario)
@@ -77,6 +90,7 @@ internal static class Program
         Console.WriteLine($"Duration            : {scenario.Duration}");
         Console.WriteLine($"Metrics interval    : {scenario.MetricsInterval}");
         Console.WriteLine($"Output              : {scenario.OutputPath ?? "console only"}");
+        Console.WriteLine($"Connect events      : {scenario.ConnectEventsOutputPath ?? "disabled"}");
         Console.WriteLine($"Heartbeat interval  : {(scenario.HeartbeatInterval > TimeSpan.Zero ? scenario.HeartbeatInterval.ToString() : "disabled")}");
         Console.WriteLine($"Pacing              : {scenario.Pacing.ToDisplayString()}");
         Console.WriteLine();

@@ -161,6 +161,7 @@ public sealed class FastPortTestLoadValidationTests
         CollectionAssert.Contains(command.Arguments.ToArray(), "120s");
         CollectionAssert.Contains(command.Arguments.ToArray(), "5m");
         CollectionAssert.Contains(command.Arguments.ToArray(), Path.Combine("out", "s5-random-10k.metrics.jsonl"));
+        CollectionAssert.Contains(command.Arguments.ToArray(), Path.Combine("out", "s5-random-10k.connect-events.jsonl"));
         CollectionAssert.Contains(command.Arguments.ToArray(), "--pacing-policy");
         CollectionAssert.Contains(command.Arguments.ToArray(), "adaptive-window");
         CollectionAssert.Contains(command.Arguments.ToArray(), "--pacing-min-window");

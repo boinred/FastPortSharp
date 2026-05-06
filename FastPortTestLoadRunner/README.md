@@ -35,6 +35,7 @@ dotnet run -c Release --project FastPortTestLoadRunner -- \
 | `--duration` | 테스트 지속 시간 | `1m` |
 | `--metrics-interval` | metrics 출력 주기 | `1s` |
 | `--output` | JSONL metrics 출력 파일 | 없음 |
+| `--connect-events-output` | 세션별 connect 결과 JSONL 출력 파일 | 없음 |
 | `--heartbeat-interval` | 일반 패킷 송신이 없을 때 heartbeat를 보내는 간격. `none`으로 비활성화 | `30s` |
 
 ## 현재 구현
@@ -44,6 +45,7 @@ dotnet run -c Release --project FastPortTestLoadRunner -- \
 - TPS, RTT, latency, bytes/sec, packets/sec 수집
 - 콘솔 metrics 출력
 - JSONL metrics 파일 출력
+- 세션별 connect 완료/취소/실패 event 출력
 - EchoRequest/EchoResponse 기반 RTT 측정
 - idle 연결 유지를 위한 테스트 클라이언트 heartbeat
 

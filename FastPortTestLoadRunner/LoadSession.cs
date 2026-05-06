@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using FastPort.Protocols.Commons;
 using FastPort.Protocols.Tests;
@@ -11,7 +12,8 @@ internal sealed class LoadSession(
     int sessionId,
     LoadScenario scenario,
     PayloadGenerator payloadGenerator,
-    MetricsCollector metricsCollector)
+    MetricsCollector metricsCollector,
+    IConnectEventSink? connectEventSink = null)
 {
     private const int PacketHeaderSize = 2;
     private const int ProtocolHeaderSize = 4;
@@ -36,8 +38,7 @@ internal sealed class LoadSession(
 
         try
         {
-            metricsCollector.RecordConnectAttempt();
-            await client.ConnectAsync(scenario.Host, scenario.Port, cancellationToken);
+            await ConnectAsync(client, cancellationToken);
             connected = true;
             metricsCollector.RecordSessionConnected();
             Volatile.Write(ref _lastClientPacketSentTimestamp, Stopwatch.GetTimestamp());
@@ -59,12 +60,7 @@ internal sealed class LoadSession(
         }
         catch (Exception ex)
         {
-            if (!connected)
-            {
-                metricsCollector.RecordConnectFailure();
-                metricsCollector.RecordSocketError("connect", ex);
-            }
-            else
+            if (connected)
             {
                 metricsCollector.RecordSocketError("unknown", ex);
             }
@@ -75,6 +71,103 @@ internal sealed class LoadSession(
             {
                 metricsCollector.RecordSessionDisconnected();
             }
+        }
+    }
+
+    private async Task ConnectAsync(TcpClient client, CancellationToken cancellationToken)
+    {
+        // 계측: 연결 요청 수와 connect phase duration을 함께 기록
+        metricsCollector.RecordConnectAttempt();
+
+        // 시간: ConnectAsync가 완료/취소/실패될 때까지 걸린 시간
+        DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow;
+        long startedAt = Stopwatch.GetTimestamp();
+        string status = "completed";
+        Exception? connectException = null;
+        try
+        {
+            // 흐름: TCP connect 완료 전까지 세션은 active session으로 집계하지 않음
+            await client.ConnectAsync(scenario.Host, scenario.Port, cancellationToken);
+
+            // 상태: TCP connect 완료
+            metricsCollector.RecordPhaseCompletion("connect", "completed");
+        }
+        catch (OperationCanceledException ex)
+        {
+            // 상태: run 종료 또는 외부 취소로 connect가 완료되지 못함
+            status = "cancelled";
+            connectException = ex;
+            metricsCollector.RecordConnectFailure();
+            metricsCollector.RecordPhaseCompletion("connect", "cancelled");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // 상태: connect 자체 실패, socket error 분류 포함
+            status = "faulted";
+            connectException = ex;
+            metricsCollector.RecordConnectFailure();
+            metricsCollector.RecordPhaseCompletion("connect", "faulted");
+            metricsCollector.RecordSocketError("connect", ex);
+            throw;
+        }
+        finally
+        {
+            // 계측: 성공/취소/실패 모두 connect latency 분석 대상
+            TimeSpan elapsed = GetPositiveElapsedTime(startedAt);
+            metricsCollector.RecordOperationDuration("connect", elapsed);
+            RecordConnectEvent(client, startedAtUtc, DateTimeOffset.UtcNow, status, elapsed, connectException);
+        }
+    }
+
+    private static TimeSpan GetPositiveElapsedTime(long startedAt)
+    {
+        // 목적: 즉시 취소된 connect도 duration summary에 1개 샘플로 남김
+        TimeSpan elapsed = Stopwatch.GetElapsedTime(startedAt);
+        return elapsed > TimeSpan.Zero ? elapsed : TimeSpan.FromTicks(1);
+    }
+
+    private void RecordConnectEvent(
+        TcpClient client,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset completedAtUtc,
+        string status,
+        TimeSpan elapsed,
+        Exception? exception)
+    {
+        if (connectEventSink is null)
+        {
+            return;
+        }
+
+        // 로그: 세션별 connect 완료/취소/실패를 endpoint와 함께 JSONL로 기록
+        connectEventSink.Record(new ConnectSessionEvent(
+            StartedAt: startedAtUtc,
+            CompletedAt: completedAtUtc,
+            SessionId: sessionId,
+            Host: scenario.Host,
+            Port: scenario.Port,
+            Status: status,
+            DurationMs: elapsed.TotalMilliseconds,
+            LocalEndPoint: TryFormatEndPoint(() => client.Client.LocalEndPoint),
+            RemoteEndPoint: TryFormatEndPoint(() => client.Client.RemoteEndPoint),
+            ExceptionType: ConnectEventExceptionClassifier.GetExceptionType(exception),
+            SocketErrorCode: ConnectEventExceptionClassifier.GetSocketErrorCode(exception)));
+    }
+
+    private static string? TryFormatEndPoint(Func<EndPoint?> getEndPoint)
+    {
+        try
+        {
+            return getEndPoint()?.ToString();
+        }
+        catch (SocketException)
+        {
+            return null;
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
         }
     }
 
