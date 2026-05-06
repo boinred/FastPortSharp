@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using FastPortTestLoadRunner;
 using LibNetworks.Sessions;
-using LibNetworks.Telemetry;
 using LibTestTelemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

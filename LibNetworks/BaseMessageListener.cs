@@ -1,19 +1,14 @@
 ﻿using System.Net.Sockets;
 using LibNetworks.Sessions;
-using LibNetworks.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace LibNetworks;
 
 public class BaseMessageListener : BaseListener
 {
+    // Message listener: base accept hook 유지, telemetry dependency 없음
     public BaseMessageListener(ILogger<BaseMessageListener> logger, IClientSessionFactory clientSessionFactory)
         : base(logger, clientSessionFactory, 1000)
-    {
-    }
-
-    public BaseMessageListener(ILogger<BaseMessageListener> logger, IClientSessionFactory clientSessionFactory, IServerTelemetry serverTelemetry)
-        : base(logger, clientSessionFactory, serverTelemetry, 1000)
     {
     }
 

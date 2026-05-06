@@ -1,6 +1,5 @@
 using System.Text.Json;
 using FastPortTestLoadRunner;
-using LibNetworks.Telemetry;
 using LibTestTelemetry;
 
 namespace FastPortTests;

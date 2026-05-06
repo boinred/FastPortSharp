@@ -1,5 +1,4 @@
 ﻿using FastPortTestSmokeServer;
-using LibNetworks.Telemetry;
 using LibTestTelemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

@@ -2,7 +2,7 @@
 using LibCommons;
 using LibNetworks.Extensions;
 using LibNetworks.Sessions;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 
@@ -13,6 +13,7 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
     private static readonly IDGenerator m_IdGenerator = new IDGenerator();
 
     private readonly long m_Id = m_IdGenerator.GetNextGeneratedId();
+    private readonly IServerTelemetry m_ServerTelemetry;
 
     private static readonly LatencyStats s_LatencyStats = new(new LatencyStatsOptions
     {
@@ -31,8 +32,9 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
         IBuffers receivedBuffers,
         IBuffers sendBuffers,
         IServerTelemetry serverTelemetry)
-        : base(logger, socket, receivedBuffers, sendBuffers, serverTelemetry)
+        : base(logger, socket, receivedBuffers, sendBuffers)
     {
+        m_ServerTelemetry = serverTelemetry;
     }
 
     public bool SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message)
@@ -52,7 +54,7 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
 
         if (packetId != (int)FastPort.Protocols.Commons.ProtocolId.Tests)
         {
-            ServerTelemetry.RecordProtocolError();
+            m_ServerTelemetry.RecordProtocolError();
             m_Logger.LogError(
                 "FastPortTestSmokeClientSession, OnReceived, Unexpected ProtocolId. PacketId:{PacketId}",
                 packetId);
@@ -107,8 +109,58 @@ public class FastPortTestSmokeClientSession : BaseSessionClient
 
         packetId = 0;
         request = null;
-        ServerTelemetry.RecordParseError();
+        m_ServerTelemetry.RecordParseError();
         return false;
+    }
+
+    protected override void OnNetworkSessionDisconnected()
+    {
+        m_ServerTelemetry.RecordSessionDisconnected();
+    }
+
+    protected override void OnNetworkSocketError(SocketError? socketError, Exception? exception)
+    {
+        m_ServerTelemetry.RecordSocketError();
+    }
+
+    protected override void OnNetworkPacketReceived(BasePacket packet)
+    {
+        m_ServerTelemetry.RecordReceived(packet.PacketSize);
+    }
+
+    protected override void OnNetworkBytesSent(int bytes)
+    {
+        m_ServerTelemetry.RecordSent(bytes);
+    }
+
+    protected override void OnNetworkSendRequested(int bytes, int queuedBytes)
+    {
+        m_ServerTelemetry.RecordSendRequested(bytes, queuedBytes);
+    }
+
+    protected override void OnNetworkSendCompleted()
+    {
+        m_ServerTelemetry.RecordSendCompleted();
+    }
+
+    protected override void OnNetworkSendBackpressure()
+    {
+        m_ServerTelemetry.RecordSendBackpressure();
+    }
+
+    protected override void OnNetworkSendRejected(int bytes, int queuedBytes)
+    {
+        m_ServerTelemetry.RecordSendRejected(bytes, queuedBytes);
+    }
+
+    protected override void OnNetworkSendDrainYield(int queuedBytes)
+    {
+        m_ServerTelemetry.RecordSendDrainYield(queuedBytes);
+    }
+
+    protected override void OnNetworkSendBufferSample(int queuedBytes)
+    {
+        m_ServerTelemetry.RecordSendBufferSample(queuedBytes);
     }
 
     public override void OnAccepted()

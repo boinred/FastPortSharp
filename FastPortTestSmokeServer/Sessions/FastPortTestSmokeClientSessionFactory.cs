@@ -1,5 +1,5 @@
 ﻿using LibNetworks.Sessions;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 using Microsoft.Extensions.Logging;
 using System.Net.Sockets;
 

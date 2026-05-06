@@ -1,4 +1,4 @@
-namespace LibNetworks.Telemetry;
+namespace LibTestTelemetry;
 
 public interface IServerTelemetry
 {
@@ -262,80 +262,6 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             }
         }
         while (Interlocked.CompareExchange(ref target, current - 1, current) != current);
-    }
-}
-
-public sealed class NullServerTelemetry : IServerTelemetry
-{
-    public static NullServerTelemetry Instance { get; } = new();
-
-    private NullServerTelemetry()
-    {
-    }
-
-    public void RecordAccept()
-    {
-    }
-
-    public void RecordAcceptError()
-    {
-    }
-
-    public void RecordSessionDisconnected()
-    {
-    }
-
-    public void RecordReceived(int bytes)
-    {
-    }
-
-    public void RecordSent(int bytes)
-    {
-    }
-
-    public void RecordSendRequested(int bytes, int queuedBytes)
-    {
-    }
-
-    public void RecordSendCompleted()
-    {
-    }
-
-    public void RecordSendBackpressure()
-    {
-    }
-
-    public void RecordSendRejected(int bytes, int queuedBytes)
-    {
-    }
-
-    public void RecordSendDrainYield(int queuedBytes)
-    {
-    }
-
-    public void RecordSendBufferSample(int queuedBytes)
-    {
-    }
-
-    public void RecordSocketError()
-    {
-    }
-
-    public void RecordParseError()
-    {
-    }
-
-    public void RecordProtocolError()
-    {
-    }
-
-    public ServerTelemetrySnapshot CreateSnapshot()
-    {
-        return new ServerTelemetrySnapshot(DateTimeOffset.Now, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    }
-
-    public void Reset()
-    {
     }
 }
 

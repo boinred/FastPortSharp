@@ -1,6 +1,5 @@
 ﻿using Google.Protobuf;
 using LibCommons;
-using LibNetworks.Telemetry;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
@@ -31,8 +30,6 @@ public abstract class BaseSession
     private readonly SessionSendOptions m_SendOptions;
     private readonly Channel<SendQueueItem> m_SendQueue;
     private long m_QueuedSendBytes;
-    protected IServerTelemetry ServerTelemetry { get; }
-
     private readonly Task m_TaskReceivedBuffers;
     private readonly Task m_TaskReceivedPackets;
 
@@ -72,26 +69,21 @@ public abstract class BaseSession
 
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
-        : this(logger, socket, receivedBuffers, sendbuffers, NullServerTelemetry.Instance, SessionSendOptions.Default)
+        : this(logger, socket, receivedBuffers, sendbuffers, SessionSendOptions.Default)
     {
     }
 
-    public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers, IServerTelemetry serverTelemetry)
-        : this(logger, socket, receivedBuffers, sendbuffers, serverTelemetry, SessionSendOptions.Default)
-    {
-    }
-
+    // BaseSession dependency: network engine 전용, telemetry protected hook 분리
     public BaseSession(
         ILogger<BaseSession> logger,
         System.Net.Sockets.Socket socket,
         LibCommons.IBuffers receivedBuffers,
         LibCommons.IBuffers sendbuffers,
-        IServerTelemetry serverTelemetry,
         SessionSendOptions? sendOptions)
     {
+        // Session engine state: logger, socket, options
         m_Logger = logger;
         m_Socket = socket;
-        ServerTelemetry = serverTelemetry;
         m_SendOptions = sendOptions ?? SessionSendOptions.Default;
 
         // 10초마다 KeepAlive 신호를 보내도록 설정 (Windows에서는 레지스트리 수정 필요)
@@ -149,6 +141,56 @@ public abstract class BaseSession
         OnEventSessionDisconnected -= OnDisconnected;
     }
 
+    // Session disconnect hook: subclass 외부 telemetry 연결점
+    protected virtual void OnNetworkSessionDisconnected()
+    {
+    }
+
+    // Socket error hook: error code 및 exception context
+    protected virtual void OnNetworkSocketError(SocketError? socketError, Exception? exception)
+    {
+    }
+
+    // Packet parsed hook: packet size 기반 counter 갱신점
+    protected virtual void OnNetworkPacketReceived(BasePacket packet)
+    {
+    }
+
+    // Socket sent byte hook: send completion과 분리된 throughput 지표
+    protected virtual void OnNetworkBytesSent(int bytes)
+    {
+    }
+
+    // Send request hook: 요청 byte 및 enqueue 후 queue depth
+    protected virtual void OnNetworkSendRequested(int bytes, int queuedBytes)
+    {
+    }
+
+    // Send request completed hook: request 단위 pending count 감소점
+    protected virtual void OnNetworkSendCompleted()
+    {
+    }
+
+    // Send backpressure hook: queue limit 또는 transient socket pressure
+    protected virtual void OnNetworkSendBackpressure()
+    {
+    }
+
+    // Send rejection hook: drop byte 및 당시 queue depth
+    protected virtual void OnNetworkSendRejected(int bytes, int queuedBytes)
+    {
+    }
+
+    // Drain yield hook: send loop budget 소진 시 queue depth
+    protected virtual void OnNetworkSendDrainYield(int queuedBytes)
+    {
+    }
+
+    // Send buffer sample hook: 현재 queued byte gauge 갱신점
+    protected virtual void OnNetworkSendBufferSample(int queuedBytes)
+    {
+    }
+
     public async Task WaitSession()
     {
         // 소켓 및 패킷 처리 대기
@@ -174,7 +216,8 @@ public abstract class BaseSession
 
         if (e.SocketError != SocketError.Success)
         {
-            ServerTelemetry.RecordSocketError();
+            // Receive completion socket error: disconnect 전 hook 노출
+            OnNetworkSocketError(e.SocketError, null);
             m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. SocketError : {e.SocketError}");
 
             RequestDisconnect();
@@ -204,7 +247,7 @@ public abstract class BaseSession
 
     public void RequestDisconnect()
     {
-        // Interlocked.CompareExchange를 사용하여 원자적으로 중복 호출 방지
+        // Interlocked.CompareExchange: 원자적 중복 호출 방지
         // 0에서 1로 변경 시도, 이미 1이면 다른 스레드가 먼저 호출한 것
         if (Interlocked.CompareExchange(ref m_DisconnectRequested, 1, 0) != 0)
         {
@@ -213,7 +256,8 @@ public abstract class BaseSession
         }
 
         m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
-        ServerTelemetry.RecordSessionDisconnected();
+        // Disconnect 처리: engine 담당, 관측 hook 분리
+        OnNetworkSessionDisconnected();
 
         // CancellationToken 취소
         try
@@ -294,7 +338,8 @@ public abstract class BaseSession
         catch (SocketException ex)
         {
             m_Logger.LogDebug($"BaseSession, RequestReceived, SocketException : {ex.Message}");
-            ServerTelemetry.RecordSocketError();
+            // Receive 요청 실패: socket error hook 기반 외부 관측
+            OnNetworkSocketError(ex.SocketErrorCode, ex);
             RequestDisconnect();
         }
     }
@@ -321,8 +366,9 @@ public abstract class BaseSession
 
         if (!TryReserveQueuedSendBytes(buffersSize, out int queuedBefore, out int queuedAfter))
         {
-            ServerTelemetry.RecordSendBackpressure();
-            ServerTelemetry.RecordSendRejected(buffersSize, queuedBefore);
+            // Queue byte limit 초과: backpressure 및 rejection 동시 관측
+            OnNetworkSendBackpressure();
+            OnNetworkSendRejected(buffersSize, queuedBefore);
             m_Logger.LogDebug(
                 "BaseSession, RequestSendBuffers, Send rejected. Buffer Length:{BufferLength}, QueuedBytes:{QueuedBytes}, MaxQueuedBytes:{MaxQueuedBytes}",
                 buffersSize,
@@ -345,7 +391,8 @@ public abstract class BaseSession
         if (!m_SendQueue.Writer.TryWrite(sendItem))
         {
             int queuedBytesAfterRollback = ReleaseQueuedSendBytes(buffersSize);
-            ServerTelemetry.RecordSendRejected(buffersSize, queuedBytesAfterRollback);
+            // Queue writer closed: 예약 byte rollback 후 rejection 기록
+            OnNetworkSendRejected(buffersSize, queuedBytesAfterRollback);
             m_Logger.LogDebug(
                 "BaseSession, RequestSendBuffers, Send rejected because queue is closed. Buffer Length:{BufferLength}, QueuedBytes:{QueuedBytes}",
                 buffersSize,
@@ -353,10 +400,12 @@ public abstract class BaseSession
             return false;
         }
 
-        ServerTelemetry.RecordSendRequested(buffersSize, queuedAfter);
+        // Queue enqueue 성공: request counter 및 pending gauge 기준점
+        OnNetworkSendRequested(buffersSize, queuedAfter);
         if (queuedAfter > SendBufferBackpressureThresholdBytes)
         {
-            ServerTelemetry.RecordSendBackpressure();
+            // High-watermark 초과: enqueue 성공과 분리된 backpressure 관측
+            OnNetworkSendBackpressure();
         }
 
         return true;
@@ -438,7 +487,8 @@ public abstract class BaseSession
                 foreach (var basePacket in basePackets)
                 {
                     m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
-                    ServerTelemetry.RecordReceived(basePacket.PacketSize);
+                    // Packet complete: received packet/bytes hook 호출 기준
+                    OnNetworkPacketReceived(basePacket);
 
                     // Channel에 패킷 전송
                     await m_ReceivedPackets.Writer.WriteAsync(basePacket, cancellationToken);
@@ -497,7 +547,8 @@ public abstract class BaseSession
                     }
 
                     int queuedBytes = GetQueuedSendBytesSnapshot();
-                    ServerTelemetry.RecordSendBufferSample(queuedBytes);
+                    // Send 직전 queue depth: 외부 gauge 최신화 sample
+                    OnNetworkSendBufferSample(queuedBytes);
 
                     int remainingBudgetBytes = m_SendOptions.NormalizedMaxDrainBytesPerSignal - drainedBytesThisCycle;
                     int maxSendBytes = Math.Min(m_SendOptions.NormalizedSendChunkBytes, remainingBudgetBytes);
@@ -516,15 +567,17 @@ public abstract class BaseSession
                     }
                     catch (SocketException ex) when (IsTransientSendBackpressure(ex.SocketErrorCode))
                     {
-                        ServerTelemetry.RecordSocketError();
-                        ServerTelemetry.RecordSendBackpressure();
+                        // Transient send pressure: socket error 및 backpressure 동시 관측
+                        OnNetworkSocketError(ex.SocketErrorCode, ex);
+                        OnNetworkSendBackpressure();
                         m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Transient SocketException : {ex.SocketErrorCode}, {ex.Message}");
                         await WaitTransientSendBackoffAsync(cancellationToken);
                         continue;
                     }
                     catch (SocketException ex)
                     {
-                        ServerTelemetry.RecordSocketError();
+                        // Non-transient send socket error: disconnect 전 hook 노출
+                        OnNetworkSocketError(ex.SocketErrorCode, ex);
                         m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
                         RequestDisconnect();
                         return;
@@ -540,14 +593,17 @@ public abstract class BaseSession
                     int advancedSize = Math.Min(sentSize, batchBytes);
                     int completedItems = AdvanceSendItems(pendingSendItems, advancedSize);
                     int queuedBytesAfterSend = ReleaseQueuedSendBytes(advancedSize);
-                    ServerTelemetry.RecordSent(advancedSize);
-                    ServerTelemetry.RecordSendBufferSample(queuedBytesAfterSend);
+                    // Sent throughput: 실제 socket 전달 byte 기준
+                    OnNetworkBytesSent(advancedSize);
+                    // Drain 후 queue depth: buffer gauge 하향 sample
+                    OnNetworkSendBufferSample(queuedBytesAfterSend);
                     drainedBytesThisCycle += advancedSize;
                     sendOperationsThisCycle++;
 
                     for (int i = 0; i < completedItems; i++)
                     {
-                        ServerTelemetry.RecordSendCompleted();
+                        // Pending request completion: 완전 drain request 수 기준
+                        OnNetworkSendCompleted();
                     }
                 }
             }
@@ -563,7 +619,8 @@ public abstract class BaseSession
         catch (SocketException ex)
         {
             m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, SocketException : {ex.Message}");
-            ServerTelemetry.RecordSocketError();
+            // Send worker 외부 socket error: 동일 hook 집계
+            OnNetworkSocketError(ex.SocketErrorCode, ex);
             RequestDisconnect();
         }
     }
@@ -712,7 +769,8 @@ public abstract class BaseSession
             return;
         }
 
-        ServerTelemetry.RecordSendDrainYield(queuedBytes);
+        // Drain budget yield: 당시 queue depth
+        OnNetworkSendDrainYield(queuedBytes);
     }
 
     private async Task WaitTransientSendBackoffAsync(CancellationToken cancellationToken)

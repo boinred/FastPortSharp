@@ -1,8 +1,10 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-05T11:54:29Z",
-  "activeFeatures": [],
-  "primaryFeature": null,
+  "lastUpdated": "2026-05-05T21:56:39.292Z",
+  "activeFeatures": [
+    "remove-server-telemetry-from-network-base-classes"
+  ],
+  "primaryFeature": "remove-server-telemetry-from-network-base-classes",
   "features": {
     "fastport-loadrunner": {
       "phase": "archived",
@@ -1071,6 +1073,47 @@
       "completedAt": "2026-05-05T08:06:18.690Z",
       "archivedAt": "2026-05-05T08:20:47Z",
       "archivePath": "docs/archive/2026-05/cloud-staged-rtt-tail-validation"
+    },
+    "remove-server-telemetry-from-network-base-classes": {
+      "phase": "act",
+      "matchRate": null,
+      "iterationCount": 1,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-05T12:19:07.862Z",
+          "completedAt": "2026-05-05T12:20:43.375Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-05T12:19:07.862Z",
+          "completedAt": "2026-05-05T12:27:26.329Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-05T12:19:07.862Z",
+          "completedAt": "2026-05-05T13:03:42.285Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-05T12:19:07.862Z",
+          "completedAt": "2026-05-05T21:56:39.292Z"
+        },
+        {
+          "phase": "report",
+          "status": "active",
+          "createdAt": "2026-05-05T12:19:07.862Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-05T12:19:07.864Z",
+        "lastUpdated": "2026-05-05T21:56:39.292Z"
+      }
     }
   },
   "pipeline": {
@@ -1081,7 +1124,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-05T11:49:07.718Z"
+    "lastActivity": "2026-05-05T21:56:39.292Z"
   },
   "history": [
     {
@@ -2642,6 +2685,64 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-05-05T11:49:07.716Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-05T12:20:43.371Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-05T12:20:43.373Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-05T12:24:06.644Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-05T12:27:26.328Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-05T12:27:26.328Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-05T13:03:42.284Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-05T13:03:42.284Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-05T21:56:39.290Z"
+    },
+    {
+      "feature": "remove-server-telemetry-from-network-base-classes",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-05T21:56:39.291Z"
     }
   ]
 }

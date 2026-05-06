@@ -1,5 +1,4 @@
 using System.Text.Json;
-using LibNetworks.Telemetry;
 
 namespace LibTestTelemetry;
 

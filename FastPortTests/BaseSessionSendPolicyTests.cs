@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using LibCommons;
 using LibNetworks.Sessions;
-using LibNetworks.Telemetry;
+using LibTestTelemetry;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FastPortTests;
@@ -368,6 +368,7 @@ public sealed class BaseSessionSendPolicyTests
 
     private sealed class TestSession : BaseSession
     {
+        private readonly IServerTelemetry _telemetry;
         private readonly Func<Socket, ReadOnlyMemory<byte>, CancellationToken, ValueTask<int>>? _sendOverride;
         private readonly Func<Socket, IList<ArraySegment<byte>>, CancellationToken, ValueTask<int>>? _sendBatchOverride;
 
@@ -382,9 +383,9 @@ public sealed class BaseSessionSendPolicyTests
                 socket,
                 new ArrayPoolCircularBuffers(1024),
                 new ArrayPoolCircularBuffers(1024),
-                telemetry,
                 sendOptions)
         {
+            _telemetry = telemetry;
             _sendOverride = sendOverride;
             _sendBatchOverride = sendBatchOverride;
         }
@@ -392,6 +393,56 @@ public sealed class BaseSessionSendPolicyTests
         public bool TrySendBytes(byte[] bytes)
         {
             return TryRequestSendBuffers(bytes);
+        }
+
+        protected override void OnNetworkSessionDisconnected()
+        {
+            _telemetry.RecordSessionDisconnected();
+        }
+
+        protected override void OnNetworkSocketError(SocketError? socketError, Exception? exception)
+        {
+            _telemetry.RecordSocketError();
+        }
+
+        protected override void OnNetworkPacketReceived(BasePacket packet)
+        {
+            _telemetry.RecordReceived(packet.PacketSize);
+        }
+
+        protected override void OnNetworkBytesSent(int bytes)
+        {
+            _telemetry.RecordSent(bytes);
+        }
+
+        protected override void OnNetworkSendRequested(int bytes, int queuedBytes)
+        {
+            _telemetry.RecordSendRequested(bytes, queuedBytes);
+        }
+
+        protected override void OnNetworkSendCompleted()
+        {
+            _telemetry.RecordSendCompleted();
+        }
+
+        protected override void OnNetworkSendBackpressure()
+        {
+            _telemetry.RecordSendBackpressure();
+        }
+
+        protected override void OnNetworkSendRejected(int bytes, int queuedBytes)
+        {
+            _telemetry.RecordSendRejected(bytes, queuedBytes);
+        }
+
+        protected override void OnNetworkSendDrainYield(int queuedBytes)
+        {
+            _telemetry.RecordSendDrainYield(queuedBytes);
+        }
+
+        protected override void OnNetworkSendBufferSample(int queuedBytes)
+        {
+            _telemetry.RecordSendBufferSample(queuedBytes);
         }
 
         protected override ValueTask<int> SendSocketAsync(

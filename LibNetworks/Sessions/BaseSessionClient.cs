@@ -1,5 +1,4 @@
-﻿using LibNetworks.Telemetry;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 
 namespace LibNetworks.Sessions;
 
@@ -16,19 +15,14 @@ public abstract class BaseSessionClient : BaseSession
         
     }
 
-    public BaseSessionClient(ILogger<BaseSessionClient> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendBuffers, IServerTelemetry serverTelemetry)
-        : base(logger, socket, receivedBuffers, sendBuffers, serverTelemetry)
-    {
-    }
-
+    // Client session 옵션 overload: telemetry 제외, send policy 조정
     public BaseSessionClient(
         ILogger<BaseSessionClient> logger,
         System.Net.Sockets.Socket socket,
         LibCommons.IBuffers receivedBuffers,
         LibCommons.IBuffers sendBuffers,
-        IServerTelemetry serverTelemetry,
         SessionSendOptions? sendOptions)
-        : base(logger, socket, receivedBuffers, sendBuffers, serverTelemetry, sendOptions)
+        : base(logger, socket, receivedBuffers, sendBuffers, sendOptions)
     {
     }
 
