@@ -1,10 +1,6 @@
 ﻿using Google.Protobuf;
 using LibCommons;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Buffers.Binary;
 
 namespace LibNetworks.Extensions
 {
@@ -20,12 +16,12 @@ namespace LibNetworks.Extensions
 
                 return false;
             }
-            packetId = BitConverter.ToInt32(basePacket.Data.Slice(0, 4));
-
-            var messageBuffers = basePacket.Data.Slice(4, basePacket.DataSize - 4).ToArray();
+            // 목적: protocol id를 임시 배열 없이 packet payload span에서 직접 읽기
+            packetId = BinaryPrimitives.ReadInt32LittleEndian(basePacket.Data.Slice(0, 4));
 
             message = new T();
-            message.MergeFrom(messageBuffers);
+            // 목적: protobuf payload ToArray 할당 없이 ReadOnlySpan<byte>에서 직접 merge
+            message.MergeFrom(basePacket.Data.Slice(4, basePacket.DataSize - 4));
 
             return true;
         }
