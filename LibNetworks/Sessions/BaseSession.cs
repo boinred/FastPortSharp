@@ -3,6 +3,7 @@ using LibCommons;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
@@ -478,8 +479,8 @@ public abstract class BaseSession
         // List로 바꾸는 것도 고려
         byte[] sendBuffers = new byte[buffersSize];
 
-        // Insert Packet Size at the beginning of the buffer
-        BitConverter.GetBytes(buffersSize).AsSpan().CopyTo(sendBuffers);
+        // 목적: 임시 byte[] 할당 없이 UInt16 packet size header 직접 기록
+        BinaryPrimitives.WriteUInt16LittleEndian(sendBuffers.AsSpan(0, BasePacket.HeaderSize), (ushort)buffersSize);
         buffers.CopyTo(sendBuffers.AsSpan(BasePacket.HeaderSize));
 
 
@@ -607,14 +608,13 @@ public abstract class BaseSession
 
     protected bool TryRequestSendMessage<T>(int packetId, Google.Protobuf.IMessage<T> message) where T : IMessage<T>
     {
-
-        Span<byte> packetIdBuffers = BitConverter.GetBytes(packetId);
         ReadOnlySpan<byte> messageBuffers = message.ToByteArray();
 
-        byte[] packetBuffers = new byte[packetIdBuffers.Length + messageBuffers.Length];
+        byte[] packetBuffers = new byte[sizeof(int) + messageBuffers.Length];
 
-        packetIdBuffers.CopyTo(packetBuffers);
-        messageBuffers.CopyTo(packetBuffers.AsSpan(packetIdBuffers.Length));
+        // 목적: 임시 packet id byte[] 없이 protocol id header 직접 기록
+        BinaryPrimitives.WriteInt32LittleEndian(packetBuffers.AsSpan(0, sizeof(int)), packetId);
+        messageBuffers.CopyTo(packetBuffers.AsSpan(sizeof(int)));
 
         return TryRequestSendBuffers(packetBuffers);
     }
