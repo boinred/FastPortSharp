@@ -101,6 +101,12 @@ public sealed class FastPortTestSmokeServerTests
         Assert.AreEqual(0, snapshot.AcceptErrors, "Smoke run should not record accept errors.");
         Assert.AreEqual(0, snapshot.SocketErrors, "Smoke run should not record server socket errors.");
         Assert.AreEqual(0, snapshot.SocketErrorRate, "Smoke run socket error rate should remain zero.");
+        AssertServerOperationDuration(snapshot, "accept-first-socket-receive");
+        AssertServerOperationDuration(snapshot, "receive-await");
+        AssertServerOperationDuration(snapshot, "receive-buffer-write");
+        AssertServerOperationDuration(snapshot, "receive-packet-extract");
+        AssertServerOperationDuration(snapshot, "receive-packet-handler");
+        AssertServerOperationDuration(snapshot, "send-enqueue");
     }
 
     private static void AssertServerObservedMetrics(ServerObservedMetricsSnapshot snapshot, long expectedAcceptedSessions)
@@ -118,6 +124,16 @@ public sealed class FastPortTestSmokeServerTests
         Assert.AreEqual(0, snapshot.SocketErrorCount, "Server observed metrics should expose socket error count.");
         Assert.AreEqual(0, snapshot.ParseErrorCount, "Server observed metrics should expose parse error count.");
         Assert.AreEqual(0, snapshot.ProtocolErrorCount, "Server observed metrics should expose protocol error count.");
+        Assert.IsNotNull(snapshot.OperationDurations, "Server observed metrics should expose operation durations.");
+        Assert.IsTrue(snapshot.OperationDurations.ContainsKey("receive-await"), "Server observed metrics should expose receive await duration.");
+        Assert.IsTrue(snapshot.OperationDurations.ContainsKey("send-enqueue"), "Server observed metrics should expose send enqueue duration.");
+    }
+
+    private static void AssertServerOperationDuration(ServerTelemetrySnapshot snapshot, string operation)
+    {
+        Assert.IsNotNull(snapshot.OperationDurations, "Server telemetry should expose operation durations.");
+        Assert.IsTrue(snapshot.OperationDurations.ContainsKey(operation), $"Server telemetry should expose {operation} duration.");
+        Assert.IsTrue(snapshot.OperationDurations[operation].Count > 0, $"{operation} should have samples.");
     }
 
     private static async Task<ServerTelemetrySnapshot> WaitForTelemetryAsync(

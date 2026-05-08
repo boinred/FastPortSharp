@@ -41,6 +41,9 @@ public interface IServerTelemetry
 
     void RecordProtocolError();
 
+    // 목적: server-side operation별 duration summary 누적
+    void RecordOperationDuration(string operation, TimeSpan elapsed);
+
     ServerTelemetrySnapshot CreateSnapshot();
 
     void Reset();
@@ -76,6 +79,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByType = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByCode = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> _socketErrorCountsByClass = new(StringComparer.Ordinal);
+    // 상태: server-side operation duration 누적 샘플
+    private readonly ConcurrentDictionary<string, OperationDurationSamples> _operationDurations = new(StringComparer.Ordinal);
     private long _parseErrors;
     private long _protocolErrors;
 
@@ -227,6 +232,20 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         Interlocked.Increment(ref _protocolErrors);
     }
 
+    public void RecordOperationDuration(string operation, TimeSpan elapsed)
+    {
+        // 방어: 0 이하 duration은 summary 왜곡 방지를 위해 제외
+        if (elapsed <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        OperationDurationSamples samples = _operationDurations.GetOrAdd(
+            NormalizeKey(operation),
+            static _ => new OperationDurationSamples());
+        samples.Add(elapsed);
+    }
+
     public ServerTelemetrySnapshot CreateSnapshot()
     {
         DateTimeOffset timestamp = DateTimeOffset.Now;
@@ -271,7 +290,8 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
             SocketErrorCountsByClass: CopyCounters(_socketErrorCountsByClass),
             DisconnectCountsByReason: CopyCounters(_disconnectCountsByReason),
             IdleTimeoutDisconnects: Interlocked.Read(ref _idleTimeoutDisconnects),
-            MaxIdleTimeoutAgeMs: Interlocked.Read(ref _maxIdleTimeoutAgeMs));
+            MaxIdleTimeoutAgeMs: Interlocked.Read(ref _maxIdleTimeoutAgeMs),
+            OperationDurations: CreateOperationDurationSummary());
     }
 
     public void Reset()
@@ -302,6 +322,7 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         _socketErrorCountsByType.Clear();
         _socketErrorCountsByCode.Clear();
         _socketErrorCountsByClass.Clear();
+        _operationDurations.Clear();
         Interlocked.Exchange(ref _parseErrors, 0);
         Interlocked.Exchange(ref _protocolErrors, 0);
     }
@@ -329,6 +350,22 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         return counters
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    private IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? CreateOperationDurationSummary()
+    {
+        // 출력 최적화: sample이 없으면 JSON null contract 유지
+        if (_operationDurations.IsEmpty)
+        {
+            return null;
+        }
+
+        return _operationDurations
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value.CreateSnapshot(),
+                StringComparer.Ordinal);
     }
 
     private static string GetExceptionType(Exception? exception)
@@ -416,6 +453,45 @@ public sealed class ServerTelemetryCollector : IServerTelemetry
         }
         while (true);
     }
+
+    private sealed class OperationDurationSamples
+    {
+        // 상태: 누적 sample 수
+        private long _count;
+        // 상태: 평균 계산용 누적 microseconds
+        private long _totalMicroseconds;
+        // 상태: tail 관측용 최대 microseconds
+        private long _maxMicroseconds;
+
+        // 목적: duration sample을 count/total/max로 lock 없이 누적
+        public void Add(TimeSpan elapsed)
+        {
+            long elapsedMicroseconds = Math.Max(
+                0,
+                (long)Math.Round(elapsed.TotalMicroseconds, MidpointRounding.AwayFromZero));
+            if (elapsedMicroseconds <= 0)
+            {
+                return;
+            }
+
+            Interlocked.Increment(ref _count);
+            Interlocked.Add(ref _totalMicroseconds, elapsedMicroseconds);
+            UpdateMax(ref _maxMicroseconds, elapsedMicroseconds);
+        }
+
+        // 목적: JSONL contract에 노출할 count/average/max snapshot 생성
+        public ObservedOperationDurationSnapshot CreateSnapshot()
+        {
+            long count = Interlocked.Read(ref _count);
+            long totalMicroseconds = Interlocked.Read(ref _totalMicroseconds);
+            long maxMicroseconds = Interlocked.Read(ref _maxMicroseconds);
+
+            return new ObservedOperationDurationSnapshot(
+                Count: count,
+                AverageMs: count <= 0 ? 0 : totalMicroseconds / (double)count / 1000,
+                MaxMs: maxMicroseconds / 1000.0);
+        }
+    }
 }
 
 public sealed record ServerTelemetrySnapshot(
@@ -449,4 +525,5 @@ public sealed record ServerTelemetrySnapshot(
     IReadOnlyDictionary<string, long>? SocketErrorCountsByClass = null,
     IReadOnlyDictionary<string, long>? DisconnectCountsByReason = null,
     long IdleTimeoutDisconnects = 0,
-    long MaxIdleTimeoutAgeMs = 0);
+    long MaxIdleTimeoutAgeMs = 0,
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null);

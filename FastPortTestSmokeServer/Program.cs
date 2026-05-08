@@ -12,6 +12,11 @@ builder.ConfigureServices((context, services) =>
     var serverSection = FastPortTestSmokeServerConfiguration.GetServerSection(context.Configuration);
     string host = serverSection["Host"] ?? "0.0.0.0";
     int port = int.TryParse(serverSection["Port"], out int configuredPort) ? configuredPort : 6628;
+
+    // 설정: ListenBacklog는 0 이하 또는 파싱 실패 시 smoke server 기본값으로 보정
+    int listenBacklog = int.TryParse(serverSection["ListenBacklog"], out int configuredListenBacklog) && configuredListenBacklog > 0
+        ? configuredListenBacklog
+        : FastPortTestSmokeServerOptions.DefaultListenBacklog;
     var telemetrySection = context.Configuration.GetSection("Telemetry");
     string? telemetryOutput = telemetrySection["Output"];
     int telemetryIntervalSeconds = int.TryParse(telemetrySection["IntervalSeconds"], out int configuredIntervalSeconds)
@@ -27,7 +32,12 @@ builder.ConfigureServices((context, services) =>
         ? configuredScanIntervalSeconds
         : 5;
 
-    services.AddSingleton(new FastPortTestSmokeServerOptions { Host = host, Port = port });
+    services.AddSingleton(new FastPortTestSmokeServerOptions
+    {
+        Host = host,
+        Port = port,
+        ListenBacklog = listenBacklog
+    });
     services.AddSingleton(new FastPortTestSmokeServerTelemetryOptions
     {
         Output = telemetryOutput,

@@ -22,9 +22,17 @@ public static class FastPortTestSmokeServerConfiguration
 
 public sealed class FastPortTestSmokeServerOptions
 {
+    // 목적: cloud 10K ramp-up에서 TCP listen queue 포화를 줄이기 위한 smoke server 기본 backlog
+    public const int DefaultListenBacklog = 4096;
+
+    // 설정: listener bind host
     public string Host { get; init; } = "0.0.0.0";
 
+    // 설정: listener bind port
     public int Port { get; init; } = 6628;
+
+    // 설정: Socket.Listen backlog
+    public int ListenBacklog { get; init; } = DefaultListenBacklog;
 }
 
 public sealed class FastPortTestSmokeServerTelemetryOptions

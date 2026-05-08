@@ -4,6 +4,7 @@ using LibNetworks.Extensions;
 using LibNetworks.Sessions;
 using LibTestTelemetry;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Net.Sockets;
 
 namespace FastPortTestSmokeServer.Sessions;
@@ -15,6 +16,14 @@ public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSes
     private readonly long m_Id = m_IdGenerator.GetNextGeneratedId();
     private readonly IServerTelemetry m_ServerTelemetry;
     private readonly SessionIdleTracker m_SessionIdleTracker;
+    // 상태: listener accept completion callback 진입 timestamp
+    private long m_AcceptCompletedTimestamp;
+    // 상태: OnAccepted task 실행 시작 timestamp
+    private long m_OnAcceptedStartedTimestamp;
+    // 상태: first socket receive duration 중복 기록 방지 flag
+    private int m_AcceptFirstSocketReceiveRecorded;
+    // 상태: first receive duration 중복 기록 방지 flag
+    private int m_AcceptFirstReceiveRecorded;
 
     private static readonly LatencyStats s_LatencyStats = new(new LatencyStatsOptions
     {
@@ -42,6 +51,20 @@ public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSes
 
     public bool SendMessage<T>(FastPort.Protocols.Commons.ProtocolId protocolId, T message)
         where T : IMessage<T> => TryRequestSendMessage((int)protocolId, message);
+
+    // 계측 전달: listener가 accept completion 기준점을 session에 전달
+    public void MarkAcceptedByListener(long acceptCompletedTimestamp)
+    {
+        // 상태: listener accept completion 기준 timestamp 저장
+        Volatile.Write(ref m_AcceptCompletedTimestamp, acceptCompletedTimestamp);
+    }
+
+    // 계측 전달: listener가 OnAccepted task 시작 기준점을 session에 전달
+    public void MarkOnAcceptedStarted(long onAcceptedStartedTimestamp)
+    {
+        // 상태: OnAccepted task 실행 시작 기준 timestamp 저장
+        Volatile.Write(ref m_OnAcceptedStartedTimestamp, onAcceptedStartedTimestamp);
+    }
 
     protected override void OnReceived(BasePacket packet)
     {
@@ -126,8 +149,24 @@ public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSes
         m_ServerTelemetry.RecordSocketError(phase, socketError, exception);
     }
 
+    protected override void OnNetworkReceiveCompleted(int bytes, TimeSpan duration)
+    {
+        // 계측: ReceiveAsync 요청부터 socket byte 도착까지의 대기 시간
+        m_ServerTelemetry.RecordOperationDuration("receive-await", duration);
+        // 계측: accept completion부터 첫 socket byte 도착까지의 startup receive 경로
+        RecordAcceptPathFirstSocketReceive();
+    }
+
+    protected override void OnNetworkOperationDuration(string operation, TimeSpan duration)
+    {
+        // 계측: BaseSession 내부 receive/parse 단계별 duration summary
+        m_ServerTelemetry.RecordOperationDuration(operation, duration);
+    }
+
     protected override void OnNetworkPacketReceived(BasePacket packet)
     {
+        // 계측: 첫 parsed packet 시점에서 accept 이후 receive 경로 지연 확정
+        RecordAcceptPathFirstReceive();
         m_ServerTelemetry.RecordReceived(packet.PacketSize);
     }
 
@@ -187,6 +226,53 @@ public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSes
         m_SessionIdleTracker.Unregister(Id);
         base.OnDisconnected();
         m_Logger.LogInformation("FastPortTestSmokeClientSession, OnDisconnected. Id:{Id}, RemoteEndPoint:{Address}", Id, GetSessionAddress());
+    }
+
+    private void RecordAcceptPathFirstSocketReceive()
+    {
+        // 중복 방지: 세션별 첫 socket receive에서만 accept path duration 기록
+        if (Interlocked.Exchange(ref m_AcceptFirstSocketReceiveRecorded, 1) != 0)
+        {
+            return;
+        }
+
+        // 계측: accept completion부터 첫 socket receive completion까지의 전체 startup receive 대기
+        long acceptCompletedTimestamp = Volatile.Read(ref m_AcceptCompletedTimestamp);
+        if (acceptCompletedTimestamp <= 0)
+        {
+            return;
+        }
+
+        m_ServerTelemetry.RecordOperationDuration(
+            "accept-first-socket-receive",
+            Stopwatch.GetElapsedTime(acceptCompletedTimestamp));
+    }
+
+    private void RecordAcceptPathFirstReceive()
+    {
+        // 중복 방지: 세션별 첫 packet에서만 accept path duration 기록
+        if (Interlocked.Exchange(ref m_AcceptFirstReceiveRecorded, 1) != 0)
+        {
+            return;
+        }
+
+        // 계측: accept completion부터 첫 parsed packet까지의 전체 session-start 경로
+        long acceptCompletedTimestamp = Volatile.Read(ref m_AcceptCompletedTimestamp);
+        if (acceptCompletedTimestamp > 0)
+        {
+            m_ServerTelemetry.RecordOperationDuration(
+                "accept-first-receive",
+                Stopwatch.GetElapsedTime(acceptCompletedTimestamp));
+        }
+
+        // 계측: OnAccepted task 시작 이후 첫 parsed packet까지의 receive 준비/수신 경로
+        long onAcceptedStartedTimestamp = Volatile.Read(ref m_OnAcceptedStartedTimestamp);
+        if (onAcceptedStartedTimestamp > 0)
+        {
+            m_ServerTelemetry.RecordOperationDuration(
+                "onaccepted-start-first-receive",
+                Stopwatch.GetElapsedTime(onAcceptedStartedTimestamp));
+        }
     }
 
     private static string ToTelemetryReason(NetworkDisconnectReason reason)

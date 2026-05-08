@@ -34,6 +34,12 @@ public abstract class BaseSession
     private readonly SemaphoreSlim m_ReceivedBufferSignal = new(0);
     // Version: stale signal 소비 중 새 receive 여부를 구분하는 변경 카운터
     private long m_ReceivedBufferVersion;
+    // 계측: 마지막 ReceiveAsync 요청 시작 timestamp
+    private long m_ReceiveRequestedTimestamp;
+    // 계측: 마지막 receive buffer write 완료 timestamp
+    private long m_LastReceiveBufferWriteTimestamp;
+    // 계측: parser worker가 이미 관측한 receive buffer write timestamp
+    private long m_LastParsedReceiveBufferWriteTimestamp;
     private readonly SessionSendOptions m_SendOptions;
     private readonly Channel<SendQueueItem> m_SendQueue;
     private long m_QueuedSendBytes;
@@ -45,7 +51,7 @@ public abstract class BaseSession
     private readonly Task m_TaskSendBuffers;
 
     // Channel<T>로 변경 (BufferBlock<T> 대비 4배 빠르고 메모리 69% 절약)
-    private readonly Channel<LibCommons.BasePacket> m_ReceivedPackets;
+    private readonly Channel<ReceivedPacketItem> m_ReceivedPackets;
 
     private readonly System.Net.EndPoint? m_RemoteEndPoint;
 
@@ -88,6 +94,10 @@ public abstract class BaseSession
         }
     }
 
+    private readonly record struct ReceivedPacketItem(
+        LibCommons.BasePacket Packet,
+        long ParserReadyTimestamp);
+
 
     public BaseSession(ILogger<BaseSession> logger, System.Net.Sockets.Socket socket, LibCommons.IBuffers receivedBuffers, LibCommons.IBuffers sendbuffers)
         : this(logger, socket, receivedBuffers, sendbuffers, SessionSendOptions.Default)
@@ -129,7 +139,7 @@ public abstract class BaseSession
         m_SocketEventsReceived.UserToken = this;
 
         // Bounded Channel 생성 (용량 제한으로 메모리 사용 제어)
-        m_ReceivedPackets = Channel.CreateBounded<LibCommons.BasePacket>(new BoundedChannelOptions(1000)
+        m_ReceivedPackets = Channel.CreateBounded<ReceivedPacketItem>(new BoundedChannelOptions(1000)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
@@ -194,6 +204,16 @@ public abstract class BaseSession
     {
     }
 
+    // Receive completion hook: socket receive await 구간 계측 연결점
+    protected virtual void OnNetworkReceiveCompleted(int bytes, TimeSpan duration)
+    {
+    }
+
+    // Operation duration hook: session 내부 단계별 latency summary 연결점
+    protected virtual void OnNetworkOperationDuration(string operation, TimeSpan duration)
+    {
+    }
+
     // Socket sent byte hook: send completion과 분리된 throughput 지표
     protected virtual void OnNetworkBytesSent(int bytes)
     {
@@ -255,6 +275,9 @@ public abstract class BaseSession
 
     private void OnSocketEventsReceivedCompleted(object? sender, SocketAsyncEventArgs e)
     {
+        // 계측 기준점: socket receive completion callback 진입 시각
+        long receiveCompletedTimestamp = GetNetworkTimestamp();
+
         if (e.SocketError == SocketError.IOPending)
         {
             m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Socket IOPeding.");
@@ -290,8 +313,17 @@ public abstract class BaseSession
             return;
         }
 
+        // 계측: ReceiveAsync 요청부터 socket byte 수신 완료까지의 대기 시간
+        RecordReceiveCompletedDuration(e.BytesTransferred, receiveCompletedTimestamp);
+
         // Process the received data
+        long bufferWriteStartedTimestamp = GetNetworkTimestamp();
         var wroteSize = m_ReceivedBuffers.Write(buffer, e.Offset, e.BytesTransferred);
+        // 계측: socket buffer에서 session receive buffer로 복사/확장하는 비용
+        OnNetworkOperationDuration("receive-buffer-write", Stopwatch.GetElapsedTime(bufferWriteStartedTimestamp));
+
+        // 계측 기준점: parser worker wake-up 및 packet extraction 대기 시간 계산용
+        Volatile.Write(ref m_LastReceiveBufferWriteTimestamp, GetNetworkTimestamp());
         // Activity: packet 완성 여부와 무관하게 socket byte 수신 성공 시 idle 기준 갱신
         MarkNetworkActivity();
         if (wroteSize > 0)
@@ -396,6 +428,8 @@ public abstract class BaseSession
         m_Logger.LogDebug($"BaseSession, RequestReceived");
         try
         {
+            // 계측 기준점: ReceiveAsync 요청 시작 시각
+            Volatile.Write(ref m_ReceiveRequestedTimestamp, GetNetworkTimestamp());
             if (!socket.ReceiveAsync(m_SocketEventsReceived))
             {
                 // If ReceiveAsync returns false, we handle the receive operation immediately
@@ -423,6 +457,42 @@ public abstract class BaseSession
         Interlocked.Increment(ref m_ReceivedBufferVersion);
         // 흐름: parser task가 Task.Delay polling 대신 즉시 재시도
         m_ReceivedBufferSignal.Release();
+    }
+
+    // 목적: receive request부터 completion까지의 socket wait duration 기록
+    private void RecordReceiveCompletedDuration(int bytes, long receiveCompletedTimestamp)
+    {
+        long receiveRequestedTimestamp = Volatile.Read(ref m_ReceiveRequestedTimestamp);
+        if (receiveRequestedTimestamp <= 0 || receiveCompletedTimestamp <= receiveRequestedTimestamp)
+        {
+            return;
+        }
+
+        OnNetworkReceiveCompleted(
+            bytes,
+            Stopwatch.GetElapsedTime(receiveRequestedTimestamp, receiveCompletedTimestamp));
+    }
+
+    // 목적: buffer write 완료 후 parser worker가 처음 관측하기까지의 delay 기록
+    private void RecordReceiveSignalToParseDuration()
+    {
+        long bufferWriteTimestamp = Volatile.Read(ref m_LastReceiveBufferWriteTimestamp);
+        if (bufferWriteTimestamp <= 0)
+        {
+            return;
+        }
+
+        long previousTimestamp = Interlocked.Exchange(
+            ref m_LastParsedReceiveBufferWriteTimestamp,
+            bufferWriteTimestamp);
+        if (previousTimestamp == bufferWriteTimestamp)
+        {
+            return;
+        }
+
+        OnNetworkOperationDuration(
+            "receive-signal-to-parse",
+            Stopwatch.GetElapsedTime(bufferWriteTimestamp));
     }
 
     // 목적: 관측한 version 이후 새 receive write가 있을 때까지 비동기 대기
@@ -476,6 +546,9 @@ public abstract class BaseSession
             return false;
         }
 
+        // 계측 기준점: packet buffer 생성부터 send queue 등록까지의 enqueue 비용
+        long sendEnqueueStartedTimestamp = GetNetworkTimestamp();
+
         // List로 바꾸는 것도 고려
         byte[] sendBuffers = new byte[buffersSize];
 
@@ -503,6 +576,8 @@ public abstract class BaseSession
         RecordPendingSendRequested(buffersSize, queuedAfter);
         // 상태: send worker가 telemetry pending 등록 이후에만 item을 drain하도록 표시
         sendItem.MarkTelemetryRegistered();
+        // 계측: send request가 send queue에 안전하게 등록되는 데 걸린 시간
+        OnNetworkOperationDuration("send-enqueue", Stopwatch.GetElapsedTime(sendEnqueueStartedTimestamp));
         if (queuedAfter > SendBufferBackpressureThresholdBytes)
         {
             // High-watermark 초과: enqueue 성공과 분리된 backpressure 관측
@@ -628,9 +703,20 @@ public abstract class BaseSession
         try
         {
             // Channel이 완료될 때까지 패킷 처리
-            await foreach (var packet in m_ReceivedPackets.Reader.ReadAllAsync(cancellationToken))
+            await foreach (var packetItem in m_ReceivedPackets.Reader.ReadAllAsync(cancellationToken))
             {
-                OnReceived(packet);
+                // 계측: parser가 packet을 준비한 뒤 handler task가 소비하기까지의 queue delay
+                OnNetworkOperationDuration(
+                    "receive-packet-queue-delay",
+                    Stopwatch.GetElapsedTime(packetItem.ParserReadyTimestamp));
+
+                // 계측 기준점: protocol parse 및 echo response enqueue 비용
+                long handlerStartedTimestamp = GetNetworkTimestamp();
+                OnReceived(packetItem.Packet);
+                // 계측: application-level packet handler 처리 시간
+                OnNetworkOperationDuration(
+                    "receive-packet-handler",
+                    Stopwatch.GetElapsedTime(handlerStartedTimestamp));
             }
         }
         catch (OperationCanceledException)
@@ -661,12 +747,21 @@ public abstract class BaseSession
                     continue;
                 }
 
+                // 계측: receive write signal 이후 parser worker가 readable buffer를 관측한 시점
+                RecordReceiveSignalToParseDuration();
+
+                // 계측 기준점: complete packet extraction 및 BasePacket payload copy 비용
+                long packetExtractStartedTimestamp = GetNetworkTimestamp();
                 if (!m_ReceivedBuffers.TryGetBasePackets(out List<LibCommons.BasePacket> basePackets))
                 {
                     // 흐름: partial packet이면 추가 receive write까지 대기
                     await WaitForReceivedBufferChangeAsync(observedVersion, cancellationToken);
                     continue;
                 }
+                // 계측: buffer에서 complete packet list를 추출하는 비용
+                OnNetworkOperationDuration(
+                    "receive-packet-extract",
+                    Stopwatch.GetElapsedTime(packetExtractStartedTimestamp));
 
                 foreach (var basePacket in basePackets)
                 {
@@ -674,8 +769,15 @@ public abstract class BaseSession
                     // Packet complete: received packet/bytes hook 호출 기준
                     OnNetworkPacketReceived(basePacket);
 
+                    // 계측 기준점: parser ready부터 bounded channel enqueue 완료까지의 비용
+                    long channelWriteStartedTimestamp = GetNetworkTimestamp();
+                    var packetItem = new ReceivedPacketItem(basePacket, channelWriteStartedTimestamp);
                     // Channel에 패킷 전송
-                    await m_ReceivedPackets.Writer.WriteAsync(basePacket, cancellationToken);
+                    await m_ReceivedPackets.Writer.WriteAsync(packetItem, cancellationToken);
+                    // 계측: channel backpressure로 parser worker가 대기한 시간
+                    OnNetworkOperationDuration(
+                        "receive-packet-channel-write",
+                        Stopwatch.GetElapsedTime(channelWriteStartedTimestamp));
                 }
             }
         }

@@ -149,7 +149,8 @@ public sealed record ServerObservedMetricsSnapshot(
     IReadOnlyDictionary<string, long>? DisconnectCountsByReason = null,
     long IdleTimeoutDisconnects = 0,
     double IdleTimeoutDisconnectsPerSecond = 0,
-    long MaxIdleTimeoutAgeMs = 0)
+    long MaxIdleTimeoutAgeMs = 0,
+    IReadOnlyDictionary<string, ObservedOperationDurationSnapshot>? OperationDurations = null)
 {
     public static ServerObservedMetricsSnapshot FromTelemetry(
         ServerTelemetrySnapshot current,
@@ -203,7 +204,8 @@ public sealed record ServerObservedMetricsSnapshot(
             DisconnectCountsByReason: current.DisconnectCountsByReason,
             IdleTimeoutDisconnects: current.IdleTimeoutDisconnects,
             IdleTimeoutDisconnectsPerSecond: Rate(current.IdleTimeoutDisconnects, previous?.IdleTimeoutDisconnects, elapsedSeconds),
-            MaxIdleTimeoutAgeMs: current.MaxIdleTimeoutAgeMs);
+            MaxIdleTimeoutAgeMs: current.MaxIdleTimeoutAgeMs,
+            OperationDurations: current.OperationDurations);
     }
 
     private static double Rate(long current, long? previous, double elapsedSeconds)

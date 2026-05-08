@@ -79,6 +79,26 @@ public sealed class ServerTelemetryTests
     }
 
     [TestMethod]
+    public void ServerTelemetryCollector_OperationDurations_TrackCountAverageAndMax()
+    {
+        var telemetry = new ServerTelemetryCollector();
+
+        telemetry.RecordOperationDuration("accept-session-create", TimeSpan.FromMilliseconds(5));
+        telemetry.RecordOperationDuration("accept-session-create", TimeSpan.FromMilliseconds(15));
+        telemetry.RecordOperationDuration("accept-task-start", TimeSpan.FromMilliseconds(3));
+        telemetry.RecordOperationDuration("ignore-zero", TimeSpan.Zero);
+
+        ServerTelemetrySnapshot snapshot = telemetry.CreateSnapshot();
+
+        Assert.IsNotNull(snapshot.OperationDurations);
+        Assert.AreEqual(2, snapshot.OperationDurations["accept-session-create"].Count);
+        Assert.AreEqual(10, snapshot.OperationDurations["accept-session-create"].AverageMs, 0.001);
+        Assert.AreEqual(15, snapshot.OperationDurations["accept-session-create"].MaxMs, 0.001);
+        Assert.AreEqual(1, snapshot.OperationDurations["accept-task-start"].Count);
+        Assert.IsFalse(snapshot.OperationDurations.ContainsKey("ignore-zero"));
+    }
+
+    [TestMethod]
     public void ServerTelemetryCollector_Reset_ClearsCounters()
     {
         var telemetry = new ServerTelemetryCollector();
@@ -96,6 +116,7 @@ public sealed class ServerTelemetryTests
         telemetry.RecordParseError();
         telemetry.RecordProtocolError();
         telemetry.RecordAcceptError();
+        telemetry.RecordOperationDuration("accept-first-receive", TimeSpan.FromMilliseconds(5));
 
         telemetry.Reset();
 
@@ -129,6 +150,7 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(0, snapshot.ParseErrors);
         Assert.AreEqual(0, snapshot.ProtocolErrors);
         Assert.AreEqual(0, snapshot.AcceptErrors);
+        Assert.IsNull(snapshot.OperationDurations);
     }
 
     [TestMethod]
@@ -168,6 +190,7 @@ public sealed class ServerTelemetryTests
 
         Assert.AreEqual("0.0.0.0", options.Host);
         Assert.AreEqual(6628, options.Port);
+        Assert.AreEqual(4096, options.ListenBacklog);
     }
 
     [TestMethod]
@@ -177,6 +200,7 @@ public sealed class ServerTelemetryTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["FastPortTestSmokeServer:Host"] = "127.0.0.2",
+                ["FastPortTestSmokeServer:ListenBacklog"] = "4096",
                 ["FastPortSmokeServer:Host"] = "127.0.0.1"
             })
             .Build();
@@ -184,6 +208,7 @@ public sealed class ServerTelemetryTests
         IConfigurationSection section = FastPortTestSmokeServer.FastPortTestSmokeServerConfiguration.GetServerSection(configuration);
 
         Assert.AreEqual("127.0.0.2", section["Host"]);
+        Assert.AreEqual("4096", section["ListenBacklog"]);
     }
 
     [TestMethod]

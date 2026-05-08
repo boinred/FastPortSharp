@@ -41,7 +41,11 @@ public sealed class ObservedMetricsTests
             SocketErrorCountsByClass: new Dictionary<string, long> { ["send|SocketException|ConnectionReset"] = 2 },
             DisconnectCountsByReason: new Dictionary<string, long> { ["idle-timeout"] = 1 },
             IdleTimeoutDisconnects: 1,
-            MaxIdleTimeoutAgeMs: 1234);
+            MaxIdleTimeoutAgeMs: 1234,
+            OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
+            {
+                ["accept-first-receive"] = new(Count: 3, AverageMs: 4.5, MaxMs: 9.5)
+            });
 
         ServerObservedMetricsSnapshot observed = ServerObservedMetricsSnapshot.FromTelemetry(raw);
 
@@ -71,6 +75,9 @@ public sealed class ObservedMetricsTests
         Assert.AreEqual(1, observed.DisconnectCountsByReason!["idle-timeout"]);
         Assert.AreEqual(1, observed.IdleTimeoutDisconnects);
         Assert.AreEqual(1234, observed.MaxIdleTimeoutAgeMs);
+        Assert.IsNotNull(observed.OperationDurations);
+        Assert.AreEqual(3, observed.OperationDurations["accept-first-receive"].Count);
+        Assert.AreEqual(9.5, observed.OperationDurations["accept-first-receive"].MaxMs, 0.001);
         Assert.AreEqual(1, observed.AcceptErrorCount);
         Assert.AreEqual(2, observed.SocketErrorCount);
         Assert.AreEqual(3, observed.ParseErrorCount);
@@ -201,7 +208,11 @@ public sealed class ObservedMetricsTests
             SendRejectedBytes: 256,
             SendDrainYieldCount: 3,
             IdleTimeoutDisconnects: 1,
-            MaxIdleTimeoutAgeMs: 1234));
+            MaxIdleTimeoutAgeMs: 1234,
+            OperationDurations: new Dictionary<string, ObservedOperationDurationSnapshot>
+            {
+                ["accept-task-start"] = new(Count: 2, AverageMs: 1.5, MaxMs: 2.5)
+            }));
 
         string json = ObservedMetricsJson.Serialize(ObservedMetricsSnapshot.FromServer(observed));
 
@@ -214,6 +225,7 @@ public sealed class ObservedMetricsTests
         Assert.IsTrue(json.Contains("\"sendAbandonedRequests\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"idleTimeoutDisconnects\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"maxIdleTimeoutAgeMs\"", StringComparison.Ordinal));
+        Assert.IsTrue(json.Contains("\"operationDurations\"", StringComparison.Ordinal));
         Assert.IsTrue(json.Contains("\"totalParsedPacketBytes\"", StringComparison.Ordinal));
         Assert.IsFalse(json.Contains("TotalSendCompletions", StringComparison.Ordinal));
 
@@ -221,6 +233,7 @@ public sealed class ObservedMetricsTests
         Assert.IsTrue(document.RootElement.TryGetProperty("serverObserved", out JsonElement serverObserved));
         Assert.IsTrue(serverObserved.TryGetProperty("totalSendCompletions", out _));
         Assert.AreEqual(5, serverObserved.GetProperty("totalSendRequests").GetInt64());
+        Assert.AreEqual(2, serverObserved.GetProperty("operationDurations").GetProperty("accept-task-start").GetProperty("count").GetInt64());
     }
 
     [TestMethod]

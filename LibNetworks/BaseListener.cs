@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Net.Sockets;
 using LibNetworks.Sessions;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,8 @@ namespace LibNetworks;
 
 public abstract class BaseListener : BaseSocket
 {
-    
+    // 목적: 10K ramp-up 중 TCP connect queue 포화를 줄이기 위한 기본 listen backlog
+    private const int C_DefaultListenBacklog = 4096;
 
     // TODO : 파일 설정에서 불러온다.
     private readonly int C_MaxConnections;
@@ -39,6 +41,16 @@ public abstract class BaseListener : BaseSocket
     {
     }
 
+    // Accept 이후 hook: session factory 생성 비용 및 accept 기준 시각 계측 연결점
+    protected virtual void OnAcceptSessionCreated(Socket clientSocket, BaseSessionClient clientSession, TimeSpan duration, long acceptCompletedTimestamp)
+    {
+    }
+
+    // Accept 이후 hook: OnAccepted task scheduling 지연 및 task 시작 시각 계측 연결점
+    protected virtual void OnAcceptSessionTaskStarted(Socket clientSocket, BaseSessionClient clientSession, TimeSpan duration, long onAcceptedStartedTimestamp)
+    {
+    }
+
     // Accept 실패 hook: phase 포함 accept failure classification 연결점
     protected virtual void OnAcceptFailed(string phase, SocketError? socketError, Exception? exception)
     {
@@ -61,7 +73,14 @@ public abstract class BaseListener : BaseSocket
     {
     }
 
+    // 흐름: 기존 호출자는 기본 backlog를 사용하도록 유지
     public bool StartAccept(string ip, int port)
+    {
+        return StartAccept(ip, port, C_DefaultListenBacklog);
+    }
+
+    // 흐름: caller가 지정한 backlog로 listener socket을 시작
+    public bool StartAccept(string ip, int port, int backlog)
     {
         if (!AddressConverter.TryToEndPoint(ip, port, out var endPoint))
         {
@@ -74,9 +93,12 @@ public abstract class BaseListener : BaseSocket
 
         try
         {
+            // 설정: 잘못된 backlog 값은 안전한 기본값으로 보정
+            int normalizedBacklog = NormalizeListenBacklog(backlog);
+
             m_Socket.Bind(endPoint!);
 
-            m_Socket.Listen(100);
+            m_Socket.Listen(normalizedBacklog);
 
 
             m_SocketEvent.Completed += OnSocketEventsAcceptCompleted;
@@ -91,6 +113,13 @@ public abstract class BaseListener : BaseSocket
         }
 
         return false;
+    }
+
+    // 목적: 설정/환경변수에서 들어온 listen backlog 보정
+    private static int NormalizeListenBacklog(int backlog)
+    {
+        // 목적: appsettings/env override가 0 이하일 때 Listen 호출을 안정화
+        return backlog > 0 ? backlog : C_DefaultListenBacklog;
     }
 
     public void RequestShutdown()
@@ -134,6 +163,9 @@ public abstract class BaseListener : BaseSocket
 
     private void OnSocketEventsAcceptCompleted(object? sender, SocketAsyncEventArgs args)
     {
+        // 계측 기준점: accept completion callback 진입 시각
+        long acceptCompletedTimestamp = Stopwatch.GetTimestamp();
+
         //
         if (args.SocketError != SocketError.Success)
         {
@@ -160,9 +192,28 @@ public abstract class BaseListener : BaseSocket
 
         //new BaseSessionClient(clientSocket);
         BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
+        // 계측: accept callback 진입부터 session factory 완료까지의 비용
+        OnAcceptSessionCreated(
+            clientSocket,
+            clientSession,
+            Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
+            acceptCompletedTimestamp);
 
         // Add Session Managers
-        Task.Run(() => clientSession.OnAccepted());
+        Task.Run(() =>
+        {
+            // 계측 기준점: ThreadPool task가 실제 실행을 시작한 시각
+            long onAcceptedStartedTimestamp = Stopwatch.GetTimestamp();
+
+            // 계측: accept callback 진입부터 OnAccepted task 시작까지의 scheduling 지연
+            OnAcceptSessionTaskStarted(
+                clientSocket,
+                clientSession,
+                Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
+                onAcceptedStartedTimestamp);
+
+            clientSession.OnAccepted();
+        });
 
         Accept(m_SocketEvent);
     }
