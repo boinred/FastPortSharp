@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package fastport.sample;
+option csharp_namespace = "FastPortGameServerTemplate.Protocols";
+
+// Design Ref: §3.3 — minimal v1 echo contract.
+// Game-specific packet schemas should be added by the user in this folder.
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  int64 server_unix_ms = 2;
+}

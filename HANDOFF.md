@@ -220,31 +220,22 @@ Likely candidates:
 - `receive-timeout-tail-flow-control`
 - `send-throughput-drain-fairness-optimization`
 
-### 3. Game Server Template Foundation
+### 3. Game Server Template Foundation — COMPLETED (2026-05)
 
-Recommended feature name:
+Feature: `game-server-template-from-network-engine` — archived at
+`docs/archive/2026-05/game-server-template-from-network-engine/`.
 
-```text
-$pdca pm fastport-game-server-template-foundation
-```
+Delivered:
 
-Purpose:
+- `LibCommons` / `LibNetworks` carry local package metadata (`PackageId=FastPort.Common`/`FastPort.Networks`, MIT, repo URL, tags) for identification only; `GeneratePackageOnBuild=false`.
+- New `FastPortGameServerTemplate` project: Generic Host + Serilog + Protobuf (`Sample.proto`, `Grpc.Tools`, `GrpcServices=None`) + GameServer/HostedService + GameSession/Factory + IPacketHandler/EchoHandler/PacketDispatcher + IGameServerTelemetry/Null impl.
+- New `FastPortGameServerTemplate.SampleClient` project: full Protobuf echo round-trip verification client (EchoRequest 1001 → EchoResponse 1002, loopback RTT ~14ms).
+- Full solution build and 139-test suite remain green.
 
-- Turn the optimized engine shape into a usable server template.
-- Keep responsibilities separated:
-  - `LibNetworks`: protocol-neutral engine core.
-  - `FastPortServer`: basic network engine host/sample.
-  - `FastPortTestSmokeServer`: echo/load validation server.
-  - future game template: game protocol/session/handler replacement points.
+**NuGet upload to nuget.org is out of scope** — consumers use FastPortSharp as a GitHub Template Repository (clone / fork) or via ProjectReference within the same solution.
 
-Expected scope:
-
-- game session base sample
-- packet handler registration pattern
-- startup/config/logging defaults
-- telemetry hook points
-- health/startup verification
-- README or template usage guide
+Out of scope (separate-cycle candidates only): room/matchmaking, auth, game-level
+heartbeat, game loop / tick, UDP, Unity client SDK, MAUI dashboard.
 
 ### 4. MAUI Dashboard
 
@@ -278,7 +269,10 @@ Initial views should focus on:
 - `LibNetworks` should stay protocol-neutral.
 - Smoke/load-test behavior belongs in `FastPortTestSmokeServer`, `FastPortTestLoadRunner`, and `FastPortTestLoadValidation`.
 - Do not move echo/smoke protocol behavior back into `FastPortServer`.
-- `FastPortServer` should remain a basic network engine host/sample until the game server template is explicitly designed.
+- `FastPortServer` should remain a basic network engine host/sample. Game server bootstrap concerns live in `FastPortGameServerTemplate` (added 2026-05).
+- `FastPortGameServerTemplate` depends only on `LibCommons` + `LibNetworks` (engine boundary). It must not reference `FastPortServer`, `FastPortClient`, `Protocols/`, `LibTestTelemetry`, or any test project.
+- Engine packages `FastPort.Common` (= `LibCommons`) and `FastPort.Networks` (= `LibNetworks`) carry package metadata locally for identification, but `GeneratePackageOnBuild=false` and **publishing to nuget.org is explicitly out of scope**. The FastPortSharp repository itself acts as the GitHub Template Repository for `FastPortGameServerTemplate`; consumers should clone/fork the repo or use ProjectReference inside the same solution.
+- Engine and template are versioned independently within the repo (`engine-v*` vs `template-v*` release tags); coupling is via ProjectReference, not NuGet.
 - High-load generated artifacts remain under `artifacts/load-validation/` and should not be committed.
 - Same-machine 10K results are useful for comparison, but server/runner split-machine validation is still needed before claiming production capacity.
 - GitHub Actions should not deploy to OCI from this public repository; cloud validation should use local scripts plus OCI CLI/SSH unless a separate hardening pass is approved.

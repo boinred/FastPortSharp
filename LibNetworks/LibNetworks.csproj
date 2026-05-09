@@ -1,9 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- Design Ref: §3.1 — NuGet metadata aligned ahead of publish. Publish itself is deferred to the next cycle. -->
+    <PackageId>FastPort.Networks</PackageId>
+    <Version>0.1.0-preview</Version>
+    <Authors>boinred</Authors>
+    <Description>Protocol-neutral TCP listener/session engine validated at 10K concurrent sessions, used by FastPort game server template.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/boinred/FastPortSharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/boinred/FastPortSharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>tcp;game-server;networking;dotnet10;fastport;iocp</PackageTags>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>

@@ -37,6 +37,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadValidation"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibTestTelemetry", "LibTestTelemetry\LibTestTelemetry.csproj", "{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate", "FastPortGameServerTemplate\FastPortGameServerTemplate.csproj", "{192C731C-E783-441B-BFC3-52775879C7CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate.SampleClient", "FastPortGameServerTemplate.SampleClient\FastPortGameServerTemplate.SampleClient.csproj", "{592EDD14-1F1B-4962-9BEE-203D6069FB70}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -167,6 +171,30 @@ Global
 		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x64.Build.0 = Release|Any CPU
 		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x86.ActiveCfg = Release|Any CPU
 		{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}.Release|x86.Build.0 = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|x64.Build.0 = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Debug|x86.Build.0 = Debug|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|x64.ActiveCfg = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|x64.Build.0 = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|x86.ActiveCfg = Release|Any CPU
+		{192C731C-E783-441B-BFC3-52775879C7CE}.Release|x86.Build.0 = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|x64.Build.0 = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Debug|x86.Build.0 = Debug|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|x64.ActiveCfg = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|x64.Build.0 = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|x86.ActiveCfg = Release|Any CPU
+		{592EDD14-1F1B-4962-9BEE-203D6069FB70}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,16 +1,21 @@
 # 🚀 FastPortSharp
 
-**High-Performance Asynchronous TCP Socket Server/Client Framework**
+**High-Performance .NET 10 TCP Engine + Game Server Starter Template**
 
 English | [한국어](README.ko.md)
 
-A scalable network library based on .NET 10, designed for applications requiring large-scale concurrent connections, such as game servers and real-time communication systems.
+FastPortSharp pairs a validated `SocketAsyncEventArgs`-based TCP engine
+(10K concurrent sessions tested) with a ready-to-bootstrap game server
+template. Use this repository as a GitHub Template Repository to spin up a
+new C# / .NET 10 game server in minutes — focus on game logic, not on
+sockets, buffers, or framing.
 
 ---
 
 ## 📋 Table of Contents
 
 - [Project Overview](#-project-overview)
+- [Game Server Template](#-game-server-template)
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
 - [Performance Benchmarks](#-performance-benchmarks)
@@ -25,13 +30,111 @@ A scalable network library based on .NET 10, designed for applications requiring
 
 ## 🎯 Project Overview
 
-FastPortSharp is a framework for high-performance network communication. It achieves high throughput with minimal memory allocation using `SocketAsyncEventArgs`-based asynchronous I/O patterns and efficient buffer management.
+FastPortSharp is a two-layer offering:
+
+- **Engine** (`LibCommons` + `LibNetworks`) — protocol-neutral TCP listener /
+  session / connector primitives validated under 10K concurrent sessions.
+  Built on `SocketAsyncEventArgs` IOCP, `Channel<T>`, ArrayPool-backed
+  circular buffers, and the .NET 10 lightweight `Lock`.
+- **Game Server Template** (`FastPortGameServerTemplate` +
+  `FastPortGameServerTemplate.SampleClient`) — a Generic Host based starter
+  with Serilog, Protobuf, and a session / handler / dispatcher trio that
+  consumes the engine. Drop in your `.proto` files and handlers and you have
+  a game server.
 
 ### Motivation
 
-- Reliable network processing in large-scale concurrent connection environments
-- Modular and reusable network component design
-- Efficient serialization/deserialization using Protocol Buffers
+- Reliable network processing in large-scale concurrent connection environments.
+- Modular, reusable engine components that can be embedded in any .NET host.
+- A "0 → 1 game server in minutes" path that stays opinionated only where it
+  matters (host wiring, framing, telemetry hook) and out of the way everywhere else.
+
+---
+
+## 🎮 Game Server Template
+
+`FastPortGameServerTemplate/` is the starter project for building a new game
+server on top of the validated TCP engine (`LibCommons` + `LibNetworks`). It
+ships pre-wired with Generic Host, Serilog, Protobuf, and a session / handler /
+dispatcher trio so you can focus on game logic instead of plumbing.
+
+### What you get out of the box
+
+| Concern | Implementation |
+|---|---|
+| Hosting | `Microsoft.Extensions.Hosting` (`Host.CreateApplicationBuilder`) |
+| Logging | Serilog Console sink, configured from `appsettings.json` |
+| Listener | `GameServer : LibNetworks.BaseMessageListener` |
+| Per-session | `GameSession : LibNetworks.Sessions.BaseSessionClient` |
+| Dispatch | `PacketDispatcher` routes packet id → `IPacketHandler` |
+| Sample protocol | `Sample.proto` (Grpc.Tools, `GrpcServices=None`) — `EchoRequest` (1001) / `EchoResponse` (1002) |
+| Telemetry hook | `IGameServerTelemetry` + `NullGameServerTelemetry` (replace via DI) |
+| Sample client | `FastPortGameServerTemplate.SampleClient/` for verifying full echo round-trip |
+| Config | `appsettings.json` → `GameServerOptions` (listen address / port / max sessions) |
+
+The template references **only** `LibCommons` + `LibNetworks` — never
+`FastPortServer`, `FastPortClient`, `Protocols/`, or any test project. This
+keeps the engine boundary clean and your game-server code free of test scaffolding.
+
+### Quickstart
+
+```bash
+# 1. Build the whole solution
+dotnet build FastPortCharp.sln -c Release
+
+# 2. Start the template server (terminal 1)
+dotnet run --project FastPortGameServerTemplate -c Release
+# → "GameServer listening" on 0.0.0.0:7777
+
+# 3. Verify a full Protobuf echo round-trip (terminal 2)
+dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+# → "EchoResponse received. Message=\"Hello, FastPort!\", RTT=...ms"
+```
+
+Listen address / port / max sessions are configured in
+`FastPortGameServerTemplate/appsettings.json`.
+
+### Customising the server
+
+1. **Add a new packet** — drop a `.proto` into `FastPortGameServerTemplate/Protocols/`.
+   Grpc.Tools regenerates C# classes on `dotnet build`. Add the new packet id
+   to `Handlers/PacketIds.cs` (use `≥ 2000` for user-defined ids).
+
+2. **Implement a handler**:
+
+   ```csharp
+   public sealed class MyHandler : IPacketHandler
+   {
+       public int PacketId => PacketIds.MyRequest;
+       public void Handle(GameSession session, BasePacket packet) { /* ... */ }
+   }
+   ```
+
+3. **Register it** in `Program.cs`:
+
+   ```csharp
+   builder.Services.AddSingleton<IPacketHandler, MyHandler>();
+   ```
+
+4. **Replace the telemetry hook** with your own `IGameServerTelemetry`
+   implementation (e.g. backed by OpenTelemetry) by overriding the DI
+   registration in `Program.cs`.
+
+5. **Tune buffer sizes** in `Sessions/GameSessionFactory.cs`
+   (`BufferCapacityBytes`, default `8 KiB` — same as the validated 10K-session
+   benchmark configuration).
+
+### Distribution
+
+This repository is the GitHub Template Repository for the game server
+template. Click **"Use this template"** on GitHub, or `git clone`/`fork`,
+then prune the projects you don't need. **Uploading the engine to nuget.org
+is intentionally out of scope** — consumers either clone the repo or reuse
+the engine via `ProjectReference` within the same solution.
+
+For the full step-by-step walkthrough and Korean version, see
+`FastPortGameServerTemplate/README.md` and
+`FastPortGameServerTemplate/QUICKSTART.ko.md`.
 
 ---
 
@@ -40,12 +143,14 @@ FastPortSharp is a framework for high-performance network communication. It achi
 | Feature | Description |
 |------|------|
 | **Async I/O** | High concurrency processing with `SocketAsyncEventArgs`-based IOCP pattern |
-| **Circular Buffer** | Minimized GC pressure through memory reuse |
-| **Protocol Buffers** | Efficient message serialization based on Google Protobuf |
+| **Circular Buffer** | ArrayPool-backed circular buffer minimises GC pressure under sustained throughput |
+| **Channel\<T\>** | Bounded `Channel<T>` for receive/send pipelines — 4× faster, 69% less memory than `BufferBlock<T>` |
+| **Protocol Buffers** | Efficient message serialization based on Google Protobuf, generated via Grpc.Tools |
 | **Session Management** | Flexible session creation and management based on the Factory pattern |
 | **Keep-Alive** | Connection state monitoring via TCP Keep-Alive settings |
-| **BackgroundService** | Service lifecycle management based on .NET Generic Host |
-| **Latency Statistics** | Real-time measurement of RTT, server processing time, and network delay |
+| **Generic Host** | `Microsoft.Extensions.Hosting` lifecycle for both server and client |
+| **Game Server Template** | Drop-in starter with Serilog, Protobuf, session / handler / dispatcher pre-wired |
+| **Latency Statistics** | Real-time RTT, server processing time, and network delay measurement (load runner) |
 
 ---
 
@@ -55,11 +160,12 @@ FastPortSharp is a framework for high-performance network communication. It achi
 |------|------|
 | Language | C# 14 / .NET 10 |
 | Async Pattern | SocketAsyncEventArgs (IOCP) |
-| Serialization | Google Protocol Buffers |
+| Concurrency | **Channel\<T\>**, .NET 10 `Lock` |
+| Serialization | Google Protocol Buffers + Grpc.Tools (gen, no gRPC runtime) |
 | DI Container | Microsoft.Extensions.DependencyInjection |
-| Hosting | Microsoft.Extensions.Hosting |
-| Concurrency | **Channel\<T\>**, .NET 10 Lock |
-| Testing | MSTest, FastPortTestLoadRunner |
+| Hosting | Microsoft.Extensions.Hosting (Generic Host) |
+| Logging | Serilog (template) / Microsoft.Extensions.Logging |
+| Testing | MSTest, FastPortTestLoadRunner, FastPortTestLoadValidation |
 
 ---
 
@@ -72,8 +178,8 @@ FastPortSharp is a framework for high-performance network communication. It achi
 | Item | Result | Note |
 |------|------|------|
 | **CircularBuffer Write** | 244~670 ns | 64B~8KB data |
-| **CircularBuffer vs QueueBuffer** | **20x faster** | Based on 4KB data |
-| **Channel vs BufferBlock** | **4x faster** | 69% memory savings |
+| **CircularBuffer vs QueueBuffer** | **20× faster** | Based on 4KB data |
+| **Channel vs BufferBlock** | **4× faster** | 69% memory savings |
 | **.NET 10 Lock vs lock** | **9% faster** | Based on 10,000 iterations |
 
 ### 📈 Detailed Benchmark Results
@@ -109,7 +215,7 @@ dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --pay
 | Average RTT | 96.03 ms | 55.68 ms | **42.0%↓** |
 | Server Processing Time | 0.234 ms | 0.002 ms | **99.1%↓** |
 | Max RTT | 434.40 ms | 83.13 ms | **80.9%↓** |
-| Throughput | ~489/min | ~1,080/min | **2.2x↑** |
+| Throughput | ~489/min | ~1,080/min | **2.2×↑** |
 
 ---
 
@@ -119,82 +225,85 @@ dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --pay
 
 ```mermaid
 flowchart TB
-    subgraph Client ["FastPortClient"]
-        CC[FastPortConnector]
-        CSS[FastPortServerSession]
-        CBS[BackgroundService]
+    subgraph Template ["🎮 FastPortGameServerTemplate"]
+        GS[GameServer : BaseMessageListener]
+        GHS[GameServerHostedService]
+        GSE[GameSession : BaseSessionClient]
+        PD[PacketDispatcher]
+        PH[IPacketHandler / EchoHandler]
+        TGT[IGameServerTelemetry]
+        SP[Sample.proto]
     end
-    
-    subgraph Server ["FastPortServer"]
-        FS[FastPortServer]
-        FCS[FastPortClientSession]
-        FSM[SessionManager]
-        SBS[BackgroundService]
+
+    subgraph SampleClient ["🧪 FastPortGameServerTemplate.SampleClient"]
+        SC[SampleClientConnector : BaseMessageConnector]
+        SCS[SampleClientSession : BaseSessionServer]
+        ES[EchoSignal]
     end
-    
-    subgraph LibNetworks ["LibNetworks"]
-        BL[BaseListener]
-        BC[BaseConnector]
-        BS[BaseSession]
+
+    subgraph LibNetworks ["📦 LibNetworks (engine)"]
+        BL[BaseListener / BaseMessageListener]
+        BC[BaseConnector / BaseMessageConnector]
+        BS[BaseSession / BaseSessionClient / BaseSessionServer]
         SEP[SocketEventsPool]
     end
-    
-    subgraph LibCommons ["LibCommons"]
-        CB[CircularBuffer]
+
+    subgraph LibCommons ["📦 LibCommons (engine)"]
+        CB[ArrayPoolCircularBuffers]
         BP[BasePacket]
         IDG[IDGenerator]
-        LS[LatencyStats]
     end
-    
-    subgraph Protocols ["Protocols"]
-        PB[Protobuf Messages]
-    end
-    
-    CC --> BC
-    CSS --> BS
-    FS --> BL
-    FCS --> BS
-    
+
+    GS --> BL
+    GHS --> GS
+    GSE --> BS
+    GSE --> PD
+    PD --> PH
+    PD --> TGT
+    SP --> GSE
+
+    SC --> BC
+    SCS --> BS
+    SC --> SCS
+    SCS --> ES
+
     BS --> CB
     BS --> BP
-    
-    FCS --> PB
-    CSS --> PB
-    
-    CBS --> CC
-    SBS --> FS
-    
-    CSS --> LS
+    BL --> SEP
+    BC --> SEP
+
+    SCS -. EchoRequest 1001 / EchoResponse 1002 .-> GSE
 ```
 
-### Server Connection Flow
+### Server Connection Flow (template)
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant L as BaseListener
-    participant SF as SessionFactory
-    participant S as ClientSession
-    participant B as CircularBuffer
-    
-    C->>L: TCP Connect
-    L->>L: AcceptAsync()
+    participant C as SampleClient
+    participant L as GameServer (Listener)
+    participant SF as GameSessionFactory
+    participant S as GameSession
+    participant D as PacketDispatcher
+    participant H as EchoHandler
+
+    C->>L: TCP Connect (127.0.0.1:7777)
     L->>SF: Create(socket)
-    SF->>S: new ClientSession()
-    S->>B: Initialize Buffers
+    SF->>S: new GameSession(...)
     S->>S: OnAccepted()
-    
-    loop Message Processing
-        C->>S: Send Data
-        S->>B: Write(data)
-        B->>S: TryGetBasePackets()
-        S->>S: OnReceived(packet)
-        S->>C: SendMessage(response)
-    end
-    
+    C->>S: EchoRequest(1001, "Hello")
+    S->>D: Dispatch(packet)
+    D->>H: Handle(session, packet)
+    H->>S: session.Send(EchoResponse, 1002)
+    S->>C: EchoResponse(1002, "Hello", serverUnixMs)
     C->>S: Disconnect
     S->>S: OnDisconnected()
 ```
+
+> Engine validation projects (`FastPortServer`, `FastPortClient`,
+> `FastPortTestSmokeServer`, `FastPortTestLoadRunner`,
+> `FastPortTestLoadValidation`, `FastPortTests`) consume the same engine
+> primitives but live separately from the template — see Project Structure
+> below.
 
 ---
 
@@ -202,32 +311,72 @@ sequenceDiagram
 
 ```
 FastPortSharp/
-├── 📂 LibCommons/                 # Common utility library
-│   ├── BaseCircularBuffers.cs     # Circular buffer implementation (.NET 10 Lock)
-│   ├── ArrayPoolCircularBuffers.cs # ArrayPool-based circular buffer
-│   ├── BasePacket.cs              # Packet structure
-│   ├── LatencyStats.cs            # Latency statistics collection
-│   └── IBuffers.cs                # Buffer interface
+├── 📂 LibCommons/                            # Engine: buffers, packet, IDs
+│   ├── BaseCircularBuffers.cs                 # Circular buffer (.NET 10 Lock)
+│   ├── ArrayPoolCircularBuffers.cs            # ArrayPool-backed circular buffer
+│   ├── BasePacket.cs                          # Packet structure
+│   ├── IBuffers.cs                            # Buffer interface
+│   ├── IDGenerator.cs                         # Session/request id generator
+│   └── LatencyStats.cs                        # Latency stats (used by load runner)
 │
-├── 📂 LibNetworks/                # Network core library
-│   ├── BaseListener.cs            # TCP listener base
-│   ├── BaseConnector.cs           # TCP connector base
-│   ├── SocketEventsPool.cs        # SocketAsyncEventArgs pool
+├── 📂 LibNetworks/                           # Engine: TCP listener / session / connector
+│   ├── BaseListener.cs / BaseMessageListener.cs
+│   ├── BaseConnector.cs / BaseMessageConnector.cs
+│   ├── SocketEventsPool.cs
+│   ├── Extensions/BasePacket+Extensions.cs    # ParseMessageFromPacket<T>
 │   └── 📂 Sessions/
-│       ├── BaseSession.cs         # Session core logic (Channel<T>)
+│       ├── BaseSession.cs                      # Channel<T> + ArrayPool framing
+│       ├── BaseSessionClient.cs                # Server-side accepted session
+│       ├── BaseSessionServer.cs                # Client-side outgoing session
 │       └── IClientSessionFactory.cs
 │
-├── 📂 FastPortServer/             # TCP server application
-├── 📂 FastPortClient/             # TCP client application
-├── 📂 Protocols/                  # Protocol Buffers definitions
-├── 📂 FastPortTestLoadRunner/         # TCP load test runner
-├── 📂 FastPortTests/              # Unit tests
-└── 📂 docs/                       # Documentation
-    ├── latency-performance-report.md           # Pre-optimization performance report
-    ├── latency-performance-report-after-lock.md # Lock-optimized report
-    ├── baseline-benchmark-results.md           # Benchmark results
-    └── FastPortSharp-Optimization-Guide-Confluence.md
+├── 🎮 FastPortGameServerTemplate/            # Game server starter (template)
+│   ├── Application/
+│   │   ├── GameServer.cs                       # : BaseMessageListener
+│   │   ├── GameServerHostedService.cs          # IHostedService lifecycle
+│   │   └── PacketDispatcher.cs
+│   ├── Sessions/
+│   │   ├── GameSession.cs                      # : BaseSessionClient
+│   │   └── GameSessionFactory.cs
+│   ├── Handlers/
+│   │   ├── IPacketHandler.cs
+│   │   ├── EchoHandler.cs                      # 1001 → 1002 round-trip sample
+│   │   └── PacketIds.cs
+│   ├── Telemetry/
+│   │   ├── IGameServerTelemetry.cs
+│   │   └── NullGameServerTelemetry.cs
+│   ├── Configuration/GameServerOptions.cs
+│   ├── Protocols/Sample.proto                  # Grpc.Tools, GrpcServices=None
+│   ├── Program.cs                              # Generic Host + Serilog wiring
+│   ├── appsettings.json
+│   ├── README.md / QUICKSTART.ko.md
+│   └── FastPortGameServerTemplate.csproj
+│
+├── 🧪 FastPortGameServerTemplate.SampleClient/  # Verifies full echo round-trip
+│   ├── Sessions/
+│   │   ├── SampleClientSession.cs              # : BaseSessionServer
+│   │   └── SampleClientSessionFactory.cs
+│   ├── SampleClientConnector.cs                # : BaseMessageConnector
+│   ├── SampleClientHostedService.cs            # Connects, sends 1001, awaits 1002
+│   ├── SampleClientOptions.cs / EchoSignal.cs
+│   ├── Program.cs / appsettings.json
+│   └── FastPortGameServerTemplate.SampleClient.csproj
+│
+├── 📂 FastPortServer/                        # Engine sample/host (validation)
+├── 📂 FastPortClient/                        # Engine sample/client (with LatencyStats)
+├── 📂 Protocols/                             # Engine-internal sample protocol
+├── 📂 FastPortTestSmokeServer/               # Smoke/echo test server
+├── 📂 FastPortTestLoadRunner/                # 10K-session load runner
+├── 📂 FastPortTestLoadValidation/            # Load validation harness
+├── 📂 FastPortTests/                         # MSTest unit tests (139 cases)
+├── 📂 LibTestTelemetry/                      # Test-only telemetry contracts (JSONL)
+│
+├── 📂 docs/                                  # Performance reports, PDCA archive
+└── FastPortCharp.sln
 ```
+
+> Naming note: the solution file is `FastPortCharp.sln` (legacy spelling
+> kept for git history continuity).
 
 ---
 
@@ -243,10 +392,10 @@ public class BaseCircularBuffers : IBuffers, IDisposable
     private byte[] m_Buffers;
     private int m_Head = 0;  // Read position
     private int m_Tail = 0;  // Write position
-    
+
     // Uses .NET 10 lightweight Lock
     private readonly Lock m_Lock = new();
-    
+
     public int Write(byte[] buffers, int offset, int count)
     {
         lock (m_Lock)
@@ -263,8 +412,8 @@ public class BaseCircularBuffers : IBuffers, IDisposable
 Uses `Channel<T>` for high-performance asynchronous message delivery.
 
 ```csharp
-// 4x faster and 69% memory savings compared to BufferBlock<T>
-private readonly Channel<BasePacket> m_ReceivedPackets = 
+// 4× faster and 69% memory savings compared to BufferBlock<T>
+private readonly Channel<BasePacket> m_ReceivedPackets =
     Channel.CreateBounded<BasePacket>(new BoundedChannelOptions(1000)
     {
         FullMode = BoundedChannelFullMode.Wait,
@@ -272,7 +421,6 @@ private readonly Channel<BasePacket> m_ReceivedPackets =
         SingleWriter = true
     });
 
-// Packet processing loop
 await foreach (var packet in m_ReceivedPackets.Reader.ReadAllAsync(cancellationToken))
 {
     OnReceived(packet);
@@ -287,47 +435,46 @@ public interface IClientSessionFactory
     BaseSessionClient Create(Socket socket);
 }
 
-public class FastPortClientSessionFactory : IClientSessionFactory
+// Template's GameSessionFactory wires session + dispatcher + telemetry.
+public sealed class GameSessionFactory : IClientSessionFactory
 {
-    public BaseSessionClient Create(Socket socket)
+    public BaseSessionClient Create(Socket clientSocket) => new GameSession(
+        m_Logger, clientSocket,
+        new ArrayPoolCircularBuffers(8 * 1024),
+        new ArrayPoolCircularBuffers(8 * 1024),
+        m_Dispatcher, m_Telemetry);
+}
+```
+
+### 4. Protobuf Round-Trip in the Template
+
+```csharp
+// Server (EchoHandler)
+public void Handle(GameSession session, BasePacket packet)
+{
+    if (!packet.ParseMessageFromPacket<EchoRequest>(out _, out var request) || request is null) return;
+    var response = new EchoResponse
     {
-        return new FastPortClientSession(_logger, socket, 
-            new ArrayPoolCircularBuffers(8192), 
-            new ArrayPoolCircularBuffers(8192));
-    }
+        Message = request.Message,
+        ServerUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+    };
+    session.Send(PacketIds.EchoResponse, response);
 }
+
+// Client (SampleClientSession.OnConnected)
+RequestSendMessage(PacketIds.EchoRequest, new EchoRequest { Message = "Hello, FastPort!" });
 ```
 
-### 4. Protocol Buffers Message Processing
+### 5. Wire Framing
 
-```csharp
-protected void RequestSendMessage<T>(int packetId, IMessage<T> message) 
-    where T : IMessage<T>
-{
-    Span<byte> packetIdBuffers = BitConverter.GetBytes(packetId);
-    ReadOnlySpan<byte> messageBuffers = message.ToByteArray();
-    
-    byte[] packetBuffers = new byte[packetIdBuffers.Length + messageBuffers.Length];
-    packetIdBuffers.CopyTo(packetBuffers);
-    messageBuffers.CopyTo(packetBuffers.AsSpan(packetIdBuffers.Length));
-    
-    RequestSendBuffers(packetBuffers);
-}
+```text
+[ 2-byte length header ][ int32 LE packet id ][ protobuf payload ... ]
 ```
 
-### 5. Latency Statistics Collection
-
-```csharp
-// appsettings.json configuration
-{
-  "LatencyStats": {
-    "EnableConsoleOutput": true,
-    "EnableFileOutput": true,
-    "OutputDirectory": "Stats",
-    "OutputFilePrefix": "latency_stats"
-  }
-}
-```
+`LibNetworks.Sessions.BaseSession.RequestSendMessage<T>` and
+`LibNetworks.Extensions.BasePacketExtensions.ParseMessageFromPacket<T>`
+encode and decode this framing — handlers and the dispatcher only see
+`BasePacket` and the strongly-typed Protobuf message.
 
 ---
 
@@ -336,25 +483,48 @@ protected void RequestSendMessage<T>(int packetId, IMessage<T> message)
 ### Prerequisites
 
 - .NET 10 SDK
-- Visual Studio 2022 or VS Code
+- Visual Studio 2022 / Rider / VS Code
 
-### Build and Run
+### Path A — Build a new game server (recommended)
 
 ```bash
-# Build solution
-dotnet build FastPortSharp.sln -c Release
+# Clone or "Use this template" on GitHub
+git clone https://github.com/boinred/FastPortSharp.git
+cd FastPortSharp
 
-# Run server
+# Build
+dotnet build FastPortCharp.sln -c Release
+
+# Run the template server
+dotnet run --project FastPortGameServerTemplate -c Release
+
+# In another terminal, verify the full echo round-trip
+dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+```
+
+Then customise `FastPortGameServerTemplate/` per the
+[Customising the server](#customising-the-server) section above.
+
+### Path B — Study the engine internals or run benchmarks
+
+```bash
+# Engine sample server / client (no game logic, raw echo on legacy protocol)
 dotnet run --project FastPortServer -c Release
-
-# Run client (in a new terminal)
 dotnet run --project FastPortClient -c Release
+
+# 10K-session load runner
+dotnet run -c Release --project FastPortTestLoadRunner -- \
+  --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
+
+# Smoke server with structured telemetry
+dotnet run --project FastPortTestSmokeServer -c Release
 ```
 
 ### Run Tests
 
 ```bash
-dotnet test FastPortTests
+dotnet test FastPortCharp.sln -c Release --no-build
+# 139 / 139 passed (as of 2026-05)
 ```
 
 ---
@@ -373,4 +543,4 @@ This project is licensed under the MIT License.
 
 ---
 
-> 💡 This project is continuously improving. Feedbacks and contributions are welcome!
+> 💡 This project is continuously improving. Feedback and contributions are welcome!
