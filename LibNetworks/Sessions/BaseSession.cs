@@ -63,34 +63,57 @@ public abstract class BaseSession
 
     private sealed class SendQueueItem
     {
+        // 상태: send worker가 telemetry 등록 이후 drain하도록 조율하는 플래그
         private int m_IsTelemetryRegistered;
+        // 상태: pooled buffer double-return 방지를 위한 one-shot 플래그
+        private int m_IsBufferReturned;
 
-        public SendQueueItem(byte[] buffer)
+        // 생성: ArrayPool rented array와 실제 packet byte 길이를 분리
+        public SendQueueItem(byte[] buffer, int length)
         {
             Buffer = buffer;
-            Length = buffer.Length;
+            Length = length;
         }
 
+        // 용도: socket send segment가 참조하는 rented backing array
         public byte[] Buffer { get; }
 
+        // 상태: partial send 이후 다음 전송 시작 위치
         public int Offset { get; private set; }
 
+        // 상태: rented array 길이가 아닌 실제 전송해야 할 packet byte 길이
         public int Length { get; }
 
+        // 상태: 아직 socket으로 drain되지 않은 byte 수
         public int Remaining => Length - Offset;
 
+        // 상태: logical packet byte가 모두 drain되었는지 여부
         public bool IsComplete => Offset >= Length;
 
+        // 상태: telemetry pending 등록 완료 여부
         public bool IsTelemetryRegistered => Volatile.Read(ref m_IsTelemetryRegistered) == 1;
 
+        // 목적: telemetry pending 등록 완료 publish
         public void MarkTelemetryRegistered()
         {
             Volatile.Write(ref m_IsTelemetryRegistered, 1);
         }
 
+        // 목적: socket send 성공 byte만큼 logical offset 전진
         public void Advance(int sentBytes)
         {
             Offset += sentBytes;
+        }
+
+        // 목적: send queue item 소유 pooled buffer를 정확히 한 번 반환
+        public void ReturnBuffer()
+        {
+            if (Interlocked.Exchange(ref m_IsBufferReturned, 1) != 0)
+            {
+                return;
+            }
+
+            ArrayPool<byte>.Shared.Return(Buffer);
         }
     }
 
@@ -549,19 +572,32 @@ public abstract class BaseSession
         // 계측 기준점: packet buffer 생성부터 send queue 등록까지의 enqueue 비용
         long sendEnqueueStartedTimestamp = GetNetworkTimestamp();
 
-        // List로 바꾸는 것도 고려
-        byte[] sendBuffers = new byte[buffersSize];
+        // 목적: per-send packet byte[] 할당 대신 pool에서 backing array 대여
+        byte[] sendBuffers = ArrayPool<byte>.Shared.Rent(buffersSize);
 
-        // 목적: 임시 byte[] 할당 없이 UInt16 packet size header 직접 기록
-        BinaryPrimitives.WriteUInt16LittleEndian(sendBuffers.AsSpan(0, BasePacket.HeaderSize), (ushort)buffersSize);
-        buffers.CopyTo(sendBuffers.AsSpan(BasePacket.HeaderSize));
+        try
+        {
+            // 목적: 임시 byte[] 할당 없이 UInt16 packet size header 직접 기록
+            BinaryPrimitives.WriteUInt16LittleEndian(sendBuffers.AsSpan(0, BasePacket.HeaderSize), (ushort)buffersSize);
+            buffers.CopyTo(sendBuffers.AsSpan(BasePacket.HeaderSize));
+        }
+        catch
+        {
+            // 예외 보정: queue 소유권 이전 전 실패한 rented buffer 반환
+            ArrayPool<byte>.Shared.Return(sendBuffers);
+            // 예외 보정: queue byte 예약 후 enqueue 전 실패한 경우 gauge rollback
+            ReleaseQueuedSendBytes(buffersSize);
+            throw;
+        }
 
 
-        m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {sendBuffers.Length}");
+        m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {buffersSize}");
 
-        var sendItem = new SendQueueItem(sendBuffers);
+        var sendItem = new SendQueueItem(sendBuffers, buffersSize);
         if (!m_SendQueue.Writer.TryWrite(sendItem))
         {
+            // Queue writer closed: queue가 소유하지 못한 pooled buffer 즉시 반환
+            sendItem.ReturnBuffer();
             int queuedBytesAfterRollback = ReleaseQueuedSendBytes(buffersSize);
             // Queue writer closed: 예약 byte rollback 후 rejection 기록
             OnNetworkSendRejected(buffersSize, queuedBytesAfterRollback);
@@ -815,9 +851,10 @@ public abstract class BaseSession
                             break;
                         }
 
+                        // 소유권: channel에서 꺼낸 item은 cancellation 경로에서도 반환되도록 pending에 먼저 보관
+                        pendingSendItems.Enqueue(sendItem);
                         // 순서: telemetry pending 등록 전 send completion이 먼저 찍히지 않도록 대기
                         await WaitForSendTelemetryRegistrationAsync(sendItem, cancellationToken);
-                        pendingSendItems.Enqueue(sendItem);
                     }
 
                     if (IsSendDrainBudgetExhausted(drainedBytesThisCycle, sendOperationsThisCycle))
@@ -916,6 +953,15 @@ public abstract class BaseSession
             OnNetworkSocketError("send-worker", ex.SocketErrorCode, ex);
             RequestDisconnect(NetworkDisconnectReason.SendSocketError);
         }
+        finally
+        {
+            // 정리: sendSegments가 pooled buffer를 더 이상 참조하지 않도록 먼저 비움
+            sendSegments.Clear();
+            // 정리: partial send 또는 cancellation으로 남은 pending item buffer 반환
+            ReturnPendingSendBuffers(pendingSendItems);
+            // 정리: disconnect/worker 종료 시 channel에 남은 item buffer 반환
+            DrainQueuedSendBuffers();
+        }
     }
 
     private static bool IsTransientSendBackpressure(SocketError socketError)
@@ -997,9 +1043,10 @@ public abstract class BaseSession
             && sendSegments.Count < MaxSendBatchSegments
             && m_SendQueue.Reader.TryRead(out SendQueueItem? item))
         {
+            // 소유권: channel에서 꺼낸 item은 build 중 cancellation에도 반환 가능하도록 pending에 먼저 등록
+            pendingSendItems.Enqueue(item);
             // 순서: batch 추가 item도 pending 등록 완료 후 segment 생성
             await WaitForSendTelemetryRegistrationAsync(item, cancellationToken);
-            pendingSendItems.Enqueue(item);
             if (!TryAppendSendSegment(item, maxBytes, sendSegments, ref totalBytes))
             {
                 break;
@@ -1061,12 +1108,32 @@ public abstract class BaseSession
 
             if (item.IsComplete)
             {
-                pendingSendItems.Dequeue();
+                SendQueueItem completedItem = pendingSendItems.Dequeue();
+                // 완료: fully-drained packet backing array를 pool로 반환
+                completedItem.ReturnBuffer();
                 completedItems++;
             }
         }
 
         return completedItems;
+    }
+
+    // 목적: send worker 종료 시 pending queue가 소유한 pooled buffer 반환
+    private static void ReturnPendingSendBuffers(Queue<SendQueueItem> pendingSendItems)
+    {
+        while (pendingSendItems.Count > 0)
+        {
+            pendingSendItems.Dequeue().ReturnBuffer();
+        }
+    }
+
+    // 목적: send worker 종료 시 channel에 drain되지 않은 pooled buffer 반환
+    private void DrainQueuedSendBuffers()
+    {
+        while (m_SendQueue.Reader.TryRead(out SendQueueItem? item))
+        {
+            item.ReturnBuffer();
+        }
     }
 
     private void RecordSendDrainYield()
