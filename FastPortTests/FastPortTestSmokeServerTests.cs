@@ -43,6 +43,21 @@ public sealed class FastPortTestSmokeServerTests
         AssertServerObservedMetrics(serverObserved, expectedAcceptedSessions: 2);
     }
 
+    [TestMethod]
+    public async Task FastPortTestSmokeServer_MultipleOutstandingAccepts_EchoesAndRecordsTelemetry()
+    {
+        await using FastPortTestSmokeServerTestHost server = await FastPortTestSmokeServerTestHost.StartAsync(outstandingAccepts: 2);
+
+        (MetricsSnapshot client, ServerTelemetrySnapshot serverSnapshot, ServerObservedMetricsSnapshot serverObserved) = await RunSmokeAsync(
+            server,
+            sessions: 4,
+            payload: PayloadProfile.Fixed(512));
+
+        AssertClientMetrics(client);
+        AssertServerTelemetry(serverSnapshot, expectedAcceptedSessions: 4);
+        AssertServerObservedMetrics(serverObserved, expectedAcceptedSessions: 4);
+    }
+
     private static async Task<(MetricsSnapshot Client, ServerTelemetrySnapshot Server, ServerObservedMetricsSnapshot ServerObserved)> RunSmokeAsync(
         FastPortTestSmokeServerTestHost server,
         int sessions,
@@ -180,7 +195,7 @@ public sealed class FastPortTestSmokeServerTests
 
         public IServerTelemetryExporter TelemetryExporter { get; }
 
-        public static async Task<FastPortTestSmokeServerTestHost> StartAsync()
+        public static async Task<FastPortTestSmokeServerTestHost> StartAsync(int outstandingAccepts = FastPortTestSmokeServer.FastPortTestSmokeServerOptions.DefaultOutstandingAccepts)
         {
             int port = GetFreeTcpPort();
             var telemetry = new ServerTelemetryCollector();
@@ -196,7 +211,8 @@ public sealed class FastPortTestSmokeServerTests
                     services.AddSingleton(new FastPortTestSmokeServer.FastPortTestSmokeServerOptions
                     {
                         Host = IPAddress.Loopback.ToString(),
-                        Port = port
+                        Port = port,
+                        OutstandingAccepts = outstandingAccepts
                     });
                     services.AddSingleton(new FastPortTestSmokeServer.Sessions.SessionIdleTrackerOptions
                     {

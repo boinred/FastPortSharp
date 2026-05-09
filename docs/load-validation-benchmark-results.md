@@ -1,12 +1,78 @@
 # Load Validation Benchmark Results
 
-> Last updated: 2026-05-06
+> Last updated: 2026-05-09
 
 `artifacts/load-validation/` is git ignored, so selected load-validation results are summarized here when they are used as a baseline or comparison point.
 
 ## Scope
 
 This document tracks same-machine `FastPortTestLoadValidation` results for the 10,000-session load path. It is separate from `docs/baseline-benchmark-results.md`, which records component-level micro benchmarks.
+
+## Multi-Accept Outstanding Comparison
+
+This run validates `multi-accept-outstanding` against the current Docker/cloud 10K topology.
+
+Common condition:
+
+```text
+Topology: Azure smoke server + local Docker Desktop runners
+Server: ListenBacklog=10500, SessionIdleCleanup IdleTimeoutSeconds=90
+Client load: 10 Docker containers x 1,000 sessions
+Payload: random:128-2048
+Send rate: 1000
+Pacing: fixed-window=1
+Ramp-up: 120s
+Duration: 3m
+```
+
+Artifacts:
+
+| Variant | Artifact root |
+|---------|---------------|
+| `OutstandingAccepts=1` | `artifacts/load-validation/multi-accept-o1-20260509-021411/` |
+| `OutstandingAccepts=4` | `artifacts/load-validation/multi-accept-o4-20260509-021411/` |
+
+Client aggregate comparison:
+
+| Metric | `OutstandingAccepts=1` | `OutstandingAccepts=4` |
+|--------|-----------------------:|-----------------------:|
+| Docker runner exits | `10/10 exit 0` | `10/10 exit 0` |
+| Current sessions at final aggregate | `9,927` | `9,921` |
+| Connect completed | `10,000` | `9,997` |
+| Connect failures | `0` | `3` |
+| Socket errors | `0` | `3` |
+| Sum TPS | `6,559.79` | `5,941.41` |
+| Average RTT P50 | `378.97ms` | `369.48ms` |
+| Average RTT P95 | `3,967.57ms` | `3,725.48ms` |
+| Average RTT P99 | `17,579.81ms` | `17,809.50ms` |
+| Max RTT P95 | `4,062.98ms` | `3,840.05ms` |
+| Max RTT P99 | `18,706.94ms` | `19,389.38ms` |
+| Avg session RTT P95 | `12,944.41ms` | `13,300.16ms` |
+| Avg session RTT P99 | `44,439.60ms` | `43,318.34ms` |
+
+Server final comparison:
+
+| Metric | `OutstandingAccepts=1` | `OutstandingAccepts=4` |
+|--------|-----------------------:|-----------------------:|
+| Total accepted sessions | `9,999` | `9,997` |
+| Total disconnected sessions | `9,999` | `9,997` |
+| Final current sessions | `0` | `0` |
+| Accept errors | `0` | `0` |
+| Socket errors | `149` | `166` |
+| Idle-timeout disconnects | `154` | `172` |
+| Send backpressure events | `0` | `0` |
+| Send rejected requests | `18` | `2` |
+| Max pending send requests | `859` | `824` |
+| Max send buffer bytes | `2,144` | `2,115` |
+| `accept-session-create` avg / max | `0.164ms / 82.794ms` | `0.164ms / 81.331ms` |
+| `accept-task-start` avg / max | `0.616ms / 82.823ms` | `0.259ms / 81.375ms` |
+| `accept-first-socket-receive` avg / max | `134.037ms / 47,515.412ms` | `126.719ms / 52,783.463ms` |
+
+Interpretation:
+
+`OutstandingAccepts=4` improves a few server-side accept path averages, most notably `accept-task-start` average from `0.616ms` to `0.259ms`, and slightly lowers `accept-first-socket-receive` average. It also lowers `sendRejectedRequests` from `18` to `2`.
+
+The improvement is not strong enough to change the default. `OutstandingAccepts=4` produced `3` connect failures where `1` produced `0`, lower aggregate TPS, slightly worse average RTT P99, and higher idle-timeout/socket-error counts. Since connect establishment is already healthy with `OutstandingAccepts=1` under backlog `10500`, this feature should keep the default at `1`. Additional `2`/`8` testing is not required until a future run shows accept backlog pressure or materially worse accept path latency.
 
 ## Cloud 10K Server Capacity Diagnostic
 

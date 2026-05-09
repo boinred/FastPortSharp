@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LibNetworks;
 using LibTestTelemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -191,6 +192,7 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual("0.0.0.0", options.Host);
         Assert.AreEqual(6628, options.Port);
         Assert.AreEqual(4096, options.ListenBacklog);
+        Assert.AreEqual(1, options.OutstandingAccepts);
     }
 
     [TestMethod]
@@ -201,6 +203,7 @@ public sealed class ServerTelemetryTests
             {
                 ["FastPortTestSmokeServer:Host"] = "127.0.0.2",
                 ["FastPortTestSmokeServer:ListenBacklog"] = "4096",
+                ["FastPortTestSmokeServer:OutstandingAccepts"] = "4",
                 ["FastPortSmokeServer:Host"] = "127.0.0.1"
             })
             .Build();
@@ -209,6 +212,7 @@ public sealed class ServerTelemetryTests
 
         Assert.AreEqual("127.0.0.2", section["Host"]);
         Assert.AreEqual("4096", section["ListenBacklog"]);
+        Assert.AreEqual("4", section["OutstandingAccepts"]);
     }
 
     [TestMethod]
@@ -224,6 +228,20 @@ public sealed class ServerTelemetryTests
         IConfigurationSection section = FastPortTestSmokeServer.FastPortTestSmokeServerConfiguration.GetServerSection(configuration);
 
         Assert.AreEqual("127.0.0.1", section["Host"]);
+    }
+
+    [TestMethod]
+    public void BaseListener_NormalizeOutstandingAccepts_UsesDefaultForInvalidValues()
+    {
+        Assert.AreEqual(1, BaseListener.NormalizeOutstandingAccepts(0));
+        Assert.AreEqual(1, BaseListener.NormalizeOutstandingAccepts(-1));
+    }
+
+    [TestMethod]
+    public void BaseListener_NormalizeOutstandingAccepts_ClampsLargeValues()
+    {
+        Assert.AreEqual(64, BaseListener.NormalizeOutstandingAccepts(1024));
+        Assert.AreEqual(4, BaseListener.NormalizeOutstandingAccepts(4));
     }
 
     [TestMethod]

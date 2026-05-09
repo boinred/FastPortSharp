@@ -22,12 +22,17 @@ public class FastPortTestSmokeServerBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "FastPortTestSmokeServerBackgroundService, StartAccept. Host:{Host}, Port:{Port}, ListenBacklog:{ListenBacklog}",
+            "FastPortTestSmokeServerBackgroundService, StartAccept. Host:{Host}, Port:{Port}, ListenBacklog:{ListenBacklog}, OutstandingAccepts:{OutstandingAccepts}",
             m_Options.Host,
             m_Options.Port,
-            m_Options.ListenBacklog);
+            m_Options.ListenBacklog,
+            m_Options.OutstandingAccepts);
 
-        if (!m_FastPortTestSmokeServer.StartAccept(m_Options.Host, m_Options.Port, m_Options.ListenBacklog))
+        if (!m_FastPortTestSmokeServer.StartAccept(
+                m_Options.Host,
+                m_Options.Port,
+                m_Options.ListenBacklog,
+                m_Options.OutstandingAccepts))
         {
             _logger.LogError("FastPortTestSmokeServerBackgroundService, StartAccept failed.");
             return;

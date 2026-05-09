@@ -1,10 +1,11 @@
 {
   "version": "2.0",
-  "lastUpdated": "2026-05-07T03:50:17.319Z",
+  "lastUpdated": "2026-05-09T02:49:39.213Z",
   "activeFeatures": [
     "remove-server-telemetry-from-network-base-classes",
     "timer-queue",
-    "listener-backlog-increase"
+    "listener-backlog-increase",
+    "multi-accept-outstanding"
   ],
   "primaryFeature": "remove-server-telemetry-from-network-base-classes",
   "features": {
@@ -1202,6 +1203,49 @@
         "lastUpdated": "2026-05-07T03:50:17.319Z"
       },
       "completedAt": "2026-05-07T03:50:17.317Z"
+    },
+    "multi-accept-outstanding": {
+      "phase": "completed",
+      "matchRate": null,
+      "iterationCount": 1,
+      "documents": {},
+      "taskChain": [
+        {
+          "phase": "plan",
+          "status": "completed",
+          "createdAt": "2026-05-09T01:51:13.169Z",
+          "completedAt": "2026-05-09T01:52:40.089Z"
+        },
+        {
+          "phase": "design",
+          "status": "completed",
+          "createdAt": "2026-05-09T01:51:13.169Z",
+          "completedAt": "2026-05-09T01:57:43.407Z"
+        },
+        {
+          "phase": "do",
+          "status": "completed",
+          "createdAt": "2026-05-09T01:51:13.169Z",
+          "completedAt": "2026-05-09T02:09:34.641Z"
+        },
+        {
+          "phase": "check",
+          "status": "completed",
+          "createdAt": "2026-05-09T01:51:13.169Z",
+          "completedAt": "2026-05-09T02:49:26.781Z"
+        },
+        {
+          "phase": "report",
+          "status": "completed",
+          "createdAt": "2026-05-09T01:51:13.169Z",
+          "completedAt": "2026-05-09T02:49:39.213Z"
+        }
+      ],
+      "timestamps": {
+        "started": "2026-05-09T01:51:13.170Z",
+        "lastUpdated": "2026-05-09T02:49:39.213Z"
+      },
+      "completedAt": "2026-05-09T02:49:39.210Z"
     }
   },
   "pipeline": {
@@ -1212,7 +1256,7 @@
   "session": {
     "startedAt": "2026-04-27T05:43:29.709Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-05-07T03:50:17.319Z"
+    "lastActivity": "2026-05-09T02:49:39.213Z"
   },
   "history": [
     {
@@ -2961,6 +3005,71 @@
       "phase": "report",
       "nextPhase": "completed",
       "timestamp": "2026-05-07T03:50:17.318Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "from": "plan",
+      "to": "design",
+      "timestamp": "2026-05-09T01:52:40.084Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "action": "phase_complete",
+      "phase": "plan",
+      "nextPhase": "design",
+      "timestamp": "2026-05-09T01:52:40.085Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "from": "design",
+      "to": "design",
+      "timestamp": "2026-05-09T01:55:43.949Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "from": "design",
+      "to": "do",
+      "timestamp": "2026-05-09T01:57:43.405Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "action": "phase_complete",
+      "phase": "design",
+      "nextPhase": "do",
+      "timestamp": "2026-05-09T01:57:43.405Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "from": "do",
+      "to": "check",
+      "timestamp": "2026-05-09T02:09:34.632Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "action": "phase_complete",
+      "phase": "do",
+      "nextPhase": "check",
+      "timestamp": "2026-05-09T02:09:34.638Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "from": "check",
+      "to": "act",
+      "timestamp": "2026-05-09T02:49:26.774Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "action": "phase_complete",
+      "phase": "check",
+      "nextPhase": "act",
+      "timestamp": "2026-05-09T02:49:26.778Z"
+    },
+    {
+      "feature": "multi-accept-outstanding",
+      "action": "phase_complete",
+      "phase": "report",
+      "nextPhase": "completed",
+      "timestamp": "2026-05-09T02:49:39.211Z"
     }
   ]
 }
