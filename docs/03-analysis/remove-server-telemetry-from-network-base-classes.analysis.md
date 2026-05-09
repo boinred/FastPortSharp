@@ -47,8 +47,8 @@ The network send/receive/accept algorithms were not changed. The implementation 
 - [x] `ObservedMetricsTests` use `LibTestTelemetry.ServerTelemetrySnapshot`.
 - [x] `FastPortTestLoadRunner` depends on `LibTestTelemetry` and not `LibNetworks`.
 - [x] `FastPortTestLoadValidation` depends on `LibTestTelemetry` and not `LibNetworks`.
-- [x] `dotnet build FastPortCharp.sln -c Release` passes.
-- [x] `dotnet test FastPortCharp.sln -c Release --no-build` passes.
+- [x] `dotnet build FastPortSharp.sln -c Release` passes.
+- [x] `dotnet test FastPortSharp.sln -c Release --no-build` passes.
 - [x] Static boundary checks pass.
 
 ## Missing Items
@@ -65,7 +65,7 @@ None.
 ### Build
 
 ```text
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 ```
 
 Result:
@@ -77,7 +77,7 @@ Build succeeded. Warnings: 0, Errors: 0
 ### Tests
 
 ```text
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Result:

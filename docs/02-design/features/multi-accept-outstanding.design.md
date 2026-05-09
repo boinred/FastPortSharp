@@ -368,8 +368,8 @@ Avoid brittle assertions on OS-level backlog or exact accept concurrency. The go
 Local verification:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release
 ```
 
 Cloud/Docker validation matrix:

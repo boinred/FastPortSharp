@@ -16,8 +16,8 @@ listener accept pump는 inherited single `m_SocketEvent` 의존 대신 `BaseList
 
 Smoke server는 `FastPortTestSmokeServer:OutstandingAccepts` 설정을 읽고 background service에서 listener로 전달한다. Local verification과 Docker/cloud 비교 검증도 완료했다.
 
-- `dotnet build FastPortCharp.sln -c Release`: passed, warning 0, error 0
-- `dotnet test FastPortCharp.sln -c Release --no-build`: passed, 139/139
+- `dotnet build FastPortSharp.sln -c Release`: passed, warning 0, error 0
+- `dotnet test FastPortSharp.sln -c Release --no-build`: passed, 139/139
 - Docker/cloud `OutstandingAccepts=1`: 10/10 runners exit 0, connect failures 0
 - Docker/cloud `OutstandingAccepts=4`: 10/10 runners exit 0, connect failures 3
 

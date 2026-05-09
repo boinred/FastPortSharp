@@ -129,8 +129,8 @@ production server의 설정 surface까지 확장할지는 별도 feature에서 �
 - [ ] `FastPortTestSmokeServerOptions.ListenBacklog`가 추가된다.
 - [ ] `FastPortTestSmokeServer/appsettings.json`에 `ListenBacklog: 4096`이 추가된다.
 - [ ] 환경변수 `FastPortTestSmokeServer__ListenBacklog`로 cloud run의 backlog를 override할 수 있다.
-- [ ] `dotnet build FastPortCharp.sln -c Release`가 통과한다.
-- [ ] 관련 tests 또는 전체 `dotnet test FastPortCharp.sln -c Release --no-build`가 통과한다.
+- [ ] `dotnet build FastPortSharp.sln -c Release`가 통과한다.
+- [ ] 관련 tests 또는 전체 `dotnet test FastPortSharp.sln -c Release --no-build`가 통과한다.
 - [ ] cloud closed-loop 3분 재테스트를 같은 조건으로 실행한다.
 - [ ] 재테스트에서 connect timeout이 기존 `1,057`보다 의미 있게 감소한다.
 - [ ] 서버 metrics에서 `sendBackpressureEvents=0`, `sendRejectedRequests=0` 유지 여부를 확인한다.
@@ -163,8 +163,8 @@ production server의 설정 surface까지 확장할지는 별도 feature에서 �
 Local verification:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Cloud verification:

@@ -421,7 +421,7 @@ The priority after the 2026-05-06 cloud 10K server-capacity diagnostic is:
 | Completion accounting | Added request-size based send completion tracking. | Decrement pending send requests only after each queued response is fully drained. | Pending send metrics now represent logical response backlog instead of raw send-loop progress. |
 | Telemetry | Added rejected-send request/byte counters to server and observed metrics. | Distinguish intentional queue rejection from socket errors and ordinary backpressure. | Current focused 10K reported `0 / 0` rejected send requests/bytes. |
 | Load validation output | Added rejected-send fields to JSON and Markdown summaries. | Keep future benchmark comparisons auditable without parsing raw metrics logs. | `summary.md` now reports the `Rejected Send` column. |
-| Test coverage | Added direct tests for queue rejection, completion accounting, FIFO send completion, batch chunk limits, pacing gates, manifest options, and telemetry/load-summary updates. | Lock in the new send policy behavior. | `dotnet test FastPortCharp.sln --no-build` passed `97` tests. |
+| Test coverage | Added direct tests for queue rejection, completion accounting, FIFO send completion, batch chunk limits, pacing gates, manifest options, and telemetry/load-summary updates. | Lock in the new send policy behavior. | `dotnet test FastPortSharp.sln --no-build` passed `97` tests. |
 | Budgeted drain | Added per-wake drain byte/op budget and drain-yield telemetry. | Reduce response burst pressure without violating `Drain(sentSize)`. | Server-side send pressure improved, but client NoBuffer worsened in uncapped 10K. |
 | Load-runner pacing | Added `--max-pending-requests-per-session`. | Diagnose whether client pacing drives NoBuffer. | Cap `4` reduced NoBuffer by `87.7%` but worsened RTT tail and introduced receive timeouts. |
 | Adaptive client pacing | Added event-driven fixed/adaptive outstanding request pacing with pacing metrics and manifest options. | Lower client send-buffer pressure without cap `4` receive-timeout regression. | Adaptive 10K reduced NoBuffer to `1,415`, removed material receive timeouts, and kept RTT P99 under `20,000ms`; RTT P95/drift still need tuning. |
@@ -541,9 +541,9 @@ The staged ladder should stop at `s3-random-3k` for now. Although the validation
 
 The current implementation was checked with:
 
-- `dotnet build FastPortCharp.sln`
-- `dotnet test FastPortCharp.sln --no-build` (`97` tests passed)
-- `dotnet build FastPortCharp.sln -c Release`
+- `dotnet build FastPortSharp.sln`
+- `dotnet test FastPortSharp.sln --no-build` (`97` tests passed)
+- `dotnet build FastPortSharp.sln -c Release`
 - latest reduced smoke validation: `artifacts/load-validation/send-channel-queue-batch-pool-smoke/summary.md`
 - reduced smoke validation: `artifacts/load-validation/send-backpressure-iterate-smoke/summary.md`
 - focused 10K validation: `artifacts/load-validation/s5-send-backpressure-iterate2/summary.md`

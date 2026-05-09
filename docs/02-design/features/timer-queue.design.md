@@ -464,8 +464,8 @@ Telemetry:
 ### 10.2 Local Validation
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 ### 10.3 Cloud Validation

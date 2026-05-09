@@ -142,8 +142,8 @@ INetworkTelemetrySink
 - [ ] 기존 server observed metrics test가 통과한다.
 - [ ] send policy/backpressure tests가 통과한다.
 - [ ] smoke server tests가 통과한다.
-- [ ] `dotnet build FastPortCharp.sln -c Release`가 통과한다.
-- [ ] `dotnet test FastPortCharp.sln -c Release --no-build`가 통과한다.
+- [ ] `dotnet build FastPortSharp.sln -c Release`가 통과한다.
+- [ ] `dotnet test FastPortSharp.sln -c Release --no-build`가 통과한다.
 
 ## 6. Schedule
 
@@ -171,8 +171,8 @@ INetworkTelemetrySink
 Required:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Focused tests:

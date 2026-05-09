@@ -79,7 +79,7 @@ Serilog, Protobuf, session / handler / dispatcher 트리오가 미리 wired-up
 
 ```bash
 # 1. 솔루션 전체 빌드
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 
 # 2. 템플릿 서버 실행 (터미널 1)
 dotnet run --project FastPortGameServerTemplate -c Release
@@ -370,11 +370,8 @@ FastPortSharp/
 ├── 📂 LibTestTelemetry/                      # 테스트 전용 텔레메트리 contract (JSONL)
 │
 ├── 📂 docs/                                  # 성능 리포트, PDCA archive
-└── FastPortCharp.sln
+└── FastPortSharp.sln
 ```
-
-> 명명 메모: 솔루션 파일은 `FastPortCharp.sln`입니다 (git 히스토리
-> 연속성을 위해 legacy 철자 유지).
 
 ---
 
@@ -491,7 +488,7 @@ git clone https://github.com/boinred/FastPortSharp.git
 cd FastPortSharp
 
 # 빌드
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 
 # 템플릿 서버 실행
 dotnet run --project FastPortGameServerTemplate -c Release
@@ -521,7 +518,7 @@ dotnet run --project FastPortTestSmokeServer -c Release
 ### 테스트 실행
 
 ```bash
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet test FastPortSharp.sln -c Release --no-build
 # 139 / 139 통과 (2026-05 기준)
 ```
 

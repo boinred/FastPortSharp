@@ -285,8 +285,8 @@ Initial views should focus on:
 Latest validation from the active `adaptive-client-pacing-threshold-tuning` feature:
 
 ```bash
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ./FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \

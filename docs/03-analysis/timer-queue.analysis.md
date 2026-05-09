@@ -51,8 +51,8 @@ The implementation intentionally places `TimerQueue` in `LibCommons.Timers` inst
 ## Verification
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Result:

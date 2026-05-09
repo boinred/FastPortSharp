@@ -41,7 +41,7 @@ Full staged validation은 기본 `dotnet test`에 넣지 않는다. 10,000 sessi
 ### 3.2 권장 build
 
 ```bash
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 ```
 
 Debug build도 동작하지만 부하 검증은 Release build를 기준으로 본다.
@@ -53,7 +53,7 @@ Debug build도 동작하지만 부하 검증은 Release build를 기준으로 �
 ### 4.1 Build
 
 ```bash
-dotnet build FastPortCharp.sln
+dotnet build FastPortSharp.sln
 ```
 
 기대 결과:
@@ -64,7 +64,7 @@ dotnet build FastPortCharp.sln
 ### 4.2 Unit Test
 
 ```bash
-dotnet test FastPortCharp.sln --no-build
+dotnet test FastPortSharp.sln --no-build
 ```
 
 기대 결과:
@@ -354,7 +354,7 @@ sed -n '1,160p' artifacts/load-validation/<run-id>/<stage-id>.stdout.log
 ## 10. High-load 실행 전 체크리스트
 
 - [ ] Release build 완료
-- [ ] `dotnet test FastPortCharp.sln --no-build` 통과
+- [ ] `dotnet test FastPortSharp.sln --no-build` 통과
 - [ ] `--dry-run`으로 command 확인
 - [ ] `FastPortTestSmokeServer` 단독 실행 확인
 - [ ] Smoke profile pass

@@ -16,8 +16,8 @@
 
 Local verification 결과:
 
-- `dotnet build FastPortCharp.sln -c Release`: passed, warning 0, error 0
-- `dotnet test FastPortCharp.sln -c Release --no-build`: passed, 134/134
+- `dotnet build FastPortSharp.sln -c Release`: passed, warning 0, error 0
+- `dotnet test FastPortSharp.sln -c Release --no-build`: passed, 134/134
 
 Cloud closed-loop 3분 재검증도 완료했다. 원격 server는 별도 clean worktree에서 실행했으며, `ss -ltnp | grep 6628` 출력에서 `LISTEN 0 4096 ... :6628`로 backlog `4096` 적용을 확인했다.
 

@@ -105,8 +105,8 @@ Clone and build:
 git clone https://github.com/boinred/FastPortSharp.git
 cd FastPortSharp
 git checkout main
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln --no-build
 ```
 
 Capture readiness:

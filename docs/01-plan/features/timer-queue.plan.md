@@ -154,8 +154,8 @@ Design phase에서 다음 항목을 확정한다.
 - [ ] stale disconnect reason 또는 counter가 smoke/server telemetry에서 확인 가능하다.
 - [ ] cloud smoke/staged validation에서 runner 종료 후 server `currentSessions`가 configured timeout 안에 0으로 수렴한다.
 - [ ] 10K path에서 per-session `System.Threading.Timer`가 생성되지 않는다.
-- [ ] `dotnet build FastPortCharp.sln -c Release`가 통과한다.
-- [ ] `dotnet test FastPortCharp.sln -c Release --no-build`가 통과한다.
+- [ ] `dotnet build FastPortSharp.sln -c Release`가 통과한다.
+- [ ] `dotnet test FastPortSharp.sln -c Release --no-build`가 통과한다.
 
 ## 6. Schedule
 
@@ -184,8 +184,8 @@ Design phase에서 다음 항목을 확정한다.
 Required:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Focused tests:

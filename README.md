@@ -80,7 +80,7 @@ keeps the engine boundary clean and your game-server code free of test scaffoldi
 
 ```bash
 # 1. Build the whole solution
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 
 # 2. Start the template server (terminal 1)
 dotnet run --project FastPortGameServerTemplate -c Release
@@ -372,11 +372,8 @@ FastPortSharp/
 ├── 📂 LibTestTelemetry/                      # Test-only telemetry contracts (JSONL)
 │
 ├── 📂 docs/                                  # Performance reports, PDCA archive
-└── FastPortCharp.sln
+└── FastPortSharp.sln
 ```
-
-> Naming note: the solution file is `FastPortCharp.sln` (legacy spelling
-> kept for git history continuity).
 
 ---
 
@@ -493,7 +490,7 @@ git clone https://github.com/boinred/FastPortSharp.git
 cd FastPortSharp
 
 # Build
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 
 # Run the template server
 dotnet run --project FastPortGameServerTemplate -c Release
@@ -523,7 +520,7 @@ dotnet run --project FastPortTestSmokeServer -c Release
 ### Run Tests
 
 ```bash
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet test FastPortSharp.sln -c Release --no-build
 # 139 / 139 passed (as of 2026-05)
 ```
 

@@ -36,7 +36,7 @@ Replace the sample handler with your own packet handlers to ship a game server.
 
 ```bash
 # from the repo root
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 dotnet run --project FastPortGameServerTemplate -c Release
 ```
 

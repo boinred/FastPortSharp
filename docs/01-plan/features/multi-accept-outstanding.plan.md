@@ -162,8 +162,8 @@ hard upper bound candidate: 64
 - [ ] `SocketAsyncEventArgs` 재사용에서 동시 사용 race가 없다.
 - [ ] listener shutdown 중 accept repost가 중단된다.
 - [ ] accept completion error 또는 null socket 상황에서 listener가 불필요하게 죽지 않는지 정책이 정의된다.
-- [ ] `dotnet build FastPortCharp.sln -c Release`가 통과한다.
-- [ ] `dotnet test FastPortCharp.sln -c Release`가 통과한다.
+- [ ] `dotnet build FastPortSharp.sln -c Release`가 통과한다.
+- [ ] `dotnet test FastPortSharp.sln -c Release`가 통과한다.
 - [ ] Docker 10 x 1000 validation에서 default `1`이 기존 결과와 회귀하지 않는다.
 - [ ] `2`, `4`, 필요 시 `8` outstanding accept 비교 결과가 문서화된다.
 - [ ] connect failure가 줄거나 accept path latency가 개선될 때만 default 변경을 검토한다.
@@ -196,8 +196,8 @@ hard upper bound candidate: 64
 Local verification:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release
 ```
 
 Docker/cloud validation:

@@ -85,8 +85,8 @@ The old `OnNetworkSessionDisconnected()` hook remains compatible through the new
 Commands run:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Results:

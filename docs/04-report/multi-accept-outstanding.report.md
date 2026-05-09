@@ -32,8 +32,8 @@ Local verification:
 
 | Check | Result |
 |-------|--------|
-| `dotnet build FastPortCharp.sln -c Release` | Passed, warning 0, error 0 |
-| `dotnet test FastPortCharp.sln -c Release --no-build` | Passed, 139/139 |
+| `dotnet build FastPortSharp.sln -c Release` | Passed, warning 0, error 0 |
+| `dotnet test FastPortSharp.sln -c Release --no-build` | Passed, 139/139 |
 
 Docker/cloud load condition:
 

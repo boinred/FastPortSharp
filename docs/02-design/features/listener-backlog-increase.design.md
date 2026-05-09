@@ -334,13 +334,13 @@ FastPortTestSmokeServer__ListenBacklog
 Build:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 ```
 
 Tests:
 
 ```text
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Focused tests are not required for the constant change because socket listen backlog is OS-observable behavior. If a unit test is added later, it should avoid relying on OS-specific backlog reporting.

@@ -46,8 +46,8 @@ Tests: passed, 136/136
 Verification commands:
 
 ```text
-dotnet build FastPortCharp.sln -c Release
-dotnet test FastPortCharp.sln -c Release --no-build
+dotnet build FastPortSharp.sln -c Release
+dotnet test FastPortSharp.sln -c Release --no-build
 ```
 
 Cloud validation update, 2026-05-09:

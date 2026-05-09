@@ -9,7 +9,7 @@ session/handler/dispatcher가 이미 wired-up 되어 있고, 외부 의존은 �
 
 ```bash
 # 레포 루트에서
-dotnet build FastPortCharp.sln -c Release
+dotnet build FastPortSharp.sln -c Release
 ```
 
 ## 2. 실행
