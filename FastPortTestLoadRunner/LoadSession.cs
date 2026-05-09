@@ -25,6 +25,8 @@ internal sealed class LoadSession(
     private readonly OutstandingRequestPacer _pacer = new(scenario.Pacing, metricsCollector);
     // 상태: 테스트 클라이언트가 마지막으로 서버에 패킷을 쓴 시각
     private long _lastClientPacketSentTimestamp = Stopwatch.GetTimestamp();
+    // 상태: 서버 echo response를 마지막으로 수신한 시각, 다음 echo send 지연 계측 기준점
+    private long _lastEchoResponseReceivedTimestamp;
     private long _requestId;
     private long _outstandingRequests;
 
@@ -245,6 +247,7 @@ internal sealed class LoadSession(
 
             try
             {
+                RecordResponseToNextSendDelay();
                 await WritePacketAsync(stream, packet, "send-write", cancellationToken);
                 _pacer.OnRequestSent();
                 IncrementOutstandingRequests();
@@ -414,10 +417,13 @@ internal sealed class LoadSession(
                 return true;
             }
 
+            // 계측 기준점: echo response를 파싱한 시각, 다음 echo request write까지의 client-side idle/pacing 지연
+            long clientReceiveTs = Stopwatch.GetTimestamp();
+            Volatile.Write(ref _lastEchoResponseReceivedTimestamp, clientReceiveTs);
+
             if (response.Header?.ClientSendTs > 0)
             {
                 long clientSendTs = (long)response.Header.ClientSendTs;
-                long clientReceiveTs = Stopwatch.GetTimestamp();
                 _pacer.OnResponse(CalculateRttMs(clientSendTs, clientReceiveTs));
                 metricsCollector.RecordRtt(sessionId, clientSendTs, clientReceiveTs);
             }
@@ -435,6 +441,21 @@ internal sealed class LoadSession(
         }
 
         return true;
+    }
+
+    internal void RecordResponseToNextSendDelay()
+    {
+        // 상태 전이: 하나의 echo response timestamp는 다음 echo send 한 번에만 매칭
+        long responseReceivedTimestamp = Interlocked.Exchange(ref _lastEchoResponseReceivedTimestamp, 0);
+        if (responseReceivedTimestamp <= 0)
+        {
+            return;
+        }
+
+        // 계측: client가 response를 받은 뒤 다음 request write 시작 직전까지 머문 시간
+        metricsCollector.RecordOperationDuration(
+            "client-response-to-next-send",
+            Stopwatch.GetElapsedTime(responseReceivedTimestamp));
     }
 
     private static bool IsHeartbeatResponse(EchoResponse response)

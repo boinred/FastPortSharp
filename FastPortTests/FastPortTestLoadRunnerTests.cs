@@ -533,6 +533,21 @@ public sealed class FastPortTestLoadRunnerTests
     }
 
     [TestMethod]
+    public void LoadSession_RecordResponseToNextSendDelay_RecordsOncePerEchoResponse()
+    {
+        var collector = new MetricsCollector(targetSessions: 1);
+        LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1, collector);
+
+        Assert.IsTrue(session.ParseEchoResponse(CreateEchoResponseBody()));
+        session.RecordResponseToNextSendDelay();
+        session.RecordResponseToNextSendDelay();
+
+        MetricsSnapshot snapshot = collector.CreateSnapshot();
+        Assert.IsNotNull(snapshot.OperationDurations);
+        Assert.AreEqual(1, snapshot.OperationDurations["client-response-to-next-send"].Count);
+    }
+
+    [TestMethod]
     public async Task LoadSession_ParseEchoResponse_DoesNotReleasePacingForHeartbeat()
     {
         LoadSession session = CreateLoadSession(maxPendingRequestsPerSession: 1);
