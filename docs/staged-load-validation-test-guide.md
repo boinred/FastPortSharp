@@ -303,7 +303,7 @@ sed -n '1,160p' artifacts/load-validation/<run-id>/<stage-id>.stdout.log
 가능 원인:
 
 - OS file descriptor limit 부족
-- 서버 backlog 또는 socket resource 부족
+- 서버 accept backlog 또는 socket resource 부족
 - ramp-up이 너무 짧음
 - target session 수가 현재 머신 한계를 넘음
 
@@ -313,6 +313,14 @@ sed -n '1,160p' artifacts/load-validation/<run-id>/<stage-id>.stdout.log
 - `ulimit -n` 확인
 - 필요 시 현재 shell에서 file descriptor limit 상향
 - `--stage s1-fixed-1k`부터 다시 시작
+
+참고:
+
+- `Socket.Listen(100)`의 `100`은 동시 접속 세션 수 제한이 아니라 accept 대기 backlog이다.
+- 이미 accept된 세션은 이 값으로 제한되지 않는다.
+- 30초 ramp-up의 1K 테스트에서는 `Listen(100)`이 직접 병목으로 관측되지 않았다.
+- 10K cloud 진단에서는 accept error보다 server send backlog/backpressure가 먼저 무너졌다.
+- 다만 MMORPG식 burst login/reconnect storm을 고려하면 backlog는 configurable하게 만들고 기본값을 `1024` 이상으로 올리는 것이 좋다.
 
 ### 9.3 `Socket error rate ... exceeds`
 

@@ -40,7 +40,7 @@ The core scheduler is intentionally generic and lives in `LibCommons.Timers`. It
 ```text
 Match rate: 91%
 Build: passed, 0 warnings, 0 errors
-Tests: passed, 130/130
+Tests: passed, 136/136
 ```
 
 Verification commands:
@@ -49,6 +49,46 @@ Verification commands:
 dotnet build FastPortCharp.sln -c Release
 dotnet test FastPortCharp.sln -c Release --no-build
 ```
+
+Cloud validation update, 2026-05-09:
+
+```text
+Topology: Azure smoke server + local Docker Desktop runners
+Server: ListenBacklog=10500, SessionIdleCleanup enabled
+Idle cleanup: IdleTimeoutSeconds=90, ScanIntervalSeconds=5
+Client load: 10 Docker containers x 1,000 sessions
+Payload: random:128-2048
+Pacing: fixed-window=1
+Ramp-up: 120s
+Duration: 3m
+```
+
+Cloud result:
+
+| Metric | Result |
+|--------|--------|
+| Docker runner exits | 10/10 exit 0 |
+| Client target sessions | 10,000 |
+| Client final current sessions | 9,941 |
+| Client connect failures | 34 |
+| Client final TPS | 7,121.83 |
+| Client average RTT P50 | 212.87 ms |
+| Client average RTT P95 | 3,061.79 ms |
+| Client average RTT P99 | 14,735.45 ms |
+| Server accepted sessions | 9,964 |
+| Server final current sessions | 0 |
+| Server send backpressure | 0 |
+| Server send rejected requests | 1 |
+| Server idle timeout disconnects | 77 |
+| Server remote-closed disconnects | 9,887 |
+| Server max idle timeout age | 107,273 ms |
+
+Artifacts:
+
+- Client runner files: `artifacts/load-validation/timer-cleanup-docker-20260509-client-3/`
+- Server metrics: `artifacts/load-validation/timer-cleanup-docker-20260509-client-3/server.metrics.jsonl`
+
+The cloud test verified that sessions converge back to `currentSessions=0` after runner exit. A shorter 30s idle timeout was rejected during the same validation because it disconnected active Docker-ramp sessions too aggressively. The 90s timeout still produced 77 idle-timeout disconnects, so high-load validation should treat timeout configuration as part of the test condition.
 
 ## 5. Key Decisions
 
@@ -70,14 +110,13 @@ The official usage path is DI singleton registration. Static global access was n
 
 ## 6. Remaining Gaps
 
-- Cloud smoke/staged/10K validation has not been run after implementation.
 - TimerQueue runtime counters are local properties only and are not exported in observed JSONL.
 - Production server projects are not wired to `ITimerQueue` yet.
+- A production idle-timeout default is not selected yet. The 2026-05-09 Docker run shows 30s is too aggressive for this test topology, while 90s is usable for cleanup validation but still affects a small number of sessions.
 
 ## 7. Next Steps
 
 1. Commit the local implementation.
-2. Deploy to the cloud smoke server.
-3. Run smoke validation first.
-4. Run staged/10K validation.
-5. Confirm `currentSessions = 0` and `pendingSendRequests = 0` within configured idle cleanup timeout after runner exit.
+2. Choose separate idle cleanup defaults for smoke/load validation and production.
+3. Keep Docker 10x1000 as the high-load cleanup validation path.
+4. Confirm `currentSessions = 0` and `pendingSendRequests = 0` within configured idle cleanup timeout after future runner exits.

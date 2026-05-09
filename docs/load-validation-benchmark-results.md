@@ -8,6 +8,80 @@
 
 This document tracks same-machine `FastPortTestLoadValidation` results for the 10,000-session load path. It is separate from `docs/baseline-benchmark-results.md`, which records component-level micro benchmarks.
 
+## Cloud 10K Server Capacity Diagnostic
+
+Artifact summary:
+
+- Client/server artifact root: `artifacts/load-validation/connect-repro-10k-20260506-183128/`
+- Server source: clean cloud clone at commit `ac091b4`
+- Stage shape: `s5-random-10k`
+- Target: `10,000` sessions
+- Payload: `random:4096-16384`
+- Send rate: `1 packet/sec/session`
+- Ramp-up: `120s`
+- Duration: `5m`
+- Listener backlog observed by `ss`: `LISTEN 0 100`
+
+This run was executed as a server-capacity diagnostic, not as a pass/fail release validation. The test client is still a load generator and can contribute noise, but the server-side telemetry is strong enough to classify the current server limit.
+
+| Metric | Value |
+|--------|------:|
+| Client connect attempts | `10,000` |
+| Client connect completed | `9,940` |
+| Client connect faulted | `60` |
+| Connect fault class | `SocketException|TimedOut` |
+| Client peak current sessions | `3,784` |
+| Server peak current sessions | `5,083` |
+| Server total accepted sessions | `9,871` |
+| Server final observed current sessions | `976` |
+| Server accept errors | `0` |
+| Server socket errors | `4,035` |
+| Server max pending send requests | `96,608` |
+| Server max send buffer bytes | `1,048,576` |
+| Server send backpressure events | `361,717` |
+| Server rejected send requests | `9,161` |
+| Client max pending request count | `228,172` |
+| Client max RTT average | `68,212.34ms` |
+| Client max RTT P95 | `256,991.30ms` |
+| Client max RTT P99 | `339,328.71ms` |
+
+Server disconnect classification:
+
+| Reason | Count |
+|--------|------:|
+| `remote-closed` | `6,589` |
+| `send-socket-error` | `2,011` |
+| `idle-timeout` | `295` |
+
+Server socket error classification:
+
+| Class | Count |
+|-------|------:|
+| `receive-completion|none|OperationAborted` | `1,921` |
+| `send|SocketException|ConnectionReset` | `1,923` |
+| `send|SocketException|Shutdown` | `191` |
+
+### Server Capacity Interpretation
+
+The current cloud 10K run fails before the server can sustain the target workload. The first material failure signal is not accept/listen failure:
+
+- `acceptErrorCount = 0`
+- `totalAcceptedSessions = 9,871`
+- `connect|SocketException|TimedOut = 60`
+- peak server current sessions reached `5,083`
+
+`Listen(100)` is not a concurrent-session cap. It is the kernel accept backlog for connections that are waiting to be accepted. The hard-coded value is still too low as an engine default and should become configurable, with a higher default such as `1024` or `4096` depending on target OS limits. However, this run points to a larger bottleneck after accept: the server send path cannot drain responses fast enough under the current random 4K-16K echo workload.
+
+The strongest server-side evidence is:
+
+- `maxPendingSendRequests = 96,608`
+- `maxSendBufferBytes = 1,048,576`
+- `sendBackpressureEvents = 361,717`
+- `sendRejectedRequests = 9,161`
+- `send-socket-error = 2,011`
+
+The practical conclusion is that server performance work should prioritize send-path throughput, backpressure, drain fairness, and disconnect cleanup with pending sends. Listener backlog tuning is still useful, but it is not the primary cause of the current 10K failure shape.
+
 ## Latest 10K Comparison
 
 Current diagnostic: `artifacts/load-validation/adaptive-pacing-operation-duration-s5/summary.md`
@@ -257,17 +331,17 @@ Follow-up interpretation:
 
 ## Current Improvement Priority
 
-The priority after the 2026-05-06 cloud and packet-assembly diagnostics is:
+The priority after the 2026-05-06 cloud 10K server-capacity diagnostic is:
 
 | Rank | Area | Reason | Completion Signal |
 |-----:|------|--------|-------------------|
-| 1 | `TimerQueue` and idle/stale session cleanup | Cloud validation showed server `currentSessions` can remain after the client runner exits. TCP keepalive alone cannot guarantee application-level cleanup within a known time window. | After runner completion, `currentSessions = 0` and `pendingSendRequests = 0` within the configured idle cleanup timeout. |
-| 2 | Receive timeout and RTT tail decomposition | The current 10K failure shape is dominated by client receive timeouts and 100s-class RTT tail, not server socket errors. | Separate timings for connect, send, receive header, receive body, server receive, parse, and send phases. |
-| 3 | Cloud 10K stability revalidation | Local and cloud results diverged, so the Azure server/local runner path is the practical stability target. | Smoke passes and staged 1K/3K/5K/10K ladder clearly identifies the first failing scale. |
-| 4 | Server disconnect reason and idle timeout telemetry | TimerQueue cleanup must be distinguishable from fault disconnects, or the next analysis will blur normal cleanup and errors. | Export idle-timeout disconnect count/reason plus session age or last-receive age. |
-| 5 | Pending send and send rejection reason detail | Pending send residue is no longer the primary issue, but rejected sends still need reason classification when they appear. | Split rejection by disconnected-after-enqueue, queue-full, and other policy reasons. |
+| 1 | Server send path, backpressure, and drain fairness | The 10K server run produced `maxPendingSendRequests = 96,608`, `sendBackpressureEvents = 361,717`, and `sendRejectedRequests = 9,161`. This is the dominant server-side bottleneck. | 10K cloud run keeps server pending sends bounded, avoids send rejection bursts, and does not accumulate 100s-class RTT tail. |
+| 2 | Pending-send disconnect cleanup | The same run ended with `send-socket-error = 2,011` and pending send pressure still visible near shutdown. | Disconnect with queued sends is classified cleanly, pending send requests drain or cancel deterministically, and final `currentSessions/pendingSendRequests` converge to `0`. |
+| 3 | Listener backlog configuration | `Listen(100)` is not a session cap and did not directly block the 1K/10K ramp, but it is low for an MMORPG-grade engine and can amplify login bursts. | Listener backlog is configurable; default is raised to a target-appropriate value and documented with OS `somaxconn`/`tcp_max_syn_backlog` limits. |
+| 4 | `TimerQueue` and idle/stale session cleanup | Cloud validation can leave server `currentSessions` after runner exit, and the 10K run observed `idle-timeout = 295`. TCP keepalive alone cannot guarantee application-level cleanup within a known time window. | After runner completion, `currentSessions = 0` and `pendingSendRequests = 0` within the configured idle cleanup timeout. |
+| 5 | Receive timeout and RTT tail decomposition | The current 10K failure has 100s-class RTT tail and large client pending request depth, but server send pressure now appears first. | Separate timings for connect, send, receive header, receive body, server receive, parse, send enqueue, and send drain phases. |
 | 6 | Packet assembly copy/allocation optimization | The local probe shows 8 KiB fragmentation itself is low cost, but completed packet extraction still allocates/copies payload-sized buffers. | Add server-side parse/assembly duration telemetry, then decide whether payload ownership/copy reduction is justified. |
-| 7 | `remove-server-telemetry-from-network-base-classes` PDCA closure | The architecture cleanup remains useful, but it is lower priority than the current cloud lifecycle and RTT stability failures. | Finish analysis/report or explicitly defer until after TimerQueue validation. |
+| 7 | `remove-server-telemetry-from-network-base-classes` PDCA closure | The architecture cleanup remains useful, but it is lower priority than the server capacity bottleneck and lifecycle stability work. | Finish analysis/report or explicitly defer until after server send-path and TimerQueue validation. |
 
 ## Implemented Improvements
 
