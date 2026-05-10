@@ -244,7 +244,11 @@ public sealed class ServerTelemetryTests
         Assert.AreEqual(4, BaseListener.NormalizeOutstandingAccepts(4));
     }
 
+    // GHA windows-latest의 thread pool 경합 완화: 본 테스트는 production이
+    // `Task.Delay(>= 1s)` 주기로 동작하므로 ExecuteAsync schedule 지연을 흡수하기 위해
+    // 병렬 실행에서 격리한다.
     [TestMethod]
+    [DoNotParallelize]
     public async Task ServerTelemetryExportBackgroundService_WritesServerObservedJsonl()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"fastport-server-telemetry-{Guid.NewGuid():N}");
@@ -271,7 +275,10 @@ public sealed class ServerTelemetryTests
             string[] lines = await WaitForFileWithLinesAsync(
                 path,
                 minLines: 1,
-                timeout: TimeSpan.FromSeconds(10),
+                // GHA windows-latest의 thread pool starvation 시 ExecuteAsync schedule이
+                // 수 초 지연될 수 있어 25× 마진(30s)을 둔다. healthy 환경에서는 ~1s에
+                // 즉시 통과한다.
+                timeout: TimeSpan.FromSeconds(30),
                 pollInterval: TimeSpan.FromMilliseconds(50));
 
             ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
