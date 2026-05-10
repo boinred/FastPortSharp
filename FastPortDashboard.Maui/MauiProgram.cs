@@ -1,5 +1,3 @@
-using SkiaSharp.Views.Maui.Controls.Hosting;
-
 namespace FastPortDashboard.Maui;
 
 public static class MauiProgram
@@ -9,7 +7,6 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
-			.UseSkiaSharp() // LiveCharts2 의존
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

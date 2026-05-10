@@ -2,7 +2,6 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels"
-             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Maui;assembly=LiveChartsCore.SkiaSharpView.Maui"
              x:Class="FastPortDashboard.Maui.MainPage"
              x:DataType="vm:DashboardViewModel"
              Title="FastPort Dashboard">
@@ -10,7 +9,6 @@
     <ScrollView>
         <VerticalStackLayout Spacing="12" Padding="16">
 
-            <!-- Header -->
             <Label Text="FastPort Telemetry Dashboard"
                    FontSize="24"
                    FontAttributes="Bold"
@@ -19,7 +17,6 @@
                    FontSize="12"
                    TextColor="Gray" />
 
-            <!-- File picker + Mock toggle -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
                 <VerticalStackLayout Spacing="8">
                     <HorizontalStackLayout Spacing="8">
@@ -52,7 +49,6 @@
                 </VerticalStackLayout>
             </Frame>
 
-            <!-- KPIs -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
                 <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
                     <VerticalStackLayout Grid.Column="0" Grid.Row="0">
@@ -82,12 +78,12 @@
                 </Grid>
             </Frame>
 
-            <!-- Chart -->
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="320">
+            <!-- Chart placeholder: 다음 cycle에서 LiveCharts2 통합. macOS 26.x에서 SwiftUI/UIKit bridging crash 회피용. -->
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="120">
                 <VerticalStackLayout>
-                    <Label Text="Server Throughput (bytes/sec)" FontAttributes="Bold" />
-                    <lvc:CartesianChart x:Name="ThroughputChart"
-                                        HeightRequest="270" />
+                    <Label Text="Server Throughput Chart" FontAttributes="Bold" />
+                    <Label Text="(Chart visual은 다음 cycle. 현재는 KPI numeric만 갱신)" FontSize="11" TextColor="Gray" />
+                    <Label Text="{Binding ThroughputSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="14" />
                 </VerticalStackLayout>
             </Frame>
 
