@@ -2,6 +2,7 @@ using System.Text.Json;
 using LibNetworks;
 using LibTestTelemetry;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net.Sockets;
 
@@ -264,23 +265,23 @@ public sealed class ServerTelemetryTests
             // production 기본값은 1초 (Program.cs의 IntervalSeconds=1).
             IntervalSeconds = 0
         };
+        var capturingLogger = new RecordingLogger<FastPortTestSmokeServer.ServerTelemetryExportBackgroundService>();
         var service = new FastPortTestSmokeServer.ServerTelemetryExportBackgroundService(
-            NullLogger<FastPortTestSmokeServer.ServerTelemetryExportBackgroundService>.Instance,
+            capturingLogger,
             exporter,
             options);
 
         // Design Ref: §3.1 — fixed Task.Delay(1200) 대신 polling으로 race 흡수.
-        // healthy 환경에서는 ~1초 즈음 즉시 통과, slow runner에서 최대 10초까지 흡수.
+        // 진단 로깅과 함께 timeout 메시지로 production 진행 상황 식별.
         await service.StartAsync(CancellationToken.None);
         try
         {
             string[] lines = await WaitForFileWithLinesAsync(
                 path,
                 minLines: 1,
-                // IntervalSeconds=0 + production Math.Max(0,...) 조합이라 첫 write가
-                // 즉시 일어남. 실패 진단 여유로 5초 timeout만 둠.
                 timeout: TimeSpan.FromSeconds(5),
-                pollInterval: TimeSpan.FromMilliseconds(50));
+                pollInterval: TimeSpan.FromMilliseconds(50),
+                producerLog: capturingLogger);
 
             ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
                 lines[0],
@@ -302,12 +303,13 @@ public sealed class ServerTelemetryTests
 
     // Design Ref: §3.1 — race-free file readiness wait.
     // 고정 Task.Delay 대신 짧은 간격 polling으로 healthy 환경에서는 즉시 통과,
-    // slow runner에서는 timeout까지 흡수. timeout 도달 시 진단 메시지로 fail.
+    // slow runner에서는 timeout까지 흡수. timeout 도달 시 진단 메시지 + producer log dump.
     private static async Task<string[]> WaitForFileWithLinesAsync(
         string path,
         int minLines,
         TimeSpan timeout,
         TimeSpan pollInterval,
+        IRecordingLogger? producerLog = null,
         CancellationToken cancellationToken = default)
     {
         DateTime deadline = DateTime.UtcNow + timeout;
@@ -336,10 +338,49 @@ public sealed class ServerTelemetryTests
             await Task.Delay(pollInterval, cancellationToken);
         }
 
+        string producerDump = producerLog?.DumpRecent(lineLimit: 50) ?? "(no producer log captured)";
         Assert.Fail(
             $"WaitForFileWithLinesAsync timeout ({timeout.TotalSeconds:F1}s): " +
             $"path={path}, fileEverExisted={everSawFile}, lastLineCount={lastLineCount}, " +
-            $"minRequired={minLines}");
+            $"minRequired={minLines}\n--- producer log (last 50) ---\n{producerDump}");
         return Array.Empty<string>(); // unreachable
+    }
+
+    // Diagnostic logger that records all log calls thread-safely so they can be
+    // dumped on test timeout. Production-side instrumentation lives in
+    // ServerTelemetryExportBackgroundService.ExecuteAsync.
+    private interface IRecordingLogger
+    {
+        string DumpRecent(int lineLimit);
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>, IRecordingLogger
+    {
+        private readonly object _gate = new();
+        private readonly List<string> _entries = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            string line = $"[{DateTime.UtcNow:HH:mm:ss.fff}] {logLevel,5}: {formatter(state, exception)}";
+            if (exception is not null) { line += $" | EX: {exception.GetType().Name} {exception.Message}"; }
+            lock (_gate) { _entries.Add(line); }
+        }
+
+        public string DumpRecent(int lineLimit)
+        {
+            lock (_gate)
+            {
+                int start = Math.Max(0, _entries.Count - lineLimit);
+                return string.Join("\n", _entries.GetRange(start, _entries.Count - start));
+            }
+        }
     }
 }
