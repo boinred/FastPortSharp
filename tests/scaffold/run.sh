@@ -302,7 +302,8 @@ compute_sha256() {
           # macOS fallback: shasum -a 256
           shasum -a 256 "${f}"
         fi
-      done
+      done \
+    | sed -E 's/^([0-9a-f]{64}) \*/\1  /'
   )
 }
 
