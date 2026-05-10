@@ -260,7 +260,9 @@ public sealed class ServerTelemetryTests
         var options = new FastPortTestSmokeServer.FastPortTestSmokeServerTelemetryOptions
         {
             Output = path,
-            IntervalSeconds = 1
+            // Test 한정: 즉시 첫 write를 트리거해 thread-pool 의존 race를 제거.
+            // production 기본값은 1초 (Program.cs의 IntervalSeconds=1).
+            IntervalSeconds = 0
         };
         var service = new FastPortTestSmokeServer.ServerTelemetryExportBackgroundService(
             NullLogger<FastPortTestSmokeServer.ServerTelemetryExportBackgroundService>.Instance,
@@ -275,10 +277,9 @@ public sealed class ServerTelemetryTests
             string[] lines = await WaitForFileWithLinesAsync(
                 path,
                 minLines: 1,
-                // GHA windows-latest의 thread pool starvation 시 ExecuteAsync schedule이
-                // 수 초 지연될 수 있어 25× 마진(30s)을 둔다. healthy 환경에서는 ~1s에
-                // 즉시 통과한다.
-                timeout: TimeSpan.FromSeconds(30),
+                // IntervalSeconds=0 + production Math.Max(0,...) 조합이라 첫 write가
+                // 즉시 일어남. 실패 진단 여유로 5초 timeout만 둠.
+                timeout: TimeSpan.FromSeconds(5),
                 pollInterval: TimeSpan.FromMilliseconds(50));
 
             ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
