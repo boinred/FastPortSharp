@@ -1,0 +1,5 @@
+[DRY-RUN]
+NewName       : Foo
+would copy
+would replace token
+would generate

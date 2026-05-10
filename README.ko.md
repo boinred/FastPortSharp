@@ -130,6 +130,26 @@ Listen 주소 / 포트 / 최대 세션 수는
 out of scope**입니다 — 같은 솔루션 안에서 `ProjectReference`로 엔진을
 재사용하거나, 레포 자체를 클론하는 두 가지 길이 권장됩니다.
 
+#### 새 프로젝트 한 번에 부트스트랩 (scaffold)
+
+자기완결적인 새 체크아웃(서버 + 엔진만, 템플릿 토큰이 프로젝트명으로
+치환된 상태)으로 바로 시작하고 싶다면, cross-platform scaffold 스크립트를
+사용하세요:
+
+```bash
+# Linux / macOS
+scripts/scaffold-game-server.sh   MyLobbyServer ../my-lobby
+
+# Windows / cross-platform
+pwsh -File scripts/scaffold-game-server.ps1 MyLobbyServer ../my-lobby
+```
+
+`FastPortGameServerTemplate/` + `LibCommons/` + `LibNetworks/`를 대상
+경로로 복사하고, `FastPortGameServerTemplate` 토큰을 지정한 이름으로
+일괄 치환한 뒤 `<이름>.sln` 생성, `git init`, `dotnet build` smoke까지
+한 번에 수행합니다. 옵션(`--force`, `--no-git`, `--dry-run`,
+`--skip-smoke`)과 exit code는 `scripts/README.md` 참고.
+
 전체 step-by-step 가이드는
 `FastPortGameServerTemplate/README.md`(영문)와
 `FastPortGameServerTemplate/QUICKSTART.ko.md`(한국어) 참고.

@@ -132,6 +132,26 @@ then prune the projects you don't need. **Uploading the engine to nuget.org
 is intentionally out of scope** — consumers either clone the repo or reuse
 the engine via `ProjectReference` within the same solution.
 
+#### Scaffold a fresh project (one command)
+
+If you'd rather start from a clean self-contained checkout (just your
+server + the engine, with the template token renamed to your project
+name), use the cross-platform scaffold script:
+
+```bash
+# Linux / macOS
+scripts/scaffold-game-server.sh   MyLobbyServer ../my-lobby
+
+# Windows / cross-platform
+pwsh -File scripts/scaffold-game-server.ps1 MyLobbyServer ../my-lobby
+```
+
+This copies `FastPortGameServerTemplate/` + `LibCommons/` + `LibNetworks/`
+to the destination, renames everything from `FastPortGameServerTemplate`
+to your chosen name, generates `<name>.sln`, runs `git init`, and
+smoke-tests with `dotnet build`. See `scripts/README.md` for options
+(`--force`, `--no-git`, `--dry-run`, `--skip-smoke`) and exit codes.
+
 For the full step-by-step walkthrough and Korean version, see
 `FastPortGameServerTemplate/README.md` and
 `FastPortGameServerTemplate/QUICKSTART.ko.md`.

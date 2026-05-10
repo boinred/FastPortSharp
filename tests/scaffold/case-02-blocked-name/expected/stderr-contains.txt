@@ -1,0 +1,3 @@
+# stderr substrings (each line must appear).
+blocked tokens list
+Application

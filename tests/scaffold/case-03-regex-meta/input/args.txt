@@ -1,0 +1,4 @@
+My$Game
+{DEST}
+--no-git
+--skip-smoke

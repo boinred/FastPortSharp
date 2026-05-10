@@ -1,0 +1,3 @@
+# The original template token must NOT survive anywhere.
+FastPortGameServerTemplate
+FastPortGameServerTemplate/FastPortGameServerTemplate.csproj

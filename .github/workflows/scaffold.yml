@@ -1,0 +1,148 @@
+name: scaffold
+
+# Verifies that scripts/scaffold-game-server.{sh,ps1} produce byte-identical
+# output across Linux / macOS / Windows.
+# Design Ref: game-server-template-scaffold-scripts §8.5.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/scaffold-game-server.**'
+      - 'tests/scaffold/**'
+      - 'FastPortGameServerTemplate/**'
+      - 'LibCommons/**'
+      - 'LibNetworks/**'
+      - '.gitattributes'
+      - '.github/workflows/scaffold.yml'
+  pull_request:
+    paths:
+      - 'scripts/scaffold-game-server.**'
+      - 'tests/scaffold/**'
+      - 'FastPortGameServerTemplate/**'
+      - 'LibCommons/**'
+      - 'LibNetworks/**'
+      - '.gitattributes'
+      - '.github/workflows/scaffold.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cases:
+    name: ${{ matrix.os }} / ${{ matrix.flavor }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            flavor: sh
+          - os: ubuntu-latest
+            flavor: ps1
+          - os: macos-latest
+            flavor: sh
+          - os: macos-latest
+            flavor: ps1
+          - os: windows-latest
+            flavor: ps1
+          # bash on Windows runs via git-bash. We exercise it but allow it to
+          # drive the .ps1 scaffold for full cross-driver coverage.
+          - os: windows-latest
+            flavor: sh
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # We compare scaffold output against itself across OSes — preserve
+          # exact line endings as committed.
+          fetch-depth: 1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup PowerShell (Linux only — runner has it preinstalled on macOS/Windows)
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v pwsh >/dev/null 2>&1; then
+            sudo apt-get update -y
+            # microsoft-prod is preconfigured on ubuntu-latest GH runner;
+            # this fallback is defensive.
+            sudo apt-get install -y powershell || \
+              sudo snap install powershell --classic
+          fi
+          pwsh --version
+
+      - name: Make bash scripts executable
+        if: matrix.flavor == 'sh'
+        run: |
+          chmod +x scripts/scaffold-game-server.sh tests/scaffold/run.sh
+
+      - name: Run scaffold cases — ${{ matrix.flavor }}
+        run: |
+          if [ "${{ matrix.flavor }}" = "sh" ]; then
+            tests/scaffold/run.sh --script sh
+          else
+            pwsh -NoProfile -File tests/scaffold/run.ps1 -Script ps1
+          fi
+
+      - name: Capture case-01 byte-identical baseline
+        run: |
+          # Re-run case-01 with --update-golden into a temp expected dir so we
+          # can compare across OSes without polluting the repo.
+          if [ "${{ matrix.flavor }}" = "sh" ]; then
+            tests/scaffold/run.sh --script sh --update-golden case-01-simple
+          else
+            pwsh -NoProfile -File tests/scaffold/run.ps1 -Script ps1 -UpdateGolden -Cases case-01-simple
+          fi
+
+      - name: Upload case-01 sha256 baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: case01-sha256-${{ matrix.os }}-${{ matrix.flavor }}
+          path: tests/scaffold/case-01-simple/expected/sha256.txt
+          if-no-files-found: error
+
+  compare:
+    name: cross-OS byte-identical compare
+    needs: cases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all baselines
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Diff baselines
+        run: |
+          set -euo pipefail
+          baselines=(artifacts/case01-sha256-*/sha256.txt)
+          if [ ${#baselines[@]} -lt 2 ]; then
+            echo "error: need at least 2 baselines to compare, got ${#baselines[@]}" >&2
+            exit 1
+          fi
+          first="${baselines[0]}"
+          echo "reference baseline: ${first}"
+          fail=0
+          for b in "${baselines[@]:1}"; do
+            if ! diff -u "${first}" "${b}"; then
+              echo "::error::baseline mismatch: ${first} vs ${b}"
+              fail=1
+            fi
+          done
+          if [ "${fail}" -ne 0 ]; then
+            echo "::error::scaffold output is NOT byte-identical across OSes/flavors"
+            exit 1
+          fi
+          echo "all ${#baselines[@]} baselines are byte-identical."

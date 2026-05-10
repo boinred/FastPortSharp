@@ -234,6 +234,8 @@ Delivered:
 
 **NuGet upload to nuget.org is out of scope** — consumers use FastPortSharp as a GitHub Template Repository (clone / fork) or via ProjectReference within the same solution.
 
+Follow-up cycle `game-server-template-scaffold-scripts` (2026-05) added cross-platform `scripts/scaffold-game-server.{sh,ps1}` so users can bootstrap a self-contained, token-renamed checkout in one command. Validated by 7 golden-file cases under `tests/scaffold/` and a 3-OS GitHub Actions matrix (`.github/workflows/scaffold.yml`) that asserts byte-identical sha256 across ubuntu / macos / windows for both bash and PowerShell flavors.
+
 Out of scope (separate-cycle candidates only): room/matchmaking, auth, game-level
 heartbeat, game loop / tick, UDP, Unity client SDK, MAUI dashboard.
 
@@ -273,6 +275,7 @@ Initial views should focus on:
 - `FastPortGameServerTemplate` depends only on `LibCommons` + `LibNetworks` (engine boundary). It must not reference `FastPortServer`, `FastPortClient`, `Protocols/`, `LibTestTelemetry`, or any test project.
 - Engine packages `FastPort.Common` (= `LibCommons`) and `FastPort.Networks` (= `LibNetworks`) carry package metadata locally for identification, but `GeneratePackageOnBuild=false` and **publishing to nuget.org is explicitly out of scope**. The FastPortSharp repository itself acts as the GitHub Template Repository for `FastPortGameServerTemplate`; consumers should clone/fork the repo or use ProjectReference inside the same solution.
 - Engine and template are versioned independently within the repo (`engine-v*` vs `template-v*` release tags); coupling is via ProjectReference, not NuGet.
+- The scaffold scripts (`scripts/scaffold-game-server.{sh,ps1}`) read blocked tokens from `tests/scaffold/_shared/blocked-tokens.txt` as a single source of truth shared with the negative-case fixtures. The replacement token (`FastPortGameServerTemplate`) is intentionally a unique 26-char compound to make collateral substitution impossible. Cross-OS byte-identical output is enforced via root `.gitattributes` (LF + UTF-8) and the 3-environment CI matrix; do not introduce CRLF-emitting tooling without updating both.
 - High-load generated artifacts remain under `artifacts/load-validation/` and should not be committed.
 - Same-machine 10K results are useful for comparison, but server/runner split-machine validation is still needed before claiming production capacity.
 - GitHub Actions should not deploy to OCI from this public repository; cloud validation should use local scripts plus OCI CLI/SSH unless a separate hardening pass is approved.

@@ -1,0 +1,4 @@
+# Substrings that must appear in stdout.
+[1/12]
+[12/12]
+Done.

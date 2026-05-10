@@ -1,0 +1,6 @@
+Foo/Foo.csproj
+Foo/Program.cs
+LibCommons/LibCommons.csproj
+LibNetworks/LibNetworks.csproj
+Foo.sln
+.gitignore

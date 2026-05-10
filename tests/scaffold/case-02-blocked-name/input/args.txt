@@ -1,0 +1,4 @@
+Application
+{DEST}
+--no-git
+--skip-smoke

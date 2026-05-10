@@ -1,0 +1,4 @@
+# Scaffold must NOT have started copying.
+Foo
+LibCommons
+LibNetworks
