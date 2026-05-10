@@ -57,6 +57,17 @@ jobs:
         shell: bash
 
     steps:
+      # Force LF on Windows checkout so the byte-identical sha256 baseline
+      # captured on macOS/Linux still matches. GitHub-hosted Windows runners
+      # default to `core.autocrlf=true` which can override `.gitattributes`
+      # for files committed before the eol attribute was added.
+      - name: Force LF line endings on Windows
+        if: runner.os == 'Windows'
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+        shell: bash
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
