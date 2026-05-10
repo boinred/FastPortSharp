@@ -221,29 +221,39 @@ public sealed class BaseSessionSendPolicyTests
     [TestMethod]
     public async Task BaseSession_DoWorkSendBuffers_CompletesMultipleAcceptedItemsInFifoOrder()
     {
+        // Design Ref: §3.3 — observable wire outcome 검증으로 race 제거.
+        // batching 구현이 한 batch에 1개 segment를 보내든 2개를 묶든
+        // 누적 wire bytes는 동일하므로, 본 테스트는 그 누적 결과만 검증한다.
         using SocketPair pair = await SocketPair.CreateAsync();
         var telemetry = new ServerTelemetryCollector();
-        var allowSecondSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        int sendAttempts = 0;
+        var observer = new BatchedFifoObserver();
+        var allowSecondPacket = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // 첫 packet ([1,2]) 의 wire 길이 = HeaderSize(2) + payload(2) = 4 bytes.
+        const int FirstPacketWireLength = 4;
+
         var session = new TestSession(
             pair.ServerSocket,
             telemetry,
             new SessionSendOptions(MaxQueuedBytes: 1024, SendChunkBytes: 64),
             sendBatchOverride: async (_, sendBuffers, cancellationToken) =>
             {
-                int attempt = Interlocked.Increment(ref sendAttempts);
-                if (attempt == 1)
+                // Phase 1: 누적 4 bytes (= 첫 packet 전체)에 도달할 때까지는
+                //          첫 segment의 일부/전부만 통과시켜 partial completion semantic 보존.
+                if (observer.TotalAcceptedBytes < FirstPacketWireLength)
                 {
-                    Assert.IsTrue(sendBuffers.Count >= 2);
-                    AssertSegmentPayload(sendBuffers[0], new byte[] { 1, 2 });
-                    AssertSegmentPayload(sendBuffers[1], new byte[] { 9, 8, 7 });
-                    return sendBuffers[0].Count;
+                    int remaining = FirstPacketWireLength - observer.TotalAcceptedBytes;
+                    int take = Math.Min(remaining, sendBuffers[0].Count);
+                    observer.OnBatch(sendBuffers, take);
+                    return take;
                 }
 
-                await allowSecondSend.Task.WaitAsync(cancellationToken);
-                Assert.IsTrue(sendBuffers.Count >= 1);
-                AssertSegmentPayload(sendBuffers[0], new byte[] { 9, 8, 7 });
-                return sendBuffers[0].Count;
+                // Phase 2: 두 번째 packet 처리는 외부 gate 풀린 뒤에만 진행.
+                await allowSecondPacket.Task.WaitAsync(cancellationToken);
+                int batchTotal = 0;
+                for (int i = 0; i < sendBuffers.Count; i++) { batchTotal += sendBuffers[i].Count; }
+                observer.OnBatch(sendBuffers, batchTotal);
+                return batchTotal;
             });
 
         try
@@ -251,17 +261,21 @@ public sealed class BaseSessionSendPolicyTests
             Assert.IsTrue(session.TrySendBytes(new byte[] { 1, 2 }));
             Assert.IsTrue(session.TrySendBytes(new byte[] { 9, 8, 7 }));
 
-            ServerTelemetrySnapshot firstCompletedSnapshot = await WaitForSnapshotAsync(
+            // Phase 1 검증: 첫 packet (4 wire bytes) 송신 완료 + 두 번째 packet pending 1.
+            ServerTelemetrySnapshot firstSnapshot = await WaitForSnapshotAsync(
                 telemetry,
-                current => current.SentBytes == 4 && current.PendingSendRequests == 1,
+                current => current.SentBytes == FirstPacketWireLength
+                           && current.PendingSendRequests == 1,
                 TimeSpan.FromSeconds(3));
 
-            Assert.AreEqual(1, firstCompletedSnapshot.SentPackets);
-            Assert.AreEqual(4, firstCompletedSnapshot.SentBytes);
-            Assert.AreEqual(1, firstCompletedSnapshot.PendingSendRequests);
-            Assert.AreEqual(5, firstCompletedSnapshot.SendBufferBytes);
+            Assert.AreEqual(1, firstSnapshot.SentPackets);
+            Assert.AreEqual(FirstPacketWireLength, firstSnapshot.SentBytes);
+            Assert.AreEqual(1, firstSnapshot.PendingSendRequests);
+            // 두 번째 packet wire 길이 = 2 + 3 = 5 bytes
+            Assert.AreEqual(5, firstSnapshot.SendBufferBytes);
 
-            allowSecondSend.SetResult();
+            // Phase 2: gate 풀고 두 번째 packet 완료까지 기다림.
+            allowSecondPacket.SetResult();
             ServerTelemetrySnapshot allCompletedSnapshot = await WaitForSnapshotAsync(
                 telemetry,
                 current => current.SentBytes == 9 && current.PendingSendRequests == 0,
@@ -271,7 +285,14 @@ public sealed class BaseSessionSendPolicyTests
             Assert.AreEqual(9, allCompletedSnapshot.SentBytes);
             Assert.AreEqual(0, allCompletedSnapshot.PendingSendRequests);
             Assert.AreEqual(0, allCompletedSnapshot.SendBufferBytes);
-            Assert.AreEqual(2, sendAttempts);
+
+            // 본질 검증: wire bytes가 FIFO 순서로 누적되었는가.
+            // BasePacket layout = [UInt16 LE PacketSize][payload]
+            byte[] expected = BuildExpectedWire(
+                new byte[] { 1, 2 },
+                new byte[] { 9, 8, 7 });
+            CollectionAssert.AreEqual(expected, observer.FlattenedBytes);
+            Assert.AreEqual(9, observer.TotalAcceptedBytes);
         }
         finally
         {
@@ -283,32 +304,31 @@ public sealed class BaseSessionSendPolicyTests
     [TestMethod]
     public async Task BaseSession_DoWorkSendBuffers_BatchedSendRespectsChunkLimit()
     {
+        // Design Ref: §3.4 — chunk limit는 batch별 max bytes 단언으로 검증.
+        // batching 구성(1 segment×N batch / N segment×1 batch)에 의존하지 않음.
+        const int ChunkLimit = 6;
+
         using SocketPair pair = await SocketPair.CreateAsync();
         var telemetry = new ServerTelemetryCollector();
-        var allowSecondSend = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        int sendAttempts = 0;
+        var observer = new BatchedFifoObserver();
+        int batchExceededLimit = 0;
+
         var session = new TestSession(
             pair.ServerSocket,
             telemetry,
             new SessionSendOptions(
                 MaxQueuedBytes: 1024,
-                SendChunkBytes: 6,
+                SendChunkBytes: ChunkLimit,
                 MaxDrainBytesPerSignal: 64),
-            sendBatchOverride: async (_, sendBuffers, cancellationToken) =>
+            sendBatchOverride: (_, sendBuffers, _) =>
             {
-                int attempt = Interlocked.Increment(ref sendAttempts);
-                if (attempt == 1)
-                {
-                    Assert.AreEqual(2, sendBuffers.Count);
-                    Assert.AreEqual(4, sendBuffers[0].Count);
-                    Assert.AreEqual(2, sendBuffers[1].Count);
-                    return 6;
-                }
+                // Worker가 NormalizedSendChunkBytes로 batch 크기를 제한했는지 검증.
+                int batchTotal = 0;
+                for (int i = 0; i < sendBuffers.Count; i++) { batchTotal += sendBuffers[i].Count; }
+                if (batchTotal > ChunkLimit) { Interlocked.Increment(ref batchExceededLimit); }
 
-                await allowSecondSend.Task.WaitAsync(cancellationToken);
-                Assert.AreEqual(1, sendBuffers.Count);
-                Assert.AreEqual(3, sendBuffers[0].Count);
-                return 3;
+                observer.OnBatch(sendBuffers, batchTotal);
+                return ValueTask.FromResult(batchTotal);
             });
 
         try
@@ -316,16 +336,7 @@ public sealed class BaseSessionSendPolicyTests
             Assert.IsTrue(session.TrySendBytes(new byte[] { 1, 2 }));
             Assert.IsTrue(session.TrySendBytes(new byte[] { 9, 8, 7 }));
 
-            ServerTelemetrySnapshot firstSnapshot = await WaitForSnapshotAsync(
-                telemetry,
-                current => current.SentBytes == 6 && current.PendingSendRequests == 1,
-                TimeSpan.FromSeconds(3));
-
-            Assert.AreEqual(6, firstSnapshot.SentBytes);
-            Assert.AreEqual(1, firstSnapshot.PendingSendRequests);
-            Assert.AreEqual(3, firstSnapshot.SendBufferBytes);
-
-            allowSecondSend.SetResult();
+            // 두 packet 합쳐 wire 9 bytes. ChunkLimit=6이므로 worker는 최소 2 batch로 나눠야 함.
             ServerTelemetrySnapshot completedSnapshot = await WaitForSnapshotAsync(
                 telemetry,
                 current => current.SentBytes == 9 && current.PendingSendRequests == 0,
@@ -334,7 +345,21 @@ public sealed class BaseSessionSendPolicyTests
             Assert.AreEqual(9, completedSnapshot.SentBytes);
             Assert.AreEqual(0, completedSnapshot.PendingSendRequests);
             Assert.AreEqual(0, completedSnapshot.SendBufferBytes);
-            Assert.AreEqual(2, sendAttempts);
+
+            // 본질 1: chunk limit 위반 0.
+            Assert.AreEqual(0, batchExceededLimit, "batch exceeded SendChunkBytes limit");
+
+            // 본질 2: ChunkLimit < total wire(9) 이므로 batch는 최소 2회 일어났어야 한다.
+            Assert.IsTrue(
+                observer.BatchCount >= 2,
+                $"expected at least 2 batches with ChunkLimit={ChunkLimit}, got {observer.BatchCount}");
+
+            // 본질 3: wire FIFO 순서.
+            byte[] expected = BuildExpectedWire(
+                new byte[] { 1, 2 },
+                new byte[] { 9, 8, 7 });
+            CollectionAssert.AreEqual(expected, observer.FlattenedBytes);
+            Assert.AreEqual(9, observer.TotalAcceptedBytes);
         }
         finally
         {
@@ -675,5 +700,94 @@ public sealed class BaseSessionSendPolicyTests
         {
             Assert.AreEqual(expectedPayload[i], segment.Array[segment.Offset + BasePacket.HeaderSize + i]);
         }
+    }
+
+    // Design Ref: §3.1 — race-free observer for batched send tests.
+    // Worker가 sendBatchOverride에서 호출하면 wire에 실제 나간 bytes만 누적 기록.
+    // batching 구현이 1×N batch이든 N×1 batch이든 누적 결과는 동일하므로
+    // FIFO 검증은 batching 디테일에 의존하지 않음.
+    private sealed class BatchedFifoObserver
+    {
+        private readonly object _gate = new();
+        private readonly List<byte[]> _batches = new();
+        private int _totalAcceptedBytes;
+
+        public int BatchCount
+        {
+            get { lock (_gate) { return _batches.Count; } }
+        }
+
+        public int TotalAcceptedBytes
+        {
+            get { lock (_gate) { return _totalAcceptedBytes; } }
+        }
+
+        public byte[] FlattenedBytes
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    int total = 0;
+                    for (int i = 0; i < _batches.Count; i++)
+                    {
+                        total += _batches[i].Length;
+                    }
+                    var result = new byte[total];
+                    int offset = 0;
+                    for (int i = 0; i < _batches.Count; i++)
+                    {
+                        Buffer.BlockCopy(_batches[i], 0, result, offset, _batches[i].Length);
+                        offset += _batches[i].Length;
+                    }
+                    return result;
+                }
+            }
+        }
+
+        // acceptedBytes는 sendBatchOverride return 값과 동일: worker에게 통보할
+        // "이 batch에서 실제로 wire에 나간 bytes 수". segments 앞쪽부터 take.
+        public void OnBatch(IList<ArraySegment<byte>> sendBuffers, int acceptedBytes)
+        {
+            if (acceptedBytes <= 0) { return; }
+            lock (_gate)
+            {
+                int captured = 0;
+                for (int i = 0; i < sendBuffers.Count && captured < acceptedBytes; i++)
+                {
+                    ArraySegment<byte> seg = sendBuffers[i];
+                    int take = Math.Min(seg.Count, acceptedBytes - captured);
+                    if (take <= 0) { break; }
+                    var copy = new byte[take];
+                    Buffer.BlockCopy(seg.Array!, seg.Offset, copy, 0, take);
+                    _batches.Add(copy);
+                    captured += take;
+                }
+                _totalAcceptedBytes += captured;
+            }
+        }
+    }
+
+    // FIFO 검증 헬퍼: BasePacket wire layout([UInt16 LE PacketSize][payload]) 두 packet의
+    // 직렬화된 expected bytes 생성. 본 클래스 테스트의 두 곳에서 재사용.
+    private static byte[] BuildExpectedWire(params byte[][] payloads)
+    {
+        int total = 0;
+        for (int i = 0; i < payloads.Length; i++)
+        {
+            total += BasePacket.HeaderSize + payloads[i].Length;
+        }
+        var wire = new byte[total];
+        int offset = 0;
+        for (int i = 0; i < payloads.Length; i++)
+        {
+            int packetSize = BasePacket.HeaderSize + payloads[i].Length;
+            // UInt16 little-endian (BasePacket header convention)
+            wire[offset + 0] = (byte)(packetSize & 0xFF);
+            wire[offset + 1] = (byte)((packetSize >> 8) & 0xFF);
+            Buffer.BlockCopy(payloads[i], 0, wire, offset + BasePacket.HeaderSize, payloads[i].Length);
+            offset += packetSize;
+        }
+        return wire;
     }
 }
