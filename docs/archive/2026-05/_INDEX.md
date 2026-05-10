@@ -9,6 +9,7 @@ Completed PDCA cycles archived in May 2026.
 | `fix-base-session-send-fifo-test-flakiness` | 100% | `BaseSessionSendPolicyTests` 두 메서드의 race를 black-box `BatchedFifoObserver`로 제거. Production 0줄 변경. macOS GHA 5/5 + 로컬 50/50. | [./fix-base-session-send-fifo-test-flakiness/](./fix-base-session-send-fifo-test-flakiness/) |
 | `fix-server-telemetry-export-jsonl-flush-flakiness` | 95-98% | `ServerTelemetryExport` test의 windows flake. 진짜 원인은 reader `FileShare.Read` mismatch. Reader fix + production hardening (WriteThrough, FileShare.ReadWrite, Math.Max(0.05) clamp). 3-OS × 5 = 15/15 PASS. | [./fix-server-telemetry-export-jsonl-flush-flakiness/](./fix-server-telemetry-export-jsonl-flush-flakiness/) |
 | `move-test-projects-to-testprojects-folder` | 97% | 5 test 프로젝트(`FastPortTests`, `FastPortTestLoadRunner`, `FastPortTestLoadValidation`, `FastPortTestSmokeServer`, `LibTestTelemetry`)를 `tests-projects/`로 일괄 이동. Production 0줄 변경. Sanity review로 README/HANDOFF gap 19건 발견·수정 (lesson: head truncation 주의). | [./move-test-projects-to-testprojects-folder/](./move-test-projects-to-testprojects-folder/) |
+| `maui-telemetry-dashboard-foundation` | 95-97.75% | `FastPortDashboard.Maui` (macOS Catalyst + Windows desktop) + 별도 `FastPortSharp.Dashboard.sln`로 build.yml CI 격리. MVVM + LiveCharts2 + IPollingAdapter (Mock/Jsonl) + 6 KPI + JSONL polling. 직전 cycle의 FileShare.ReadWrite lesson 재활용. RTT chart는 follow-up cycle로 분리. | [./maui-telemetry-dashboard-foundation/](./maui-telemetry-dashboard-foundation/) |
 
 ## Conventions
 
