@@ -211,7 +211,7 @@ For the full step-by-step walkthrough and Korean version, see
 ### Running Load Tests
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
+dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -385,11 +385,12 @@ FastPortSharp/
 ├── 📂 FastPortServer/                        # Engine sample/host (validation)
 ├── 📂 FastPortClient/                        # Engine sample/client (with LatencyStats)
 ├── 📂 Protocols/                             # Engine-internal sample protocol
-├── 📂 FastPortTestSmokeServer/               # Smoke/echo test server
-├── 📂 FastPortTestLoadRunner/                # 10K-session load runner
-├── 📂 FastPortTestLoadValidation/            # Load validation harness
-├── 📂 FastPortTests/                         # MSTest unit tests (139 cases)
-├── 📂 LibTestTelemetry/                      # Test-only telemetry contracts (JSONL)
+├── 📂 tests-projects/                        # Grouped test surface
+│   ├── FastPortTestSmokeServer/              # Smoke/echo test server
+│   ├── FastPortTestLoadRunner/               # 10K-session load runner
+│   ├── FastPortTestLoadValidation/           # Load validation harness
+│   ├── FastPortTests/                        # MSTest unit tests (139 cases)
+│   └── LibTestTelemetry/                     # Test-only telemetry contracts (JSONL)
 │
 ├── 📂 docs/                                  # Performance reports, PDCA archive
 └── FastPortSharp.sln
@@ -530,11 +531,11 @@ dotnet run --project FastPortServer -c Release
 dotnet run --project FastPortClient -c Release
 
 # 10K-session load runner
-dotnet run -c Release --project FastPortTestLoadRunner -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- \
   --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 
 # Smoke server with structured telemetry
-dotnet run --project FastPortTestSmokeServer -c Release
+dotnet run --project tests-projects/FastPortTestSmokeServer -c Release
 ```
 
 ### Run Tests

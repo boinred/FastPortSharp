@@ -290,7 +290,7 @@ Latest validation from the active `adaptive-client-pacing-threshold-tuning` feat
 ```bash
 dotnet build FastPortSharp.sln -c Release
 dotnet test FastPortSharp.sln -c Release --no-build
-./FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
+./tests-projects/FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \
   --pacing-policy adaptive-window \

@@ -209,7 +209,7 @@ pwsh -File scripts/scaffold-game-server.ps1 MyLobbyServer ../my-lobby
 ### 부하 테스트 실행
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
+dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 ```
 
 ---
@@ -383,11 +383,12 @@ FastPortSharp/
 ├── 📂 FastPortServer/                        # 엔진 sample/host (검증)
 ├── 📂 FastPortClient/                        # 엔진 sample/client (LatencyStats)
 ├── 📂 Protocols/                             # 엔진 내부 sample 프로토콜
-├── 📂 FastPortTestSmokeServer/               # smoke/echo 테스트 서버
-├── 📂 FastPortTestLoadRunner/                # 10K 세션 부하 runner
-├── 📂 FastPortTestLoadValidation/            # 부하 검증 harness
-├── 📂 FastPortTests/                         # MSTest 단위 테스트 (139 cases)
-├── 📂 LibTestTelemetry/                      # 테스트 전용 텔레메트리 contract (JSONL)
+├── 📂 tests-projects/                        # 테스트 surface 그룹화
+│   ├── FastPortTestSmokeServer/              # smoke/echo 테스트 서버
+│   ├── FastPortTestLoadRunner/               # 10K 세션 부하 runner
+│   ├── FastPortTestLoadValidation/           # 부하 검증 harness
+│   ├── FastPortTests/                        # MSTest 단위 테스트 (139 cases)
+│   └── LibTestTelemetry/                     # 테스트 전용 텔레메트리 contract (JSONL)
 │
 ├── 📂 docs/                                  # 성능 리포트, PDCA archive
 └── FastPortSharp.sln
@@ -528,11 +529,11 @@ dotnet run --project FastPortServer -c Release
 dotnet run --project FastPortClient -c Release
 
 # 10K 세션 부하 runner
-dotnet run -c Release --project FastPortTestLoadRunner -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- \
   --sessions 10000 --payload random:4096-16384 --duration 5m --ramp-up 60s
 
 # 구조화된 텔레메트리를 가진 smoke 서버
-dotnet run --project FastPortTestSmokeServer -c Release
+dotnet run --project tests-projects/FastPortTestSmokeServer -c Release
 ```
 
 ### 테스트 실행
