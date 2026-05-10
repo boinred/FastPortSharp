@@ -315,6 +315,8 @@ public sealed class ServerTelemetryTests
         DateTime deadline = DateTime.UtcNow + timeout;
         bool everSawFile = false;
         int lastLineCount = 0;
+        int ioExceptionCount = 0;
+        long lastFileLength = -1;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -323,7 +325,25 @@ public sealed class ServerTelemetryTests
                 everSawFile = true;
                 try
                 {
-                    string[] lines = await File.ReadAllLinesAsync(path, cancellationToken);
+                    lastFileLength = new FileInfo(path).Length;
+                }
+                catch (IOException) { /* race with truncate; ignore */ }
+
+                try
+                {
+                    // 명시적 FileShare.ReadWrite — Windows에서 producer가 write handle을
+                    // 잡고 있을 때도 read 가능. File.ReadAllLinesAsync default가
+                    // FileShare.Read라 Windows에서 충돌 발생.
+                    using var fs = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete);
+                    using var sr = new StreamReader(fs);
+                    string content = await sr.ReadToEndAsync(cancellationToken);
+                    string[] lines = content.Length == 0
+                        ? Array.Empty<string>()
+                        : content.Split('\n').Where(l => l.Length > 0).ToArray();
                     lastLineCount = lines.Length;
                     if (lines.Length >= minLines)
                     {
@@ -332,7 +352,7 @@ public sealed class ServerTelemetryTests
                 }
                 catch (IOException)
                 {
-                    // exporter가 write/flush 중인 동안 read 충돌 가능 — 다음 polling에서 재시도
+                    ioExceptionCount++;
                 }
             }
             await Task.Delay(pollInterval, cancellationToken);
@@ -342,6 +362,7 @@ public sealed class ServerTelemetryTests
         Assert.Fail(
             $"WaitForFileWithLinesAsync timeout ({timeout.TotalSeconds:F1}s): " +
             $"path={path}, fileEverExisted={everSawFile}, lastLineCount={lastLineCount}, " +
+            $"lastFileLength={lastFileLength}, ioExceptions={ioExceptionCount}, " +
             $"minRequired={minLines}\n--- producer log (last 50) ---\n{producerDump}");
         return Array.Empty<string>(); // unreachable
     }
