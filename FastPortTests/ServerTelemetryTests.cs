@@ -263,24 +263,75 @@ public sealed class ServerTelemetryTests
             exporter,
             options);
 
+        // Design Ref: §3.1 — fixed Task.Delay(1200) 대신 polling으로 race 흡수.
+        // healthy 환경에서는 ~1초 즈음 즉시 통과, slow runner에서 최대 10초까지 흡수.
         await service.StartAsync(CancellationToken.None);
-        await Task.Delay(1200);
-        await service.StopAsync(CancellationToken.None);
+        try
+        {
+            string[] lines = await WaitForFileWithLinesAsync(
+                path,
+                minLines: 1,
+                timeout: TimeSpan.FromSeconds(10),
+                pollInterval: TimeSpan.FromMilliseconds(50));
 
-        Assert.IsTrue(File.Exists(path));
-        string[] lines = await File.ReadAllLinesAsync(path);
-        Assert.IsTrue(lines.Length >= 1);
+            ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
+                lines[0],
+                ObservedMetricsJson.SerializerOptions);
 
-        ObservedMetricsSnapshot? snapshot = JsonSerializer.Deserialize<ObservedMetricsSnapshot>(
-            lines[0],
-            ObservedMetricsJson.SerializerOptions);
+            Assert.IsNotNull(snapshot);
+            Assert.IsNull(snapshot.ClientObserved);
+            Assert.IsNotNull(snapshot.ServerObserved);
+            Assert.AreEqual(1, snapshot.ServerObserved!.TotalAcceptedSessions);
+            Assert.AreEqual(1, snapshot.ServerObserved.TotalSendRequests);
+            Assert.AreEqual(1, snapshot.ServerObserved.PendingSendRequests);
+            Assert.AreEqual(256, snapshot.ServerObserved.SendBufferBytes);
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
 
-        Assert.IsNotNull(snapshot);
-        Assert.IsNull(snapshot.ClientObserved);
-        Assert.IsNotNull(snapshot.ServerObserved);
-        Assert.AreEqual(1, snapshot.ServerObserved!.TotalAcceptedSessions);
-        Assert.AreEqual(1, snapshot.ServerObserved.TotalSendRequests);
-        Assert.AreEqual(1, snapshot.ServerObserved.PendingSendRequests);
-        Assert.AreEqual(256, snapshot.ServerObserved.SendBufferBytes);
+    // Design Ref: §3.1 — race-free file readiness wait.
+    // 고정 Task.Delay 대신 짧은 간격 polling으로 healthy 환경에서는 즉시 통과,
+    // slow runner에서는 timeout까지 흡수. timeout 도달 시 진단 메시지로 fail.
+    private static async Task<string[]> WaitForFileWithLinesAsync(
+        string path,
+        int minLines,
+        TimeSpan timeout,
+        TimeSpan pollInterval,
+        CancellationToken cancellationToken = default)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        bool everSawFile = false;
+        int lastLineCount = 0;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (File.Exists(path))
+            {
+                everSawFile = true;
+                try
+                {
+                    string[] lines = await File.ReadAllLinesAsync(path, cancellationToken);
+                    lastLineCount = lines.Length;
+                    if (lines.Length >= minLines)
+                    {
+                        return lines;
+                    }
+                }
+                catch (IOException)
+                {
+                    // exporter가 write/flush 중인 동안 read 충돌 가능 — 다음 polling에서 재시도
+                }
+            }
+            await Task.Delay(pollInterval, cancellationToken);
+        }
+
+        Assert.Fail(
+            $"WaitForFileWithLinesAsync timeout ({timeout.TotalSeconds:F1}s): " +
+            $"path={path}, fileEverExisted={everSawFile}, lastLineCount={lastLineCount}, " +
+            $"minRequired={minLines}");
+        return Array.Empty<string>(); // unreachable
     }
 }
