@@ -390,6 +390,9 @@ FastPortSharp/
 │   ├── FastPortTests/                        # MSTest 단위 테스트 (139 cases)
 │   └── LibTestTelemetry/                     # 테스트 전용 텔레메트리 contract (JSONL)
 │
+├── 📂 FastPortDashboard.Maui/                # MAUI desktop dashboard (macOS / Windows)
+│                                              # FastPortSharp.Dashboard.sln 로 빌드
+│
 ├── 📂 docs/                                  # 성능 리포트, PDCA archive
 └── FastPortSharp.sln
 ```

@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Foundation cycle: macOS Catalyst + Windows desktop만. iOS/Android는 별도 cycle. -->
+		<TargetFrameworks>net10.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>FastPortDashboard.Maui</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+
+		<!-- Display name -->
+		<ApplicationTitle>FastPortDashboard.Maui</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.companyname.fastportdashboard.maui</ApplicationId>
+		<ApplicationIdGuid>cb169cd5-e823-4942-93b5-25839e94da4f</ApplicationIdGuid>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\appicon.svg" ForegroundFile="Resources\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\appiconfg.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- MAUI core (.NET 8+ 부터 명시적 PackageReference 필요). -->
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+		<!-- Chart library: LiveCharts2 (MAUI Catalyst + Windows desktop 공식 지원). -->
+		<PackageReference Include="LiveChartsCore.SkiaSharpView.Maui" Version="2.0.0-rc6" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Data contract: ObservedMetricsSnapshot 등 (test-projects/ 에 있지만 Foundation에서 직접 참조).
+		     향후 cycle에서 LibTelemetryContracts로 rename 검토. -->
+		<ProjectReference Include="..\tests-projects\LibTestTelemetry\LibTestTelemetry.csproj" />
+	</ItemGroup>
+
+</Project>

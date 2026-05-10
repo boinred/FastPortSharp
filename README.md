@@ -392,6 +392,9 @@ FastPortSharp/
 │   ├── FastPortTests/                        # MSTest unit tests (139 cases)
 │   └── LibTestTelemetry/                     # Test-only telemetry contracts (JSONL)
 │
+├── 📂 FastPortDashboard.Maui/                # MAUI desktop dashboard (macOS / Windows)
+│                                              # Built via FastPortSharp.Dashboard.sln
+│
 ├── 📂 docs/                                  # Performance reports, PDCA archive
 └── FastPortSharp.sln
 ```

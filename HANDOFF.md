@@ -241,27 +241,31 @@ heartbeat, game loop / tick, UDP, Unity client SDK, MAUI dashboard.
 
 ### 4. MAUI Dashboard
 
-Start after the telemetry and server template boundaries are stable.
+#### 4.1 Foundation — COMPLETED (2026-05)
 
-Likely candidates:
+Feature: `maui-telemetry-dashboard-foundation` — `FastPortDashboard.Maui` (macOS Catalyst + Windows desktop) + 별도 `FastPortSharp.Dashboard.sln` 신설로 기존 build.yml CI 회귀 0. LiveCharts2 chart + 6 KPIs + JSONL polling (Mock + Jsonl 두 어댑터). 직전 cycle의 file share lesson 적용 (`FileShare.ReadWrite`).
 
-- `maui-telemetry-dashboard-foundation`
-- `maui-load-validation-run-viewer`
-- `maui-run-comparison-report-export`
+Delivered:
+- `FastPortDashboard.Maui/` (production project, root)
+- `FastPortSharp.Dashboard.sln` (격리 sln)
+- MVVM (DashboardViewModel + IPollingAdapter abstraction)
+- 1 chart (Server Throughput bytes/sec) + 6 KPIs (sessions, pending, buffer, last-update 등)
+- File picker + Mock toggle
 
-The dashboard should consume the existing observed metric envelope:
+Build: `dotnet build FastPortSharp.Dashboard.sln -c Release` 0/0. 기존 139 tests 회귀 0.
 
-- root `timestamp`
-- `clientObserved`
-- `serverObserved`
+#### 4.2 Follow-up candidates
 
-Initial views should focus on:
+- `maui-load-validation-run-viewer` — 여러 run 비교 + history navigation
+- `maui-run-comparison-report-export` — PDF/HTML report export
+- `rename-libtesttelemetry-to-libtelemetrycontracts` — production이 test-prefix lib 참조하는 상태 정리
+- `dashboard-rtt-chart` — `clientObserved.RttP95Ms` 추가 + dual-pane chart
+- `dashboard-mobile-targets` — iOS / Android 빌드 + 모바일 layout
 
-- TPS
-- RTT P95/P99
-- per-session RTT tail
-- pending request/send
-- pacing window/wait
+Initial dashboard data axes (Foundation 외 대상):
+
+- TPS / RTT P95/P99 / per-session RTT tail
+- pending request/send / pacing window/wait
 - socket error classification
 - server backpressure/send buffer
 - stage pass/fail comparison
