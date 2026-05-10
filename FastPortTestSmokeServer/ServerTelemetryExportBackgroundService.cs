@@ -46,7 +46,15 @@ public sealed class ServerTelemetryExportBackgroundService : BackgroundService
             outputPath,
             interval);
 
-        await using FileStream stream = File.Open(outputPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+        // Windows file cache 일관성: WriteThrough로 OS write cache 우회.
+        // Async + WriteThrough 조합으로 다른 reader handle이 매 flush 즉시 가시.
+        await using FileStream stream = new FileStream(
+            outputPath,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.Read,
+            bufferSize: 4096,
+            options: FileOptions.WriteThrough | FileOptions.Asynchronous);
         await using var writer = new StreamWriter(stream);
         _logger.LogInformation("Server telemetry export file opened: {OutputPath}", outputPath);
 
