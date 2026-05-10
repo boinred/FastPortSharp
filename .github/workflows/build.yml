@@ -6,11 +6,9 @@ name: build
 on:
   push:
     branches:
-      - main
       - builds.release
   pull_request:
     branches:
-      - main
       - builds.release
   workflow_dispatch:
 
