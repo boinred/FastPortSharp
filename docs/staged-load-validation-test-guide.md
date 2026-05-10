@@ -77,7 +77,7 @@ dotnet test FastPortSharp.sln --no-build
 Dry-run은 실제 부하를 실행하지 않고 `FastPortTestLoadRunner` 명령만 출력한다.
 
 ```bash
-./FastPortTestLoadValidation/bin/Debug/net10.0/FastPortTestLoadValidation \
+./tests-projects/FastPortTestLoadValidation/bin/Debug/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \
   --output artifacts/load-validation/dry-run \
@@ -87,13 +87,13 @@ Dry-run은 실제 부하를 실행하지 않고 `FastPortTestLoadRunner` 명령�
 기대 출력:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadRunner -- --host 127.0.0.1 --port 6628 --sessions 10000 --payload random:4096-16384 --rate 1 --ramp-up 120s --duration 5m --metrics-interval 1s --output artifacts/load-validation/dry-run/s5-random-10k.metrics.jsonl
+dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- --host 127.0.0.1 --port 6628 --sessions 10000 --payload random:4096-16384 --rate 1 --ramp-up 120s --duration 5m --metrics-interval 1s --output artifacts/load-validation/dry-run/s5-random-10k.metrics.jsonl
 ```
 
 Release build binary로 확인하려면:
 
 ```bash
-./FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
+./tests-projects/FastPortTestLoadValidation/bin/Release/net10.0/FastPortTestLoadValidation \
   --profile staged \
   --stage s5-random-10k \
   --dry-run
@@ -108,17 +108,17 @@ Release build binary로 확인하려면:
 터미널 1:
 
 ```bash
-dotnet run -c Release --project FastPortTestSmokeServer
+dotnet run -c Release --project tests-projects/FastPortTestSmokeServer
 ```
 
-서버가 `6628`이 아닌 다른 port를 사용해야 하면 `FastPortTestSmokeServer/appsettings.json`의 `FastPortTestSmokeServer:Port`를 조정하고, validation 실행 시 같은 port를 `--port`로 넘긴다.
+서버가 `6628`이 아닌 다른 port를 사용해야 하면 `tests-projects/FastPortTestSmokeServer/appsettings.json`의 `FastPortTestSmokeServer:Port`를 조정하고, validation 실행 시 같은 port를 `--port`로 넘긴다.
 
 ### 5.2 Smoke profile 실행
 
 터미널 2:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadValidation -- \
   --profile smoke \
   --output artifacts/load-validation/smoke-local
 ```
@@ -166,13 +166,13 @@ artifacts/load-validation/smoke-local/
 터미널 1:
 
 ```bash
-dotnet run -c Release --project FastPortTestSmokeServer
+dotnet run -c Release --project tests-projects/FastPortTestSmokeServer
 ```
 
 터미널 2:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadValidation -- \
   --profile staged \
   --output artifacts/load-validation/staged-local \
   --continue-on-failure
@@ -193,7 +193,7 @@ Stage matrix:
 먼저 낮은 단계부터 실행한다.
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadValidation -- \
   --profile staged \
   --stage s1-fixed-1k \
   --output artifacts/load-validation/s1-local
@@ -202,7 +202,7 @@ dotnet run -c Release --project FastPortTestLoadValidation -- \
 10,000 session 단일 stage:
 
 ```bash
-dotnet run -c Release --project FastPortTestLoadValidation -- \
+dotnet run -c Release --project tests-projects/FastPortTestLoadValidation -- \
   --profile staged \
   --stage s5-random-10k \
   --output artifacts/load-validation/s5-local

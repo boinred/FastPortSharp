@@ -17,11 +17,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "솔루션 항목", "솔루�
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTests", "FastPortTests\FastPortTests.csproj", "{767231F2-4343-45A2-8757-9640DD85B31A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTests", "tests-projects\FastPortTests\FastPortTests.csproj", "{767231F2-4343-45A2-8757-9640DD85B31A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Protocols", "Protocols\Protocols.csproj", "{72E119BB-AF18-4E85-8EF2-9093C1D40AC4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadRunner", "FastPortTestLoadRunner\FastPortTestLoadRunner.csproj", "{E6DD2AB4-FEAE-4EF9-8489-51379976948C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadRunner", "tests-projects\FastPortTestLoadRunner\FastPortTestLoadRunner.csproj", "{E6DD2AB4-FEAE-4EF9-8489-51379976948C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{FF8E302A-D3F6-40D6-945D-E894F9369882}"
 	ProjectSection(SolutionItems) = preProject
@@ -31,11 +31,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{FF8E302A-D
 		docs\latency-performance-report.md = docs\latency-performance-report.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestSmokeServer", "FastPortTestSmokeServer\FastPortTestSmokeServer.csproj", "{69748F78-57D1-4A45-89B6-03C3BF9ECF8C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestSmokeServer", "tests-projects\FastPortTestSmokeServer\FastPortTestSmokeServer.csproj", "{69748F78-57D1-4A45-89B6-03C3BF9ECF8C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadValidation", "FastPortTestLoadValidation\FastPortTestLoadValidation.csproj", "{86357368-E11D-48ED-9CE8-1B4A5DF2527D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadValidation", "tests-projects\FastPortTestLoadValidation\FastPortTestLoadValidation.csproj", "{86357368-E11D-48ED-9CE8-1B4A5DF2527D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibTestTelemetry", "LibTestTelemetry\LibTestTelemetry.csproj", "{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibTestTelemetry", "tests-projects\LibTestTelemetry\LibTestTelemetry.csproj", "{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate", "FastPortGameServerTemplate\FastPortGameServerTemplate.csproj", "{192C731C-E783-441B-BFC3-52775879C7CE}"
 EndProject

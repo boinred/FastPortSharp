@@ -8,9 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
+    <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\LibTestTelemetry\LibTestTelemetry.csproj" />
-    <ProjectReference Include="..\Protocols\Protocols.csproj" />
+    <ProjectReference Include="..\..\Protocols\Protocols.csproj" />
   </ItemGroup>
 
 </Project>

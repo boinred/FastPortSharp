@@ -20,5 +20,5 @@ scripts/cloud/write-manifest.sh server
 echo "Starting FastPortTestSmokeServer on 0.0.0.0:$FASTPORT_SERVER_PORT"
 echo "Server metrics: $FASTPORT_SERVER_METRICS"
 
-dotnet build FastPortTestSmokeServer/FastPortTestSmokeServer.csproj -c Release
-dotnet run --no-build -c Release --project FastPortTestSmokeServer
+dotnet build tests-projects/FastPortTestSmokeServer/FastPortTestSmokeServer.csproj -c Release
+dotnet run --no-build -c Release --project tests-projects/FastPortTestSmokeServer

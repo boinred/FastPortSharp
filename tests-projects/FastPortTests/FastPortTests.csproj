@@ -13,11 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
+    <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\FastPortTestLoadRunner\FastPortTestLoadRunner.csproj" />
     <ProjectReference Include="..\FastPortTestLoadValidation\FastPortTestLoadValidation.csproj" />
     <ProjectReference Include="..\FastPortTestSmokeServer\FastPortTestSmokeServer.csproj" />
-    <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+    <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
     <ProjectReference Include="..\LibTestTelemetry\LibTestTelemetry.csproj" />
   </ItemGroup>
 

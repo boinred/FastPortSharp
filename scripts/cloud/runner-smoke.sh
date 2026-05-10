@@ -15,11 +15,11 @@ mkdir -p "$FASTPORT_CLOUD_OUTPUT/runner" "$FASTPORT_OUTPUT"
 
 scripts/cloud/os-readiness.sh > "$FASTPORT_CLOUD_OUTPUT/runner/os-readiness.txt"
 
-dotnet build FastPortTestLoadRunner/FastPortTestLoadRunner.csproj -c Release
-dotnet build FastPortTestLoadValidation/FastPortTestLoadValidation.csproj -c Release
+dotnet build tests-projects/FastPortTestLoadRunner/FastPortTestLoadRunner.csproj -c Release
+dotnet build tests-projects/FastPortTestLoadValidation/FastPortTestLoadValidation.csproj -c Release
 
 args=(
-  run --no-build -c Release --project FastPortTestLoadValidation --
+  run --no-build -c Release --project tests-projects/FastPortTestLoadValidation --
   --profile smoke
   --host "$FASTPORT_SERVER_HOST"
   --port "$FASTPORT_SERVER_PORT"
