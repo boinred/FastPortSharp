@@ -12,6 +12,12 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>latest</LangVersion>
 
+		<!-- Foundation cycle 한정: macOS 26.x + .NET 10 MAUI Catalyst에서 Release AOT가
+		     `mono_jit_init` → `xamarin_bridge_initialize` 단계에서 SIGABRT.
+		     AOT를 끄면 JIT로 동작 (런타임 성능은 약간 ↓이지만 dev/test 충분). -->
+		<RunAOTCompilation Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">false</RunAOTCompilation>
+		<MtouchInterpreter Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">all</MtouchInterpreter>
+
 		<!-- Display name -->
 		<ApplicationTitle>FastPortDashboard.Maui</ApplicationTitle>
 
