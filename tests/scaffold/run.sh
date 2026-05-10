@@ -237,7 +237,8 @@ run_case() {
     actual_sha256="$(compute_sha256 "${dest}")"
     if ! diff -u "${expected_dir}/sha256.txt" <(printf '%s\n' "${actual_sha256}") >"${tmp}/sha256.diff"; then
       case_pass=0
-      fail_reasons+=("sha256 mismatch (see ${tmp}/sha256.diff)")
+      fail_reasons+=("sha256 mismatch (first 40 diff lines below)")
+      head -40 "${tmp}/sha256.diff" >&2
       KEEP_TMP=1
     fi
   fi
@@ -246,7 +247,8 @@ run_case() {
     actual_tree="$(compute_tree "${dest}")"
     if ! diff -u "${expected_dir}/tree.txt" <(printf '%s\n' "${actual_tree}") >"${tmp}/tree.diff"; then
       case_pass=0
-      fail_reasons+=("tree mismatch (see ${tmp}/tree.diff)")
+      fail_reasons+=("tree mismatch (first 40 diff lines below)")
+      head -40 "${tmp}/tree.diff" >&2
       KEEP_TMP=1
     fi
   fi
