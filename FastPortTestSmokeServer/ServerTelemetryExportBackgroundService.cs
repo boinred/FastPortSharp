@@ -28,7 +28,7 @@ public sealed class ServerTelemetryExportBackgroundService : BackgroundService
             return;
         }
 
-        TimeSpan interval = TimeSpan.FromSeconds(Math.Max(0, _options.IntervalSeconds));
+        TimeSpan interval = TimeSpan.FromSeconds(Math.Max(0.05, _options.IntervalSeconds));
         string outputPath = _options.Output;
         string? directory = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrWhiteSpace(directory))
