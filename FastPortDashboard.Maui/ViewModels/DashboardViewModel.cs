@@ -1,15 +1,14 @@
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using FastPortDashboard.Maui.Adapters;
 using LibTestTelemetry;
 
 namespace FastPortDashboard.Maui.ViewModels;
 
-// Design Ref: §3.4 — MVVM dashboard ViewModel.
+// Design Ref: §3.2 — CommunityToolkit.Mvvm 소스 제너레이터 적용.
 // View와 Adapter 사이의 application 계층. UI 의존 0이라 unit test 용이.
-public sealed class DashboardViewModel : INotifyPropertyChanged
+public sealed partial class DashboardViewModel : ObservableObject
 {
     private const int MaxChartPoints = 600; // 10분치 (1초 간격 가정)
 
@@ -18,98 +17,35 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
 
     public ObservableCollection<TimedDoublePoint> ThroughputSeries { get; } = new();
 
-    private long _currentSessions;
-    public long CurrentSessions
-    {
-        get => _currentSessions;
-        private set { if (_currentSessions != value) { _currentSessions = value; OnPropertyChanged(); } }
-    }
+    // ─── KPI (Plan SC: ~60% LOC 축소) ────────────────────────────
+    [ObservableProperty] private long _currentSessions;
+    [ObservableProperty] private long _totalAcceptedSessions;
+    [ObservableProperty] private long _totalSentBytes;
+    [ObservableProperty] private long _pendingSendRequests;
+    [ObservableProperty] private long _sendBufferBytes;
+    [ObservableProperty] private DateTimeOffset _lastUpdate = DateTimeOffset.MinValue;
 
-    private long _totalAcceptedSessions;
-    public long TotalAcceptedSessions
-    {
-        get => _totalAcceptedSessions;
-        private set { if (_totalAcceptedSessions != value) { _totalAcceptedSessions = value; OnPropertyChanged(); } }
-    }
+    // ─── UI Input ────────────────────────────────────────────────
+    [ObservableProperty] private bool _useMock;
+    [ObservableProperty] private string _filePath = string.Empty;
+    [ObservableProperty] private string? _errorMessage;
 
-    private long _totalSentBytes;
-    public long TotalSentBytes
-    {
-        get => _totalSentBytes;
-        private set { if (_totalSentBytes != value) { _totalSentBytes = value; OnPropertyChanged(); } }
-    }
-
-    private long _pendingSendRequests;
-    public long PendingSendRequests
-    {
-        get => _pendingSendRequests;
-        private set { if (_pendingSendRequests != value) { _pendingSendRequests = value; OnPropertyChanged(); } }
-    }
-
-    private long _sendBufferBytes;
-    public long SendBufferBytes
-    {
-        get => _sendBufferBytes;
-        private set { if (_sendBufferBytes != value) { _sendBufferBytes = value; OnPropertyChanged(); } }
-    }
-
-    private DateTimeOffset _lastUpdate = DateTimeOffset.MinValue;
-    public DateTimeOffset LastUpdate
-    {
-        get => _lastUpdate;
-        private set { if (_lastUpdate != value) { _lastUpdate = value; OnPropertyChanged(); } }
-    }
-
+    // ─── State (CanExecute trigger; Design Ref: §3.3) ────────────
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    [NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
     private PollingState _state = PollingState.Idle;
-    public PollingState State
-    {
-        get => _state;
-        private set
-        {
-            if (_state != value)
-            {
-                _state = value;
-                OnPropertyChanged();
-                ((Command)ConnectCommand).ChangeCanExecute();
-                ((Command)DisconnectCommand).ChangeCanExecute();
-            }
-        }
-    }
 
-    private string? _errorMessage;
-    public string? ErrorMessage
-    {
-        get => _errorMessage;
-        private set { if (_errorMessage != value) { _errorMessage = value; OnPropertyChanged(); } }
-    }
+    private bool CanConnect()
+        => State == PollingState.Idle || State == PollingState.Disconnected || State == PollingState.Error;
 
-    private bool _useMock;
-    public bool UseMock
-    {
-        get => _useMock;
-        set { if (_useMock != value) { _useMock = value; OnPropertyChanged(); } }
-    }
+    private bool CanDisconnect() => State == PollingState.Polling;
 
-    private string _filePath = string.Empty;
-    public string FilePath
-    {
-        get => _filePath;
-        set { if (_filePath != value) { _filePath = value; OnPropertyChanged(); } }
-    }
+    [RelayCommand(CanExecute = nameof(CanConnect))]
+    private async Task ConnectAsync() => await StartAsync();
 
-    public ICommand ConnectCommand { get; }
-    public ICommand DisconnectCommand { get; }
-
-    public DashboardViewModel()
-    {
-        ConnectCommand = new Command(
-            execute: async () => await StartAsync(),
-            canExecute: () => State == PollingState.Idle || State == PollingState.Disconnected || State == PollingState.Error);
-
-        DisconnectCommand = new Command(
-            execute: () => Stop(),
-            canExecute: () => State == PollingState.Polling);
-    }
+    [RelayCommand(CanExecute = nameof(CanDisconnect))]
+    private void Disconnect() => Stop();
 
     // Test entry point: adapter를 직접 주입해 데이터 흐름 검증.
     public async Task PumpAsync(IPollingAdapter adapter, CancellationToken ct)
@@ -132,7 +68,6 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         SendBufferBytes = server.SendBufferBytes;
         LastUpdate = server.Timestamp;
 
-        // Chart point 추가 (recent N개만 유지)
         double tsMs = server.Timestamp.ToUnixTimeMilliseconds();
         ThroughputSeries.Add(new TimedDoublePoint(tsMs, server.SentBytesPerSecond));
         while (ThroughputSeries.Count > MaxChartPoints)
@@ -179,15 +114,5 @@ public sealed class DashboardViewModel : INotifyPropertyChanged
         }
     }
 
-    private void Stop()
-    {
-        _cts?.Cancel();
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
+    private void Stop() => _cts?.Cancel();
 }

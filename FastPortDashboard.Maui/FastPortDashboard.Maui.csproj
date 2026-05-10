@@ -55,6 +55,9 @@
 	<ItemGroup>
 		<!-- MAUI core (.NET 8+ 부터 명시적 PackageReference 필요). -->
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+		<!-- MVVM source generators (ObservableProperty / RelayCommand / NotifyCanExecuteChangedFor).
+		     Design Ref: §3.1 — DashboardViewModel boilerplate 제거. -->
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<!-- Foundation cycle: LiveCharts2 통합은 다음 cycle (`dashboard-rtt-chart` 또는
 		     `dashboard-livecharts-integration`)에서 진행. macOS 26.x + .NET 10 MAUI Catalyst
 		     초기 ObservationTracking SwiftUI bridging crash 회피용. -->
