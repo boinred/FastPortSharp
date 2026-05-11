@@ -17,6 +17,9 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     public ObservableCollection<TimedDoublePoint> ThroughputSeries { get; } = new();
 
+    // Design Ref: §3.3 (dashboard-rtt-chart) — Client RTT P95Ms 시계열.
+    public ObservableCollection<TimedDoublePoint> ClientRttSeries { get; } = new();
+
     // ─── KPI (Plan SC: ~60% LOC 축소) ────────────────────────────
     [ObservableProperty] private long _currentSessions;
     [ObservableProperty] private long _totalAcceptedSessions;
@@ -58,21 +61,40 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     public void ApplySnapshot(ObservedMetricsSnapshot snap)
     {
+        // Design Ref: §3.3 (dashboard-rtt-chart) — Server/Client 둘 다 null-safe 분기.
         var server = snap.ServerObserved;
-        if (server is null) { return; }
-
-        CurrentSessions = server.CurrentSessions;
-        TotalAcceptedSessions = server.TotalAcceptedSessions;
-        TotalSentBytes = server.TotalSentBytes;
-        PendingSendRequests = server.PendingSendRequests;
-        SendBufferBytes = server.SendBufferBytes;
-        LastUpdate = server.Timestamp;
-
-        double tsMs = server.Timestamp.ToUnixTimeMilliseconds();
-        ThroughputSeries.Add(new TimedDoublePoint(tsMs, server.SentBytesPerSecond));
-        while (ThroughputSeries.Count > MaxChartPoints)
+        if (server is not null)
         {
-            ThroughputSeries.RemoveAt(0);
+            CurrentSessions = server.CurrentSessions;
+            TotalAcceptedSessions = server.TotalAcceptedSessions;
+            TotalSentBytes = server.TotalSentBytes;
+            PendingSendRequests = server.PendingSendRequests;
+            SendBufferBytes = server.SendBufferBytes;
+            LastUpdate = server.Timestamp;
+
+            double tsMs = server.Timestamp.ToUnixTimeMilliseconds();
+            ThroughputSeries.Add(new TimedDoublePoint(tsMs, server.SentBytesPerSecond));
+            while (ThroughputSeries.Count > MaxChartPoints)
+            {
+                ThroughputSeries.RemoveAt(0);
+            }
+        }
+
+        var client = snap.ClientObserved;
+        if (client is not null)
+        {
+            ApplyClientSnapshot(client);
+        }
+    }
+
+    // Design Ref: §3.3 — ClientObserved → ClientRttSeries (P95Ms 기본).
+    private void ApplyClientSnapshot(ClientObservedMetricsSnapshot client)
+    {
+        double tsMs = client.Timestamp.ToUnixTimeMilliseconds();
+        ClientRttSeries.Add(new TimedDoublePoint(tsMs, client.RttP95Ms));
+        while (ClientRttSeries.Count > MaxChartPoints)
+        {
+            ClientRttSeries.RemoveAt(0);
         }
     }
 

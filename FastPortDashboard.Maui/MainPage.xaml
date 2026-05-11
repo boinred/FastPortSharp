@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels;assembly=FastPortDashboard.Core"
+             xmlns:microcharts="clr-namespace:Microcharts.Maui;assembly=Microcharts.Maui"
              x:Class="FastPortDashboard.Maui.MainPage"
              x:DataType="vm:DashboardViewModel"
              Title="FastPort Dashboard">
@@ -78,12 +79,12 @@
                 </Grid>
             </Frame>
 
-            <!-- Chart placeholder: 다음 cycle에서 LiveCharts2 통합. macOS 26.x에서 SwiftUI/UIKit bridging crash 회피용. -->
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="120">
+            <!-- Design Ref: §3.5 (dashboard-rtt-chart) — Microcharts.Maui LineChart. -->
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
                 <VerticalStackLayout>
-                    <Label Text="Server Throughput Chart" FontAttributes="Bold" />
-                    <Label Text="(Chart visual은 다음 cycle. 현재는 KPI numeric만 갱신)" FontSize="11" TextColor="Gray" />
-                    <Label Text="{Binding ThroughputSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="14" />
+                    <Label Text="Client RTT P95 (ms)" FontAttributes="Bold" />
+                    <Label Text="{Binding ClientRttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
+                    <microcharts:ChartView x:Name="RttChartView" HeightRequest="160" />
                 </VerticalStackLayout>
             </Frame>
 

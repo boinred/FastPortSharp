@@ -208,6 +208,58 @@ public class DashboardViewModelTests
         Assert.AreEqual((double)600, vm.ThroughputSeries[^1].Value, "최신 point 보존");
     }
 
+    // ─── Helper for client snap ──────────────────────────────────
+    private static ClientObservedMetricsSnapshot MakeClientSnap(
+        double rttP95Ms = 75, DateTimeOffset? ts = null)
+    {
+        return new ClientObservedMetricsSnapshot(
+            Timestamp: ts ?? DateTimeOffset.UtcNow,
+            TargetSessions: 100, CurrentSessions: 10,
+            TotalSentPackets: 0, TotalReceivedPackets: 0,
+            TotalSentBytes: 0, TotalReceivedBytes: 0,
+            SentPacketsPerSecond: 0, ReceivedPacketsPerSecond: 0,
+            SentBytesPerSecond: 0, ReceivedBytesPerSecond: 0,
+            Tps: 0,
+            RttAverageMs: 40, RttP50Ms: 30, RttP95Ms: rttP95Ms, RttP99Ms: 150,
+            ConnectCount: 0, DisconnectCount: 0,
+            SocketErrorCount: 0, SocketErrorRate: 0);
+    }
+
+    // T-VM-11 (dashboard-rtt-chart): ClientObserved → ClientRttSeries append.
+    [TestMethod]
+    public void ApplySnapshot_ClientObserved_AppendsRttSeries()
+    {
+        var vm = new DashboardViewModel();
+        var combined = ObservedMetricsSnapshot.Combined(
+            MakeClientSnap(rttP95Ms: 87.5),
+            MakeServerSnap());
+
+        vm.ApplySnapshot(combined);
+
+        Assert.AreEqual(1, vm.ClientRttSeries.Count);
+        Assert.AreEqual(87.5, vm.ClientRttSeries[0].Value);
+    }
+
+    // T-VM-12 (dashboard-rtt-chart): ClientRttSeries 600 trim.
+    [TestMethod]
+    public void ApplyClientSnapshot_TrimsRttSeriesAt600()
+    {
+        var vm = new DashboardViewModel();
+        var baseTs = new DateTimeOffset(2026, 5, 11, 0, 0, 0, TimeSpan.Zero);
+
+        for (int i = 0; i < 601; i++)
+        {
+            var snap = ObservedMetricsSnapshot.Combined(
+                MakeClientSnap(rttP95Ms: i, ts: baseTs.AddSeconds(i)),
+                serverObserved: null);
+            vm.ApplySnapshot(snap);
+        }
+
+        Assert.AreEqual(600, vm.ClientRttSeries.Count, "MaxChartPoints 600 trim (client RTT)");
+        Assert.AreEqual((double)1, vm.ClientRttSeries[0].Value, "가장 오래된 (i=0) 제거");
+        Assert.AreEqual((double)600, vm.ClientRttSeries[^1].Value, "최신 보존");
+    }
+
     // T-VM-10
     [TestMethod]
     public async Task ConnectCommand_NoMockAndEmptyFilePath_SetsErrorState()

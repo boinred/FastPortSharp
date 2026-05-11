@@ -72,7 +72,30 @@ public sealed class MockPollingAdapter : IPollingAdapter
                 PendingSendRequests: pendingSendRequests,
                 SendBufferBytes: sendBufferBytes);
 
-            yield return ObservedMetricsSnapshot.FromServer(serverSnap);
+            // Design Ref: §3.4 (dashboard-rtt-chart) — Client RTT 시뮬레이션 (P95 50~100ms random walk).
+            var clientSnap = new ClientObservedMetricsSnapshot(
+                Timestamp: DateTimeOffset.UtcNow,
+                TargetSessions: 100,
+                CurrentSessions: (int)currentSessions,
+                TotalSentPackets: 0,
+                TotalReceivedPackets: 0,
+                TotalSentBytes: 0,
+                TotalReceivedBytes: 0,
+                SentPacketsPerSecond: 0,
+                ReceivedPacketsPerSecond: 0,
+                SentBytesPerSecond: 0,
+                ReceivedBytesPerSecond: 0,
+                Tps: 0,
+                RttAverageMs: 30 + _rng.NextDouble() * 20,
+                RttP50Ms: 25 + _rng.NextDouble() * 15,
+                RttP95Ms: 50 + _rng.NextDouble() * 50,
+                RttP99Ms: 100 + _rng.NextDouble() * 100,
+                ConnectCount: 0,
+                DisconnectCount: 0,
+                SocketErrorCount: 0,
+                SocketErrorRate: 0);
+
+            yield return ObservedMetricsSnapshot.Combined(clientSnap, serverSnap);
 
             try
             {

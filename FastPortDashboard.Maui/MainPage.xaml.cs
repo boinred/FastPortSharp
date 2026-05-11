@@ -1,10 +1,13 @@
 using FastPortDashboard.Maui.ViewModels;
+using Microcharts;
+using SkiaSharp;
 
 namespace FastPortDashboard.Maui;
 
 public partial class MainPage : ContentPage
 {
 	private readonly DashboardViewModel _viewModel;
+	private static readonly SKColor RttLineColor = SKColor.Parse("#2196F3");
 
 	public MainPage()
 	{
@@ -12,6 +15,32 @@ public partial class MainPage : ContentPage
 
 		_viewModel = new DashboardViewModel();
 		BindingContext = _viewModel;
+
+		// Design Ref: §3.6 (dashboard-rtt-chart) — code-behind에서 ChartEntry 변환.
+		// Core ViewModel은 도메인 데이터(TimedDoublePoint) 유지, Microcharts 의존은 Maui 측에만.
+		_viewModel.ClientRttSeries.CollectionChanged += (_, _) => UpdateRttChart();
+		UpdateRttChart();
+	}
+
+	private void UpdateRttChart()
+	{
+		var entries = _viewModel.ClientRttSeries
+			.Select(p => new ChartEntry((float)p.Value)
+			{
+				Label = string.Empty,
+				ValueLabel = ((int)p.Value).ToString(),
+				Color = RttLineColor,
+			})
+			.ToArray();
+
+		RttChartView.Chart = new LineChart
+		{
+			Entries = entries,
+			LineMode = LineMode.Straight,
+			LineSize = 2,
+			PointMode = PointMode.None,
+			BackgroundColor = SKColors.Transparent,
+		};
 	}
 
 	private async void OnBrowseClicked(object? sender, EventArgs e)
