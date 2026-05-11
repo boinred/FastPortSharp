@@ -82,11 +82,11 @@ Serilog, Protobuf, session / handler / dispatcher 트리오가 미리 wired-up
 dotnet build FastPortSharp.sln -c Release
 
 # 2. 템플릿 서버 실행 (터미널 1)
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 # → "GameServer listening" on 0.0.0.0:7777
 
 # 3. Full Protobuf echo round-trip 검증 (터미널 2)
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 # → "EchoResponse received. Message=\"Hello, FastPort!\", RTT=...ms"
 ```
 
@@ -348,37 +348,38 @@ FastPortSharp/
 │       ├── BaseSessionServer.cs                # 클라이언트 측 outgoing 세션
 │       └── IClientSessionFactory.cs
 │
-├── 🎮 FastPortGameServerTemplate/            # 게임 서버 스타터 (템플릿)
-│   ├── Application/
-│   │   ├── GameServer.cs                       # : BaseMessageListener
-│   │   ├── GameServerHostedService.cs          # IHostedService 라이프사이클
-│   │   └── PacketDispatcher.cs
-│   ├── Sessions/
-│   │   ├── GameSession.cs                      # : BaseSessionClient
-│   │   └── GameSessionFactory.cs
-│   ├── Handlers/
-│   │   ├── IPacketHandler.cs
-│   │   ├── EchoHandler.cs                      # 1001 → 1002 round-trip 샘플
-│   │   └── PacketIds.cs
-│   ├── Telemetry/
-│   │   ├── IGameServerTelemetry.cs
-│   │   └── NullGameServerTelemetry.cs
-│   ├── Configuration/GameServerOptions.cs
-│   ├── Protocols/Sample.proto                  # Grpc.Tools, GrpcServices=None
-│   ├── Program.cs                              # Generic Host + Serilog wiring
-│   ├── appsettings.json
-│   ├── README.md / QUICKSTART.ko.md
-│   └── FastPortGameServerTemplate.csproj
-│
-├── 🧪 FastPortGameServerTemplate.SampleClient/  # Full echo round-trip 검증
-│   ├── Sessions/
-│   │   ├── SampleClientSession.cs              # : BaseSessionServer
-│   │   └── SampleClientSessionFactory.cs
-│   ├── SampleClientConnector.cs                # : BaseMessageConnector
-│   ├── SampleClientHostedService.cs            # connect → 1001 → 1002 await
-│   ├── SampleClientOptions.cs / EchoSignal.cs
-│   ├── Program.cs / appsettings.json
-│   └── FastPortGameServerTemplate.SampleClient.csproj
+├── 📂 template-projects/                      # 게임 서버 템플릿 surface 그룹화
+│   ├── 🎮 FastPortGameServerTemplate/          # 게임 서버 스타터 (템플릿)
+│   │   ├── Application/
+│   │   │   ├── GameServer.cs                   # : BaseMessageListener
+│   │   │   ├── GameServerHostedService.cs      # IHostedService 라이프사이클
+│   │   │   └── PacketDispatcher.cs
+│   │   ├── Sessions/
+│   │   │   ├── GameSession.cs                  # : BaseSessionClient
+│   │   │   └── GameSessionFactory.cs
+│   │   ├── Handlers/
+│   │   │   ├── IPacketHandler.cs
+│   │   │   ├── EchoHandler.cs                  # 1001 → 1002 round-trip 샘플
+│   │   │   └── PacketIds.cs
+│   │   ├── Telemetry/
+│   │   │   ├── IGameServerTelemetry.cs
+│   │   │   └── NullGameServerTelemetry.cs
+│   │   ├── Configuration/GameServerOptions.cs
+│   │   ├── Protocols/Sample.proto              # Grpc.Tools, GrpcServices=None
+│   │   ├── Program.cs                          # Generic Host + Serilog wiring
+│   │   ├── appsettings.json
+│   │   ├── README.md / QUICKSTART.ko.md
+│   │   └── FastPortGameServerTemplate.csproj
+│   │
+│   └── 🧪 FastPortGameServerTemplate.SampleClient/  # Full echo round-trip 검증
+│       ├── Sessions/
+│       │   ├── SampleClientSession.cs          # : BaseSessionServer
+│       │   └── SampleClientSessionFactory.cs
+│       ├── SampleClientConnector.cs            # : BaseMessageConnector
+│       ├── SampleClientHostedService.cs        # connect → 1001 → 1002 await
+│       ├── SampleClientOptions.cs / EchoSignal.cs
+│       ├── Program.cs / appsettings.json
+│       └── FastPortGameServerTemplate.SampleClient.csproj
 │
 ├── 📂 FastPortServer/                        # 엔진 sample/host (검증)
 ├── 📂 FastPortClient/                        # 엔진 sample/client (LatencyStats)
@@ -515,10 +516,10 @@ cd FastPortSharp
 dotnet build FastPortSharp.sln -c Release
 
 # 템플릿 서버 실행
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 
 # 다른 터미널에서 full echo round-trip 검증
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 ```
 
 이후 위의 [서버 커스터마이징](#서버-커스터마이징) 섹션에 따라

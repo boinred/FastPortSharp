@@ -37,7 +37,7 @@ Replace the sample handler with your own packet handlers to ship a game server.
 ```bash
 # from the repo root
 dotnet build FastPortSharp.sln -c Release
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 ```
 
 Expected log on stdout:
@@ -71,10 +71,10 @@ Start the server in one terminal, run the client in another:
 
 ```bash
 # terminal 1
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 
 # terminal 2
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 ```
 
 Expected client output:

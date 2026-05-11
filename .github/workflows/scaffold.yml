@@ -10,7 +10,7 @@ on:
     paths:
       - 'scripts/scaffold-game-server.**'
       - 'tests/scaffold/**'
-      - 'FastPortGameServerTemplate/**'
+      - 'template-projects/FastPortGameServerTemplate/**'
       - 'LibCommons/**'
       - 'LibNetworks/**'
       - '.gitattributes'
@@ -19,7 +19,7 @@ on:
     paths:
       - 'scripts/scaffold-game-server.**'
       - 'tests/scaffold/**'
-      - 'FastPortGameServerTemplate/**'
+      - 'template-projects/FastPortGameServerTemplate/**'
       - 'LibCommons/**'
       - 'LibNetworks/**'
       - '.gitattributes'

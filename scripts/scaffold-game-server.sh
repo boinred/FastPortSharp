@@ -45,7 +45,7 @@ readonly NAME_REGEX='^[A-Z][A-Za-z0-9]{0,63}$'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly SCRIPT_DIR
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-readonly TEMPLATE_SRC="${REPO_ROOT}/${TEMPLATE_TOKEN}"
+readonly TEMPLATE_SRC="${REPO_ROOT}/template-projects/${TEMPLATE_TOKEN}"
 readonly LIBCOMMONS_SRC="${REPO_ROOT}/LibCommons"
 readonly LIBNETWORKS_SRC="${REPO_ROOT}/LibNetworks"
 readonly BLOCKED_TOKENS_FILE="${REPO_ROOT}/tests/scaffold/_shared/blocked-tokens.txt"

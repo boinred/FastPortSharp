@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
-    <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+    <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
+    <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
     <!-- Reuse the generated Sample.proto types (EchoRequest/EchoResponse) and PacketIds. -->
     <ProjectReference Include="..\FastPortGameServerTemplate\FastPortGameServerTemplate.csproj" />
   </ItemGroup>

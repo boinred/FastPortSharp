@@ -85,7 +85,7 @@ $Script:NameRegex     = '^[A-Z][A-Za-z0-9]{0,63}$'
 #   scripts/scaffold-game-server.ps1 -> repo root is one directory up.
 $Script:ScriptDir       = Split-Path -Parent $PSCommandPath
 $Script:RepoRoot        = Resolve-Path (Join-Path $Script:ScriptDir '..') | Select-Object -ExpandProperty Path
-$Script:TemplateSrc     = Join-Path $Script:RepoRoot $Script:TemplateToken
+$Script:TemplateSrc     = Join-Path $Script:RepoRoot (Join-Path 'template-projects' $Script:TemplateToken)
 $Script:LibCommonsSrc   = Join-Path $Script:RepoRoot 'LibCommons'
 $Script:LibNetworksSrc  = Join-Path $Script:RepoRoot 'LibNetworks'
 $Script:BlockedTokensFile = Join-Path $Script:RepoRoot 'tests/scaffold/_shared/blocked-tokens.txt'

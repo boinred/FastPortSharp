@@ -38,8 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LibCommons\LibCommons.csproj" />
-    <ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+    <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
+    <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
   </ItemGroup>
 
   <ItemGroup>

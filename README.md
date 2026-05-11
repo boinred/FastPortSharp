@@ -83,11 +83,11 @@ keeps the engine boundary clean and your game-server code free of test scaffoldi
 dotnet build FastPortSharp.sln -c Release
 
 # 2. Start the template server (terminal 1)
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 # → "GameServer listening" on 0.0.0.0:7777
 
 # 3. Verify a full Protobuf echo round-trip (terminal 2)
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 # → "EchoResponse received. Message=\"Hello, FastPort!\", RTT=...ms"
 ```
 
@@ -350,37 +350,38 @@ FastPortSharp/
 │       ├── BaseSessionServer.cs                # Client-side outgoing session
 │       └── IClientSessionFactory.cs
 │
-├── 🎮 FastPortGameServerTemplate/            # Game server starter (template)
-│   ├── Application/
-│   │   ├── GameServer.cs                       # : BaseMessageListener
-│   │   ├── GameServerHostedService.cs          # IHostedService lifecycle
-│   │   └── PacketDispatcher.cs
-│   ├── Sessions/
-│   │   ├── GameSession.cs                      # : BaseSessionClient
-│   │   └── GameSessionFactory.cs
-│   ├── Handlers/
-│   │   ├── IPacketHandler.cs
-│   │   ├── EchoHandler.cs                      # 1001 → 1002 round-trip sample
-│   │   └── PacketIds.cs
-│   ├── Telemetry/
-│   │   ├── IGameServerTelemetry.cs
-│   │   └── NullGameServerTelemetry.cs
-│   ├── Configuration/GameServerOptions.cs
-│   ├── Protocols/Sample.proto                  # Grpc.Tools, GrpcServices=None
-│   ├── Program.cs                              # Generic Host + Serilog wiring
-│   ├── appsettings.json
-│   ├── README.md / QUICKSTART.ko.md
-│   └── FastPortGameServerTemplate.csproj
-│
-├── 🧪 FastPortGameServerTemplate.SampleClient/  # Verifies full echo round-trip
-│   ├── Sessions/
-│   │   ├── SampleClientSession.cs              # : BaseSessionServer
-│   │   └── SampleClientSessionFactory.cs
-│   ├── SampleClientConnector.cs                # : BaseMessageConnector
-│   ├── SampleClientHostedService.cs            # Connects, sends 1001, awaits 1002
-│   ├── SampleClientOptions.cs / EchoSignal.cs
-│   ├── Program.cs / appsettings.json
-│   └── FastPortGameServerTemplate.SampleClient.csproj
+├── 📂 template-projects/                      # Grouped game-server template surface
+│   ├── 🎮 FastPortGameServerTemplate/          # Game server starter (template)
+│   │   ├── Application/
+│   │   │   ├── GameServer.cs                   # : BaseMessageListener
+│   │   │   ├── GameServerHostedService.cs      # IHostedService lifecycle
+│   │   │   └── PacketDispatcher.cs
+│   │   ├── Sessions/
+│   │   │   ├── GameSession.cs                  # : BaseSessionClient
+│   │   │   └── GameSessionFactory.cs
+│   │   ├── Handlers/
+│   │   │   ├── IPacketHandler.cs
+│   │   │   ├── EchoHandler.cs                  # 1001 → 1002 round-trip sample
+│   │   │   └── PacketIds.cs
+│   │   ├── Telemetry/
+│   │   │   ├── IGameServerTelemetry.cs
+│   │   │   └── NullGameServerTelemetry.cs
+│   │   ├── Configuration/GameServerOptions.cs
+│   │   ├── Protocols/Sample.proto              # Grpc.Tools, GrpcServices=None
+│   │   ├── Program.cs                          # Generic Host + Serilog wiring
+│   │   ├── appsettings.json
+│   │   ├── README.md / QUICKSTART.ko.md
+│   │   └── FastPortGameServerTemplate.csproj
+│   │
+│   └── 🧪 FastPortGameServerTemplate.SampleClient/  # Verifies full echo round-trip
+│       ├── Sessions/
+│       │   ├── SampleClientSession.cs          # : BaseSessionServer
+│       │   └── SampleClientSessionFactory.cs
+│       ├── SampleClientConnector.cs            # : BaseMessageConnector
+│       ├── SampleClientHostedService.cs        # Connects, sends 1001, awaits 1002
+│       ├── SampleClientOptions.cs / EchoSignal.cs
+│       ├── Program.cs / appsettings.json
+│       └── FastPortGameServerTemplate.SampleClient.csproj
 │
 ├── 📂 FastPortServer/                        # Engine sample/host (validation)
 ├── 📂 FastPortClient/                        # Engine sample/client (with LatencyStats)
@@ -517,10 +518,10 @@ cd FastPortSharp
 dotnet build FastPortSharp.sln -c Release
 
 # Run the template server
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 
 # In another terminal, verify the full echo round-trip
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 ```
 
 Then customise `FastPortGameServerTemplate/` per the

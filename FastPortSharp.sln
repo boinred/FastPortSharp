@@ -37,9 +37,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortTestLoadValidation"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LibTestTelemetry", "tests-projects\LibTestTelemetry\LibTestTelemetry.csproj", "{D7D237EE-DE22-40CE-A561-F9DE96CF0A5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate", "FastPortGameServerTemplate\FastPortGameServerTemplate.csproj", "{192C731C-E783-441B-BFC3-52775879C7CE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate", "template-projects\FastPortGameServerTemplate\FastPortGameServerTemplate.csproj", "{192C731C-E783-441B-BFC3-52775879C7CE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate.SampleClient", "FastPortGameServerTemplate.SampleClient\FastPortGameServerTemplate.SampleClient.csproj", "{592EDD14-1F1B-4962-9BEE-203D6069FB70}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FastPortGameServerTemplate.SampleClient", "template-projects\FastPortGameServerTemplate.SampleClient\FastPortGameServerTemplate.SampleClient.csproj", "{592EDD14-1F1B-4962-9BEE-203D6069FB70}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

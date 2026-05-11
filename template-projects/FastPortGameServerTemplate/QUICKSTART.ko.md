@@ -15,7 +15,7 @@ dotnet build FastPortSharp.sln -c Release
 ## 2. 실행
 
 ```bash
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 ```
 
 콘솔에 다음 로그가 보이면 정상:
@@ -98,10 +98,10 @@ builder.Services.AddSingleton<IGameServerTelemetry, MyOtelTelemetry>();
 
 ```bash
 # 터미널 1
-dotnet run --project FastPortGameServerTemplate -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate -c Release
 
 # 터미널 2
-dotnet run --project FastPortGameServerTemplate.SampleClient -c Release
+dotnet run --project template-projects/FastPortGameServerTemplate.SampleClient -c Release
 ```
 
 예상 클라이언트 출력:
