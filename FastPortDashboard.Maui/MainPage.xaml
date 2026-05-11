@@ -88,6 +88,15 @@
                 </VerticalStackLayout>
             </Frame>
 
+            <!-- Design Ref: §3.1 (dashboard-throughput-chart) — RTT chart 아래 수직 스택. -->
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
+                <VerticalStackLayout>
+                    <Label Text="Server Throughput (B/s)" FontAttributes="Bold" />
+                    <Label Text="{Binding ThroughputSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
+                    <microcharts:ChartView x:Name="ThroughputChartView" HeightRequest="160" />
+                </VerticalStackLayout>
+            </Frame>
+
         </VerticalStackLayout>
     </ScrollView>
 
