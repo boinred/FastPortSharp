@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- ViewModel/Adapter는 MAUI Controls 타입을 직접 사용하지 않음
+		     (ICommand는 BCL, RelayCommand는 Toolkit). 따라서 plain net10.0 test로 실행 가능.
+		     dotnet test가 net10.0-maccatalyst Exe를 직접 실행할 수 없는 제약을 회피.
+		     소스 파일은 Compile Include로 가져오고 Toolkit source generator를 동일하게 적용. -->
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+		<PackageReference Include="MSTest" Version="3.9.0" />
+		<!-- DashboardViewModel이 사용하는 Toolkit source generator. -->
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\LibTestTelemetry\LibTestTelemetry.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Production 소스를 직접 compile-include. namespace는 'FastPortDashboard.Maui.*' 보존. -->
+		<Compile Include="..\..\FastPortDashboard.Maui\ViewModels\DashboardViewModel.cs" Link="_Source\DashboardViewModel.cs" />
+		<Compile Include="..\..\FastPortDashboard.Maui\ViewModels\PollingState.cs" Link="_Source\PollingState.cs" />
+		<Compile Include="..\..\FastPortDashboard.Maui\ViewModels\TimedDoublePoint.cs" Link="_Source\TimedDoublePoint.cs" />
+		<Compile Include="..\..\FastPortDashboard.Maui\Adapters\IPollingAdapter.cs" Link="_Source\IPollingAdapter.cs" />
+		<Compile Include="..\..\FastPortDashboard.Maui\Adapters\MockPollingAdapter.cs" Link="_Source\MockPollingAdapter.cs" />
+		<Compile Include="..\..\FastPortDashboard.Maui\Adapters\JsonlPollingAdapter.cs" Link="_Source\JsonlPollingAdapter.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+	</ItemGroup>
+
+</Project>
