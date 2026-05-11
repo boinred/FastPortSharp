@@ -26,31 +26,17 @@ public sealed class JsonlPollingAdapter : IPollingAdapter
 
         while (!ct.IsCancellationRequested)
         {
-            // 한 번의 polling iteration에서 새로 추가된 line을 모두 read.
-            ObservedMetricsSnapshot[] newSnapshots = await ReadNewSnapshotsAsync(lastReadOffset, ct);
-            foreach (var snap in newSnapshots)
+            // Design Ref: §3.2 (dashboard-jsonl-offset-fix) —
+            // offset을 yield BEFORE에 확정해 consumer-generator yield/resume gap race를 회피.
+            // 기존 패턴(yield → FileInfo.Length 재캡처)에선 consumer가 yield 사이에 append하면
+            // 새 데이터가 offset jump로 영구 skip됨.
+            (ObservedMetricsSnapshot[] snapshots, long newOffset) = await ReadNewSnapshotsAsync(lastReadOffset, ct);
+            lastReadOffset = newOffset;
+
+            foreach (var snap in snapshots)
             {
                 yield return snap;
             }
-
-            // offset 갱신은 별도 try 안에 (file truncate 케이스 대응)
-            try
-            {
-                if (File.Exists(_path))
-                {
-                    long currentLength = new FileInfo(_path).Length;
-                    if (currentLength < lastReadOffset)
-                    {
-                        // truncated/rotated → 처음부터 다시
-                        lastReadOffset = 0;
-                    }
-                    else
-                    {
-                        lastReadOffset = currentLength;
-                    }
-                }
-            }
-            catch (IOException) { /* 다음 polling에서 재시도 */ }
 
             try
             {
@@ -60,22 +46,37 @@ public sealed class JsonlPollingAdapter : IPollingAdapter
         }
     }
 
-    private async Task<ObservedMetricsSnapshot[]> ReadNewSnapshotsAsync(
+    private async Task<(ObservedMetricsSnapshot[] Snapshots, long NewOffset)> ReadNewSnapshotsAsync(
         long startOffset, CancellationToken ct)
     {
-        if (!File.Exists(_path)) { return Array.Empty<ObservedMetricsSnapshot>(); }
+        if (!File.Exists(_path))
+        {
+            return (Array.Empty<ObservedMetricsSnapshot>(), startOffset);
+        }
 
         var results = new List<ObservedMetricsSnapshot>();
+        long newOffset = startOffset;
         try
         {
             using var fs = new FileStream(
                 _path,
                 FileMode.Open,
                 FileAccess.Read,
-                // 직전 cycle lesson: producer Write + reader Read 충돌 방지.
+                // Memory: fileshare-windows-gotcha — producer Write + reader Read 충돌 방지.
                 FileShare.ReadWrite | FileShare.Delete);
 
-            if (startOffset > 0 && startOffset <= fs.Length)
+            // Design Ref: §3.2 — truncation detection을 ReadNew 안에서 처리 (yield 후 별도 처리 제거).
+            if (fs.Length < startOffset)
+            {
+                // truncated/rotated → 처음부터 다시
+                startOffset = 0;
+            }
+
+            // open 직후 length를 stable snapshot으로 capture.
+            // 이후 producer append는 다음 iteration에서 처리 (race window 좁힘).
+            long fileLength = fs.Length;
+
+            if (startOffset > 0 && startOffset <= fileLength)
             {
                 fs.Seek(startOffset, SeekOrigin.Begin);
             }
@@ -88,11 +89,13 @@ public sealed class JsonlPollingAdapter : IPollingAdapter
                 ObservedMetricsSnapshot? snap = TryDeserialize(line);
                 if (snap is not null) { results.Add(snap); }
             }
+
+            newOffset = fileLength;
         }
         catch (IOException) { /* 다음 polling에서 재시도 */ }
         catch (OperationCanceledException) { /* normal stop */ }
 
-        return results.ToArray();
+        return (results.ToArray(), newOffset);
     }
 
     private static ObservedMetricsSnapshot? TryDeserialize(string line)
