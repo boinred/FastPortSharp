@@ -80,12 +80,14 @@
                 </Grid>
             </Frame>
 
-            <!-- Design Ref: §3.3 (dashboard-multi-rtt-overlay) — SKCanvasView 3-line overlay (P50/P95/P99). -->
+            <!-- Design Ref: §2 (dashboard-revert-skcanvasview-keep-data) — Microcharts ChartView 복귀 (P95 단일).
+                 직전 cycle (multi-rtt-overlay)의 SKCanvasView가 macOS 26 SwiftUI Observation crash
+                 trigger했으므로 안전한 ChartView로 복귀. TimedRttPoint data layer는 ViewModel에 보존 → 향후 활용. -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
                 <VerticalStackLayout>
-                    <Label Text="Client RTT P50/P95/P99 (ms)" FontAttributes="Bold" />
+                    <Label Text="Client RTT P95 (ms)" FontAttributes="Bold" />
                     <Label Text="{Binding ClientRttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <skia:SKCanvasView x:Name="RttCanvasView" PaintSurface="OnRttCanvasPaintSurface" HeightRequest="160" />
+                    <microcharts:ChartView x:Name="RttChartView" HeightRequest="160" />
                 </VerticalStackLayout>
             </Frame>
 
