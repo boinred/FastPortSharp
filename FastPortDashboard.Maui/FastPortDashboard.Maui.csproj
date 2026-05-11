@@ -55,9 +55,9 @@
 	<ItemGroup>
 		<!-- MAUI core (.NET 8+ 부터 명시적 PackageReference 필요). -->
 		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
-		<!-- Design Ref: §3.1 (dashboard-rtt-chart cycle) — Microcharts.Maui로 RTT line chart.
-		     LiveCharts2는 macOS 26 SwiftUI bridging crash history로 보류. -->
-		<PackageReference Include="Microcharts.Maui" Version="1.0.1" />
+		<!-- Design Ref: §2 (dashboard-chart-graphicsview-migration) — Microcharts.Maui / SkiaSharp 제거.
+		     SkiaSharp 기반 view가 macOS 26 SwiftUI Observation framework crash trigger임이 확인됨.
+		     라인 차트는 Microsoft.Maui.Graphics + GraphicsView + IDrawable (Views/LineChartDrawable.cs)로 재구현. -->
 	</ItemGroup>
 
 	<ItemGroup>

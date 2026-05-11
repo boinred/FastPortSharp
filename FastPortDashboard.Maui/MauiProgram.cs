@@ -1,5 +1,3 @@
-using Microcharts.Maui;
-
 namespace FastPortDashboard.Maui;
 
 public static class MauiProgram
@@ -9,8 +7,8 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
-			// Design Ref: §3.2 (dashboard-rtt-chart) — Microcharts handler 등록.
-			.UseMicrocharts()
+			// Design Ref: §2 (dashboard-chart-graphicsview-migration) — Microcharts/Skia 제거.
+			// 차트는 LineChartDrawable + GraphicsView로 대체, 추가 handler 등록 불필요.
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

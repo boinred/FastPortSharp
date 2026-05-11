@@ -2,8 +2,6 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels;assembly=FastPortDashboard.Core"
-             xmlns:microcharts="clr-namespace:Microcharts.Maui;assembly=Microcharts.Maui"
-             xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="FastPortDashboard.Maui.MainPage"
              x:DataType="vm:DashboardViewModel"
              Title="FastPort Dashboard">
@@ -80,23 +78,22 @@
                 </Grid>
             </Frame>
 
-            <!-- Design Ref: §2 (dashboard-revert-skcanvasview-keep-data) — Microcharts ChartView 복귀 (P95 단일).
-                 직전 cycle (multi-rtt-overlay)의 SKCanvasView가 macOS 26 SwiftUI Observation crash
-                 trigger했으므로 안전한 ChartView로 복귀. TimedRttPoint data layer는 ViewModel에 보존 → 향후 활용. -->
+            <!-- Design Ref: §5.1 (dashboard-chart-graphicsview-migration) — GraphicsView로 교체.
+                 SkiaSharp 기반 ChartView가 macOS 26 SwiftUI Observation crash trigger였음. -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
                 <VerticalStackLayout>
                     <Label Text="Client RTT P95 (ms)" FontAttributes="Bold" />
                     <Label Text="{Binding ClientRttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <microcharts:ChartView x:Name="RttChartView" HeightRequest="160" />
+                    <GraphicsView x:Name="RttChartView" HeightRequest="160" />
                 </VerticalStackLayout>
             </Frame>
 
-            <!-- Design Ref: §3.1 (dashboard-throughput-chart) — RTT chart 아래 수직 스택. -->
+            <!-- Design Ref: §5.1 — Throughput line chart, 위와 동일 구조. -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
                 <VerticalStackLayout>
                     <Label Text="Server Throughput (B/s)" FontAttributes="Bold" />
                     <Label Text="{Binding ThroughputSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <microcharts:ChartView x:Name="ThroughputChartView" HeightRequest="160" />
+                    <GraphicsView x:Name="ThroughputChartView" HeightRequest="160" />
                 </VerticalStackLayout>
             </Frame>
 
