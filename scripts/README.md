@@ -5,7 +5,9 @@ Cross-platform scaffolding utilities for the FastPortSharp game-server template.
 ## scaffold-game-server
 
 Bootstraps a new self-contained game server project from
-`FastPortGameServerTemplate/` + the engine (`LibCommons/` + `LibNetworks/`).
+`template-projects/FastPortGameServerTemplate/` +
+`template-projects/FastPortGameServerTemplate.Contracts/` (shared proto +
+PacketIds) + the engine (`LibCommons/` + `LibNetworks/`).
 
 Two scripts, identical behaviour, byte-identical output:
 
@@ -66,20 +68,27 @@ dotnet run --project MyLobbyServer -c Release
 
 The new project is self-contained:
 - `<NewName>/` — your game server (start here)
+- `<NewName>.Contracts/` — proto contracts + PacketIds (shared with future
+  consumers, e.g. matching sample client)
 - `LibCommons/` — engine: buffers, packet primitives
 - `LibNetworks/` — engine: TCP listener / session
-- `<NewName>.sln` — solution that ties them together
+- `<NewName>.sln` — solution that ties the four projects together
 - `.gitignore`, `.gitattributes`, `README.md` — repo hygiene
 
 ### What gets renamed
 
 The scripts substitute the literal token `FastPortGameServerTemplate`
 with `<NewProjectName>` in:
-- folder names
-- file names (the `.csproj`)
+- folder names (`<NewName>/`, `<NewName>.Contracts/`)
+- file names (the `.csproj` pair)
 - file contents (`.cs`, `.csproj`, `.proto`, `.json`, `.md`)
-- the generated `.sln` references
+- the generated `.sln` references (4 projects)
 - the C# namespace
+
+The scripts also adjust `..\..\LibCommons` / `..\..\LibNetworks` relative
+paths in the copied csproj files to `..\LibCommons` / `..\LibNetworks`,
+since the source `template-projects/` is at depth 2 but the scaffold
+output is flat.
 
 The token is a unique 26-char compound so collateral matches are essentially
 impossible (there is also a guard list in

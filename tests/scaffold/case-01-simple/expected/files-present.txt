@@ -13,12 +13,15 @@ MyLobbyServer/Application/PacketDispatcher.cs
 MyLobbyServer/Configuration/GameServerOptions.cs
 MyLobbyServer/Handlers/EchoHandler.cs
 MyLobbyServer/Handlers/IPacketHandler.cs
-MyLobbyServer/Handlers/PacketIds.cs
 MyLobbyServer/Sessions/GameSession.cs
 MyLobbyServer/Sessions/GameSessionFactory.cs
 MyLobbyServer/Telemetry/IGameServerTelemetry.cs
 MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
-MyLobbyServer/Protocols/Sample.proto
+
+# Contracts project (proto + PacketIds, token-renamed)
+MyLobbyServer.Contracts/MyLobbyServer.Contracts.csproj
+MyLobbyServer.Contracts/Protocols/Sample.proto
+MyLobbyServer.Contracts/Handlers/PacketIds.cs
 
 # Engine projects (verbatim copy)
 LibCommons/LibCommons.csproj

@@ -86,6 +86,8 @@ $Script:NameRegex     = '^[A-Z][A-Za-z0-9]{0,63}$'
 $Script:ScriptDir       = Split-Path -Parent $PSCommandPath
 $Script:RepoRoot        = Resolve-Path (Join-Path $Script:ScriptDir '..') | Select-Object -ExpandProperty Path
 $Script:TemplateSrc     = Join-Path $Script:RepoRoot (Join-Path 'template-projects' $Script:TemplateToken)
+# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
+$Script:ContractsSrc    = Join-Path $Script:RepoRoot (Join-Path 'template-projects' "$Script:TemplateToken.Contracts")
 $Script:LibCommonsSrc   = Join-Path $Script:RepoRoot 'LibCommons'
 $Script:LibNetworksSrc  = Join-Path $Script:RepoRoot 'LibNetworks'
 $Script:BlockedTokensFile = Join-Path $Script:RepoRoot 'tests/scaffold/_shared/blocked-tokens.txt'
@@ -283,15 +285,16 @@ function Show-DryRunPlan {
     Write-Log "[DRY-RUN]   -SkipSmoke    : $(if ($SkipSmoke) { 'on' } else { 'off' })"
     Write-Log "[DRY-RUN] would copy:"
     Write-Log "[DRY-RUN]   $Script:TemplateSrc -> $(Join-Path $Script:DestPathResolved $NewProjectName)"
+    Write-Log "[DRY-RUN]   $Script:ContractsSrc -> $(Join-Path $Script:DestPathResolved "$NewProjectName.Contracts")"
     Write-Log "[DRY-RUN]   $Script:LibCommonsSrc -> $(Join-Path $Script:DestPathResolved 'LibCommons')"
     Write-Log "[DRY-RUN]   $Script:LibNetworksSrc -> $(Join-Path $Script:DestPathResolved 'LibNetworks')"
     Write-Log "[DRY-RUN] would replace token `"$Script:TemplateToken`" -> `"$NewProjectName`" in:"
-    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) under <Dest>/$NewProjectName"
+    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) under <Dest>/$NewProjectName and <Dest>/$NewProjectName.Contracts"
     Write-Log "[DRY-RUN] would generate:"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitignore')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitattributes')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved 'README.md')"
-    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") (3 projects)"
+    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") (4 projects)"
     if (-not $NoGit) {
         Write-Log "[DRY-RUN]   .git + initial commit"
     }
@@ -305,6 +308,10 @@ function Show-DryRunPlan {
 function Copy-Template {
     Copy-TreeFiltered -Src $Script:TemplateSrc -Dest (Join-Path $Script:DestPathResolved $Script:TemplateToken)
 }
+# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
+function Copy-Contracts {
+    Copy-TreeFiltered -Src $Script:ContractsSrc -Dest (Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts")
+}
 function Copy-LibCommons {
     Copy-TreeFiltered -Src $Script:LibCommonsSrc -Dest (Join-Path $Script:DestPathResolved 'LibCommons')
 }
@@ -315,31 +322,59 @@ function Copy-LibNetworks {
 # ---------- step 8: token replacement ---------------------------------------
 
 function Update-Tokens {
-    $subtree = Join-Path $Script:DestPathResolved $Script:TemplateToken
+    # Design Ref: template-contracts-scaffold-fix §2.1 —
+    # Both Template and Contracts subtrees need token replacement.
+    $subtrees = @(
+        Join-Path $Script:DestPathResolved $Script:TemplateToken
+        Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts"
+    )
     $count = 0
 
-    Get-ChildItem -LiteralPath $subtree -Recurse -File -Force | ForEach-Object {
-        $file = $_
-        if ($Script:TextExtensions -notcontains $file.Extension) { return }
+    foreach ($subtree in $subtrees) {
+        Get-ChildItem -LiteralPath $subtree -Recurse -File -Force | ForEach-Object {
+            $file = $_
+            if ($Script:TextExtensions -notcontains $file.Extension) { return }
 
-        # Read with explicit UTF-8 to avoid PowerShell auto-detecting other
-        # encodings; preserves whatever line endings the source has.
-        $content = [System.IO.File]::ReadAllText($file.FullName, $Script:Utf8NoBom)
-        if (-not $content.Contains($Script:TemplateToken)) { return }
+            # Read with explicit UTF-8 to avoid PowerShell auto-detecting other
+            # encodings; preserves whatever line endings the source has.
+            $content = [System.IO.File]::ReadAllText($file.FullName, $Script:Utf8NoBom)
+            if (-not $content.Contains($Script:TemplateToken)) { return }
 
-        $newContent = $content.Replace($Script:TemplateToken, $NewProjectName)
-        Write-FileUtf8NoBom -Path $file.FullName -Content $newContent
-        $count++
+            $newContent = $content.Replace($Script:TemplateToken, $NewProjectName)
+            Write-FileUtf8NoBom -Path $file.FullName -Content $newContent
+            $count++
+        }
     }
 
-    # Rename the template subtree directory itself.
+    # Rename the Template subtree directory + csproj.
     $newSubtree = Join-Path $Script:DestPathResolved $NewProjectName
-    Rename-Item -LiteralPath $subtree -NewName $NewProjectName
+    Rename-Item -LiteralPath (Join-Path $Script:DestPathResolved $Script:TemplateToken) -NewName $NewProjectName
+    Rename-Item `
+        -LiteralPath (Join-Path $newSubtree "$Script:TemplateToken.csproj") `
+        -NewName "$NewProjectName.csproj"
 
-    # Rename the csproj file inside the new subtree.
-    $oldCsproj = Join-Path $newSubtree "$Script:TemplateToken.csproj"
-    $newCsproj = "$NewProjectName.csproj"
-    Rename-Item -LiteralPath $oldCsproj -NewName $newCsproj
+    # Design Ref: §2.1 — Rename the Contracts subtree directory + csproj.
+    $newContractsSubtree = Join-Path $Script:DestPathResolved "$NewProjectName.Contracts"
+    Rename-Item `
+        -LiteralPath (Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts") `
+        -NewName "$NewProjectName.Contracts"
+    Rename-Item `
+        -LiteralPath (Join-Path $newContractsSubtree "$Script:TemplateToken.Contracts.csproj") `
+        -NewName "$NewProjectName.Contracts.csproj"
+
+    # Design Ref: §2.1 — Source csproj has `..\..\LibCommons` (template-projects/
+    # depth) but scaffold output is flat, so adjust to `..\LibCommons`.
+    $csprojFiles = @(
+        Join-Path $newSubtree "$NewProjectName.csproj"
+        Join-Path $newContractsSubtree "$NewProjectName.Contracts.csproj"
+    )
+    foreach ($cf in $csprojFiles) {
+        if (-not (Test-Path -LiteralPath $cf)) { continue }
+        $c = [System.IO.File]::ReadAllText($cf, $Script:Utf8NoBom)
+        $c = $c.Replace('..\..\LibCommons', '..\LibCommons')
+        $c = $c.Replace('..\..\LibNetworks', '..\LibNetworks')
+        Write-FileUtf8NoBom -Path $cf -Content $c
+    }
 
     Write-Log "        replaced token in $count files."
 }
@@ -445,6 +480,9 @@ function New-SolutionFile {
         if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path $NewProjectName "$NewProjectName.csproj") | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
+        # Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
+        dotnet sln "$NewProjectName.sln" add (Join-Path "$NewProjectName.Contracts" "$NewProjectName.Contracts.csproj") | Out-Null
+        if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path 'LibCommons'  'LibCommons.csproj')  | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path 'LibNetworks' 'LibNetworks.csproj') | Out-Null
@@ -505,8 +543,9 @@ function Invoke-Main {
         exit 0
     }
 
-    Write-Log "[5/12]  Copying $Script:TemplateToken..."
+    Write-Log "[5/12]  Copying $Script:TemplateToken + $Script:TemplateToken.Contracts..."
     Copy-Template
+    Copy-Contracts
     Write-Log "        OK"
 
     Write-Log "[6/12]  Copying LibCommons..."

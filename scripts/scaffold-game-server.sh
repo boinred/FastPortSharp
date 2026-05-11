@@ -46,6 +46,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly SCRIPT_DIR
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly TEMPLATE_SRC="${REPO_ROOT}/template-projects/${TEMPLATE_TOKEN}"
+# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
+readonly CONTRACTS_SRC="${REPO_ROOT}/template-projects/${TEMPLATE_TOKEN}.Contracts"
 readonly LIBCOMMONS_SRC="${REPO_ROOT}/LibCommons"
 readonly LIBNETWORKS_SRC="${REPO_ROOT}/LibNetworks"
 readonly BLOCKED_TOKENS_FILE="${REPO_ROOT}/tests/scaffold/_shared/blocked-tokens.txt"
@@ -238,15 +240,16 @@ dry_run_plan() {
   log "[DRY-RUN]   --skip-smoke  : $([ "${OPT_SKIP_SMOKE}" -eq 1 ] && echo on || echo off)"
   log "[DRY-RUN] would copy:"
   log "[DRY-RUN]   ${TEMPLATE_SRC}    -> ${DEST_PATH}/${NEW_NAME}"
+  log "[DRY-RUN]   ${CONTRACTS_SRC}   -> ${DEST_PATH}/${NEW_NAME}.Contracts"
   log "[DRY-RUN]   ${LIBCOMMONS_SRC}  -> ${DEST_PATH}/LibCommons"
   log "[DRY-RUN]   ${LIBNETWORKS_SRC} -> ${DEST_PATH}/LibNetworks"
   log "[DRY-RUN] would replace token \"${TEMPLATE_TOKEN}\" -> \"${NEW_NAME}\" in:"
-  log "[DRY-RUN]   text files (extensions: ${TEXT_EXTS}) under <dest>/${NEW_NAME}"
+  log "[DRY-RUN]   text files (extensions: ${TEXT_EXTS}) under <dest>/${NEW_NAME} and <dest>/${NEW_NAME}.Contracts"
   log "[DRY-RUN] would generate:"
   log "[DRY-RUN]   ${DEST_PATH}/.gitignore"
   log "[DRY-RUN]   ${DEST_PATH}/.gitattributes"
   log "[DRY-RUN]   ${DEST_PATH}/README.md"
-  log "[DRY-RUN]   ${DEST_PATH}/${NEW_NAME}.sln (3 projects)"
+  log "[DRY-RUN]   ${DEST_PATH}/${NEW_NAME}.sln (4 projects)"
   if [ "${OPT_NO_GIT}" -ne 1 ]; then
     log "[DRY-RUN]   .git + initial commit"
   fi
@@ -259,6 +262,10 @@ dry_run_plan() {
 
 copy_template() {
   copy_tree "${TEMPLATE_SRC}"   "${DEST_PATH}/${TEMPLATE_TOKEN}"
+}
+# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
+copy_contracts() {
+  copy_tree "${CONTRACTS_SRC}"  "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts"
 }
 copy_libcommons() {
   copy_tree "${LIBCOMMONS_SRC}"  "${DEST_PATH}/LibCommons"
@@ -288,32 +295,59 @@ build_text_find_args() {
 }
 
 replace_tokens() {
-  local subtree="${DEST_PATH}/${TEMPLATE_TOKEN}"
+  # Design Ref: template-contracts-scaffold-fix §2.1 —
+  # Both Template and Contracts subtrees need token replacement.
+  # Each subtree is iterated separately to keep `find` scope clearly bounded
+  # (LibCommons/LibNetworks must NOT be touched).
+  local subtrees=(
+    "${DEST_PATH}/${TEMPLATE_TOKEN}"
+    "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts"
+  )
   local find_expr
   find_expr="$(build_text_find_args)"
 
-  # In-place token replacement on every text file under <dest>/<TEMPLATE_TOKEN>/.
-  # Use eval to expand the dynamically-built find extension predicate.
-  # We constructed find_expr ourselves from a fixed whitelist so eval is safe here.
   local count=0
   local file
-  while IFS= read -r file; do
-    [ -f "${file}" ] || continue
-    # Only touch files that actually contain the token (perf + minimise mtime churn).
-    if grep -F -q -- "${TEMPLATE_TOKEN}" "${file}" 2>/dev/null; then
-      replace_in_file "${file}" "${TEMPLATE_TOKEN}" "${NEW_NAME}"
-      count=$((count + 1))
-    fi
-  done <<EOF
+  local subtree
+  for subtree in "${subtrees[@]}"; do
+    while IFS= read -r file; do
+      [ -f "${file}" ] || continue
+      # Only touch files that actually contain the token (perf + minimise mtime churn).
+      if grep -F -q -- "${TEMPLATE_TOKEN}" "${file}" 2>/dev/null; then
+        replace_in_file "${file}" "${TEMPLATE_TOKEN}" "${NEW_NAME}"
+        count=$((count + 1))
+      fi
+    done <<EOF
 $(eval "find \"${subtree}\" -type f ${find_expr}")
 EOF
+  done
 
-  # Rename the template subtree directory itself.
+  # Rename the Template subtree directory + csproj.
   mv "${DEST_PATH}/${TEMPLATE_TOKEN}" "${DEST_PATH}/${NEW_NAME}"
-
-  # Rename the csproj file inside the new subtree.
   mv "${DEST_PATH}/${NEW_NAME}/${TEMPLATE_TOKEN}.csproj" \
      "${DEST_PATH}/${NEW_NAME}/${NEW_NAME}.csproj"
+
+  # Design Ref: §2.1 — Rename the Contracts subtree directory + csproj.
+  mv "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts" "${DEST_PATH}/${NEW_NAME}.Contracts"
+  mv "${DEST_PATH}/${NEW_NAME}.Contracts/${TEMPLATE_TOKEN}.Contracts.csproj" \
+     "${DEST_PATH}/${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"
+
+  # Design Ref: template-contracts-scaffold-fix §2.1 —
+  # Source csproj has `..\..\LibCommons` (template-projects/ depth) but scaffold
+  # output is flat, so adjust to `..\LibCommons`. Same for LibNetworks.
+  local csproj_files=(
+    "${DEST_PATH}/${NEW_NAME}/${NEW_NAME}.csproj"
+    "${DEST_PATH}/${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"
+  )
+  local cf
+  for cf in "${csproj_files[@]}"; do
+    [ -f "${cf}" ] || continue
+    sed -i.bak \
+      -e 's|\.\.\\\.\.\\LibCommons|..\\LibCommons|g' \
+      -e 's|\.\.\\\.\.\\LibNetworks|..\\LibNetworks|g' \
+      "${cf}"
+    rm -f "${cf}.bak"
+  done
 
   log "        replaced token in ${count} files."
 }
@@ -413,6 +447,7 @@ generate_sln() {
   ( cd "${DEST_PATH}" \
     && dotnet new sln --format sln -n "${NEW_NAME}"                          >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}/${NEW_NAME}.csproj"     >/dev/null \
+    && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"  >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibCommons/LibCommons.csproj"       >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibNetworks/LibNetworks.csproj"     >/dev/null )
 }
@@ -459,8 +494,9 @@ main() {
     exit 0
   fi
 
-  log "[5/12]  Copying ${TEMPLATE_TOKEN}..."
+  log "[5/12]  Copying ${TEMPLATE_TOKEN} + ${TEMPLATE_TOKEN}.Contracts..."
   copy_template
+  copy_contracts
   log "        OK"
 
   log "[6/12]  Copying LibCommons..."
