@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels;assembly=FastPortDashboard.Core"
              xmlns:microcharts="clr-namespace:Microcharts.Maui;assembly=Microcharts.Maui"
+             xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="FastPortDashboard.Maui.MainPage"
              x:DataType="vm:DashboardViewModel"
              Title="FastPort Dashboard">
@@ -79,12 +80,12 @@
                 </Grid>
             </Frame>
 
-            <!-- Design Ref: §3.5 (dashboard-rtt-chart) — Microcharts.Maui LineChart. -->
+            <!-- Design Ref: §3.3 (dashboard-multi-rtt-overlay) — SKCanvasView 3-line overlay (P50/P95/P99). -->
             <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
                 <VerticalStackLayout>
-                    <Label Text="Client RTT P95 (ms)" FontAttributes="Bold" />
+                    <Label Text="Client RTT P50/P95/P99 (ms)" FontAttributes="Bold" />
                     <Label Text="{Binding ClientRttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <microcharts:ChartView x:Name="RttChartView" HeightRequest="160" />
+                    <skia:SKCanvasView x:Name="RttCanvasView" PaintSurface="OnRttCanvasPaintSurface" HeightRequest="160" />
                 </VerticalStackLayout>
             </Frame>
 

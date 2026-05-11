@@ -17,8 +17,9 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     public ObservableCollection<TimedDoublePoint> ThroughputSeries { get; } = new();
 
-    // Design Ref: §3.3 (dashboard-rtt-chart) — Client RTT P95Ms 시계열.
-    public ObservableCollection<TimedDoublePoint> ClientRttSeries { get; } = new();
+    // Design Ref: §3.2 (dashboard-multi-rtt-overlay) — Client RTT P50/P95/P99 시계열.
+    // 직전 cycle (dashboard-rtt-chart)에서 P95 단일이었으나 본 cycle에서 multi-percentile로 확장.
+    public ObservableCollection<TimedRttPoint> ClientRttSeries { get; } = new();
 
     // ─── KPI (Plan SC: ~60% LOC 축소) ────────────────────────────
     [ObservableProperty] private long _currentSessions;
@@ -87,11 +88,11 @@ public sealed partial class DashboardViewModel : ObservableObject
         }
     }
 
-    // Design Ref: §3.3 — ClientObserved → ClientRttSeries (P95Ms 기본).
+    // Design Ref: §3.2 (dashboard-multi-rtt-overlay) — ClientObserved → ClientRttSeries (P50/P95/P99).
     private void ApplyClientSnapshot(ClientObservedMetricsSnapshot client)
     {
         double tsMs = client.Timestamp.ToUnixTimeMilliseconds();
-        ClientRttSeries.Add(new TimedDoublePoint(tsMs, client.RttP95Ms));
+        ClientRttSeries.Add(new TimedRttPoint(tsMs, client.RttP50Ms, client.RttP95Ms, client.RttP99Ms));
         while (ClientRttSeries.Count > MaxChartPoints)
         {
             ClientRttSeries.RemoveAt(0);

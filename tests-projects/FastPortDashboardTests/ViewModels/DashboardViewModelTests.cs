@@ -225,7 +225,7 @@ public class DashboardViewModelTests
             SocketErrorCount: 0, SocketErrorRate: 0);
     }
 
-    // T-VM-11 (dashboard-rtt-chart): ClientObserved → ClientRttSeries append.
+    // T-VM-11 (dashboard-multi-rtt-overlay): ClientObserved → ClientRttSeries P50/P95/P99 append.
     [TestMethod]
     public void ApplySnapshot_ClientObserved_AppendsRttSeries()
     {
@@ -237,10 +237,12 @@ public class DashboardViewModelTests
         vm.ApplySnapshot(combined);
 
         Assert.AreEqual(1, vm.ClientRttSeries.Count);
-        Assert.AreEqual(87.5, vm.ClientRttSeries[0].Value);
+        Assert.AreEqual(30, vm.ClientRttSeries[0].P50Ms, "P50 from MakeClientSnap default");
+        Assert.AreEqual(87.5, vm.ClientRttSeries[0].P95Ms, "P95 from argument");
+        Assert.AreEqual(150, vm.ClientRttSeries[0].P99Ms, "P99 from MakeClientSnap default");
     }
 
-    // T-VM-12 (dashboard-rtt-chart): ClientRttSeries 600 trim.
+    // T-VM-12 (dashboard-multi-rtt-overlay): ClientRttSeries 600 trim — P95 기준 검증.
     [TestMethod]
     public void ApplyClientSnapshot_TrimsRttSeriesAt600()
     {
@@ -256,8 +258,8 @@ public class DashboardViewModelTests
         }
 
         Assert.AreEqual(600, vm.ClientRttSeries.Count, "MaxChartPoints 600 trim (client RTT)");
-        Assert.AreEqual((double)1, vm.ClientRttSeries[0].Value, "가장 오래된 (i=0) 제거");
-        Assert.AreEqual((double)600, vm.ClientRttSeries[^1].Value, "최신 보존");
+        Assert.AreEqual((double)1, vm.ClientRttSeries[0].P95Ms, "가장 오래된 (i=0) 제거");
+        Assert.AreEqual((double)600, vm.ClientRttSeries[^1].P95Ms, "최신 보존");
     }
 
     // T-VM-10
