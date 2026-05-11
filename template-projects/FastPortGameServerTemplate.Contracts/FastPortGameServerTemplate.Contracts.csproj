@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Design Ref: template-contracts-extraction §2.3, §9 — Template proto contract library.
+    Leaf node (no internal dep). Consumed by Template, SampleClient, and future Dashboard.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>FastPortGameServerTemplate</RootNamespace>
+    <AssemblyName>FastPortGameServerTemplate.Contracts</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.32.1" />
+    <PackageReference Include="Google.Protobuf.Tools" Version="3.32.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.71.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Design Ref: §3.3 — same Grpc.Tools auto-generation as before, just relocated here. -->
+    <Protobuf Include="Protocols\**\*.proto"
+              ProtoRoot="Protocols"
+              GrpcServices="None"
+              Access="Public" />
+  </ItemGroup>
+
+</Project>

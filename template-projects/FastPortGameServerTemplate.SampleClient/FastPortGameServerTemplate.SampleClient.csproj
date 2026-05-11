@@ -25,8 +25,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
-    <!-- Reuse the generated Sample.proto types (EchoRequest/EchoResponse) and PacketIds. -->
-    <ProjectReference Include="..\FastPortGameServerTemplate\FastPortGameServerTemplate.csproj" />
+    <!-- Design Ref: template-contracts-extraction §2.3 —
+         Contracts lib에서 Sample.proto + PacketIds 직접 획득 (Template Exe 참조 안티패턴 해소). -->
+    <ProjectReference Include="..\FastPortGameServerTemplate.Contracts\FastPortGameServerTemplate.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

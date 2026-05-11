@@ -19,27 +19,17 @@
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <!-- Design Ref: template-contracts-extraction §11.3 —
+         Google.Protobuf 유지 (Application/Handlers에서 EchoResponse 인스턴스화 잔존).
+         Grpc.Tools / Google.Protobuf.Tools 는 Contracts lib로 이동. -->
     <PackageReference Include="Google.Protobuf" Version="3.32.1" />
-    <PackageReference Include="Google.Protobuf.Tools" Version="3.32.1" />
-    <PackageReference Include="Grpc.Tools" Version="2.71.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Design Ref: §3.3 — Grpc.Tools auto-generates C# classes from .proto.
-         GrpcServices="None" because we use raw Protobuf messages over LibNetworks TCP framing,
-         not gRPC HTTP/2. -->
-    <Protobuf Include="Protocols\**\*.proto"
-              ProtoRoot="Protocols"
-              GrpcServices="None"
-              Access="Public" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
+    <!-- Design Ref: template-contracts-extraction §2.3 — Sample.proto + PacketIds 분리. -->
+    <ProjectReference Include="..\FastPortGameServerTemplate.Contracts\FastPortGameServerTemplate.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

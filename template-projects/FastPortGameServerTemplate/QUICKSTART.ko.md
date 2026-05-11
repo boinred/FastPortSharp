@@ -56,10 +56,13 @@ nc -zv 127.0.0.1 7777
 
 ## 5. 새 패킷 핸들러 추가
 
-1. `Protocols/MyGame.proto` 추가 (`csharp_namespace`은 기존 `Sample.proto`와
-   동일 패턴). `dotnet build` 시 Grpc.Tools가 C# 클래스를 자동 생성합니다.
-2. 새 packet id를 `Handlers/PacketIds.cs`에 추가 (사용자 정의는 `2000+`
-   범위 권장).
+1. `../FastPortGameServerTemplate.Contracts/Protocols/MyGame.proto` 추가
+   (`csharp_namespace`은 기존 `Sample.proto`와 동일 패턴). Contracts lib 빌드
+   시 Grpc.Tools가 C# 클래스를 자동 생성하며 Template/SampleClient/Dashboard
+   가 공유합니다.
+2. 새 packet id를
+   `../FastPortGameServerTemplate.Contracts/Handlers/PacketIds.cs`에 추가
+   (사용자 정의는 `2000+` 범위 권장).
 3. `IPacketHandler`를 구현:
 
    ```csharp
