@@ -1,0 +1,82 @@
+name: dashboard
+
+# Builds and tests FastPortSharp.Dashboard.sln across macOS + Windows.
+# Companion to build.yml (which builds FastPortSharp.sln). Triggered only
+# when Dashboard-related files change to keep main CI unaffected.
+# Design Ref: dashboard-ci-add cycle §3.1.
+
+on:
+  push:
+    branches:
+      - builds.release
+    paths:
+      - 'FastPortDashboard.Maui/**'
+      - 'FastPortDashboard.Core/**'
+      - 'tests-projects/FastPortDashboardTests/**'
+      - 'tests-projects/LibTestTelemetry/**'
+      - 'FastPortSharp.Dashboard.sln'
+      - '.github/workflows/dashboard.yml'
+  pull_request:
+    branches:
+      - builds.release
+    paths:
+      - 'FastPortDashboard.Maui/**'
+      - 'FastPortDashboard.Core/**'
+      - 'tests-projects/FastPortDashboardTests/**'
+      - 'tests-projects/LibTestTelemetry/**'
+      - 'FastPortSharp.Dashboard.sln'
+      - '.github/workflows/dashboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # MAUI workload는 macOS + Windows에서만 가능. Linux는 net10.0-maccatalyst /
+        # net10.0-windows TFM 둘 다 빌드 불가하므로 matrix 제외.
+        os: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Force LF line endings on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: dotnet --info
+        shell: bash
+        run: dotnet --info
+
+      - name: Install MAUI workload
+        shell: bash
+        run: dotnet workload install maui
+
+      - name: Restore
+        shell: bash
+        run: dotnet restore FastPortSharp.Dashboard.sln
+
+      - name: Build (Release)
+        shell: bash
+        run: dotnet build FastPortSharp.Dashboard.sln -c Release --no-restore
+
+      - name: Test (Release)
+        shell: bash
+        run: dotnet test FastPortSharp.Dashboard.sln -c Release --no-build --logger "console;verbosity=normal"
