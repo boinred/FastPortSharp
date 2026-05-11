@@ -5,16 +5,19 @@ using Microsoft.Maui.Graphics;
 namespace FastPortDashboard.Maui;
 
 // Design Ref: §2 (dashboard-chart-graphicsview-migration) — SkiaSharp / Microcharts 의존 제거.
-// 두 GraphicsView는 LineChartDrawable 인스턴스에 snapshot list를 주입하고 Invalidate()로 재렌더.
+// Design Ref: §2 (dashboard-chart-multi-rtt-overlay-v2) — RTT는 MultiLineChartDrawable(P50/P95/P99),
+// Throughput은 기존 LineChartDrawable single-line 보존.
 public partial class MainPage : ContentPage
 {
     private readonly DashboardViewModel _viewModel;
-    private readonly LineChartDrawable _rttDrawable;
+    private readonly MultiLineChartDrawable _rttMultiDrawable;
     private readonly LineChartDrawable _throughputDrawable;
 
-    // Design Ref: §5.4 — 시각화 parity를 위해 기존 Material 색상 유지.
-    private static readonly Color RttP95Color = Color.FromArgb("#FF9800");
-    private static readonly Color ThroughputLineColor = Color.FromArgb("#4CAF50");
+    // Design Ref: §10 — RTT percentile 색상 + Throughput 색상 한 곳에 통합.
+    private static readonly Color RttP50Color = Color.FromArgb("#2196F3");        // blue
+    private static readonly Color RttP95Color = Color.FromArgb("#FF9800");        // orange
+    private static readonly Color RttP99Color = Color.FromArgb("#F44336");        // red
+    private static readonly Color ThroughputLineColor = Color.FromArgb("#4CAF50"); // green
 
     public MainPage()
     {
@@ -23,10 +26,9 @@ public partial class MainPage : ContentPage
         _viewModel = new DashboardViewModel();
         BindingContext = _viewModel;
 
-        _rttDrawable = new LineChartDrawable
+        _rttMultiDrawable = new MultiLineChartDrawable
         {
-            LineColor = RttP95Color,
-            ValueFormat = "F0",
+            ShowLegend = true,
         };
         _throughputDrawable = new LineChartDrawable
         {
@@ -34,7 +36,7 @@ public partial class MainPage : ContentPage
             ValueFormat = "F0",
         };
 
-        RttChartView.Drawable = _rttDrawable;
+        RttChartView.Drawable = _rttMultiDrawable;
         ThroughputChartView.Drawable = _throughputDrawable;
 
         _viewModel.ClientRttSeries.CollectionChanged += (_, _) => UpdateRttChart();
@@ -43,16 +45,20 @@ public partial class MainPage : ContentPage
         UpdateThroughputChart();
     }
 
-    // Design Ref: §2.2 — ClientRttSeries(TimedRttPoint) → P95 snapshot → Invalidate.
+    // Design Ref: §2.2 — ClientRttSeries(TimedRttPoint) → 3 LineChartSeries snapshot.
     private void UpdateRttChart()
     {
-        _rttDrawable.Values = _viewModel.ClientRttSeries
-            .Select(p => p.P95Ms)
-            .ToArray();
+        var points = _viewModel.ClientRttSeries.ToArray();
+        _rttMultiDrawable.Series = new[]
+        {
+            new LineChartSeries(RttP50Color, points.Select(p => p.P50Ms).ToArray(), "P50"),
+            new LineChartSeries(RttP95Color, points.Select(p => p.P95Ms).ToArray(), "P95"),
+            new LineChartSeries(RttP99Color, points.Select(p => p.P99Ms).ToArray(), "P99"),
+        };
         RttChartView.Invalidate();
     }
 
-    // Design Ref: §2.2 — Throughput mirror.
+    // Design Ref: §2.2 — Throughput single-line (직전 cycle parity 유지).
     private void UpdateThroughputChart()
     {
         _throughputDrawable.Values = _viewModel.ThroughputSeries

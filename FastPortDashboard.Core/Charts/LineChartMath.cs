@@ -37,4 +37,41 @@ public static class LineChartMath
         if (count <= 1 || width <= 0f) return 0f;
         return width / (count - 1);
     }
+
+    // Design Ref: §3.3 (dashboard-chart-multi-rtt-overlay-v2) — N series 통합 min/max.
+    // 빈 입력 / 모두 빈 series / 일부 빈 series / 동일 값 케이스 안전.
+    public static (double Min, double Max) ComputeRangeMulti(IEnumerable<IReadOnlyList<double>> seriesList)
+    {
+        if (seriesList is null)
+        {
+            return (0d, 1d);
+        }
+
+        bool any = false;
+        double min = double.PositiveInfinity;
+        double max = double.NegativeInfinity;
+        foreach (var values in seriesList)
+        {
+            if (values is null || values.Count == 0) continue;
+            for (int i = 0; i < values.Count; i++)
+            {
+                double v = values[i];
+                if (v < min) min = v;
+                if (v > max) max = v;
+                any = true;
+            }
+        }
+
+        if (!any)
+        {
+            return (0d, 1d);
+        }
+
+        if (min == max)
+        {
+            return (min - 0.5d, max + 0.5d);
+        }
+
+        return (min, max);
+    }
 }
