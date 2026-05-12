@@ -30,15 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Design Ref: §2.1 — generate Sample.cs into this assembly from shared proto. -->
+    <!-- Generate Sample.cs + PacketIds enum from shared protos into this assembly. -->
     <Protobuf Include="..\Protos\*.proto"
               ProtoRoot="..\Protos"
               GrpcServices="None"
               Access="Public" />
-    <!-- Design Ref: §10.2 — source-level sharing of PacketIds with Template
-         (no Exe->Exe ProjectReference; PacketIds.cs is compiled into both dlls). -->
-    <Compile Include="..\FastPortGameServerTemplate\Handlers\PacketIds.cs"
-             Link="Handlers\PacketIds.cs" />
   </ItemGroup>
 
   <ItemGroup>

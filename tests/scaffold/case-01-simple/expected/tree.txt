@@ -38,7 +38,6 @@
 ./MyLobbyServer/Configuration/GameServerOptions.cs
 ./MyLobbyServer/Handlers/EchoHandler.cs
 ./MyLobbyServer/Handlers/IPacketHandler.cs
-./MyLobbyServer/Handlers/PacketIds.cs
 ./MyLobbyServer/MyLobbyServer.csproj
 ./MyLobbyServer/Program.cs
 ./MyLobbyServer/QUICKSTART.ko.md
@@ -48,5 +47,6 @@
 ./MyLobbyServer/Telemetry/IGameServerTelemetry.cs
 ./MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
 ./MyLobbyServer/appsettings.json
+./Protos/PacketIds.proto
 ./Protos/Sample.proto
 ./README.md

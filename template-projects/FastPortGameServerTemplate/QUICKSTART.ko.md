@@ -59,9 +59,11 @@ nc -zv 127.0.0.1 7777
 1. `../Protos/MyGame.proto` 추가 (`csharp_namespace`은 기존 `Sample.proto`와
    동일 패턴). 각 consumer (Template/SampleClient/...)의 `<Protobuf Include>`
    가 빌드 타임에 자체 어셈블리에 C# 클래스를 생성합니다.
-2. 새 packet id를 `Handlers/PacketIds.cs`에 추가 (사용자 정의는 `2000+` 범위
-   권장). SampleClient는 `<Compile Include Link>` 로 Template의 PacketIds.cs를
-   공유 컴파일합니다.
+2. 새 packet id를 `../Protos/PacketIds.proto` 의 `PacketIds` enum에 추가
+   (사용자 정의 `2000+` 권장, 이름은 `PACKET_IDS_*` prefix 유지 — C# generator
+   가 자동으로 strip해서 `PacketIds.MyRequest` 형태로 노출). C# 호출 시점에
+   는 `RequestSendMessage((int)PacketIds.MyRequest, ...)` 처럼 명시적 `(int)`
+   cast 필요.
 3. `IPacketHandler`를 구현:
 
    ```csharp

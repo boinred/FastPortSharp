@@ -13,13 +13,13 @@ MyLobbyServer/Application/PacketDispatcher.cs
 MyLobbyServer/Configuration/GameServerOptions.cs
 MyLobbyServer/Handlers/EchoHandler.cs
 MyLobbyServer/Handlers/IPacketHandler.cs
-MyLobbyServer/Handlers/PacketIds.cs
 MyLobbyServer/Sessions/GameSession.cs
 MyLobbyServer/Sessions/GameSessionFactory.cs
 MyLobbyServer/Telemetry/IGameServerTelemetry.cs
 MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
 
 # Shared Protos folder (proto files only — verbatim location, namespace token-replaced)
+Protos/PacketIds.proto
 Protos/Sample.proto
 
 # Engine projects (verbatim copy)

@@ -101,10 +101,11 @@ your own game server.
 
 ## Customising
 
-- **Add a new packet**: drop a `.proto` into `../Protos/`, add the packet id to
-  this project's `Handlers/PacketIds.cs` (≥ 2000 for user-defined), rebuild,
-  write an `IPacketHandler` in this project's `Handlers/`, and register it in
-  `Program.cs`:
+- **Add a new packet**: drop a `.proto` into `../Protos/`. Packet IDs live in
+  `../Protos/PacketIds.proto` as a `PacketIds` enum (user-defined values ≥ 2000,
+  prefix names with `PACKET_IDS_` so the C# generator strips it to nice PascalCase).
+  Rebuild, write an `IPacketHandler` in this project's `Handlers/`, and register
+  it in `Program.cs`:
 
   ```csharp
   builder.Services.AddSingleton<IPacketHandler, MyHandler>();

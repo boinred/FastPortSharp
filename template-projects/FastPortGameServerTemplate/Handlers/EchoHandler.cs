@@ -17,7 +17,7 @@ public sealed class EchoHandler : IPacketHandler
         m_Logger = logger;
     }
 
-    public int PacketId => PacketIds.EchoRequest;
+    public int PacketId => (int)PacketIds.EchoRequest;
 
     public void Handle(GameSession session, BasePacket packet)
     {
@@ -35,7 +35,7 @@ public sealed class EchoHandler : IPacketHandler
             ServerUnixMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
 
-        session.Send(PacketIds.EchoResponse, response);
+        session.Send((int)PacketIds.EchoResponse, response);
 
         m_Logger.LogDebug(
             "Echoed back. SessionId={SessionId}, MessageLen={Len}",

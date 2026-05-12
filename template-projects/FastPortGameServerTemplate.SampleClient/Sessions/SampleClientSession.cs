@@ -1,4 +1,3 @@
-using FastPortGameServerTemplate.Handlers;
 using FastPortGameServerTemplate.Protocols;
 using LibCommons;
 using LibNetworks.Extensions;
@@ -39,7 +38,7 @@ public sealed class SampleClientSession : BaseSessionServer
 
         m_SendTimestamp = Stopwatch.GetTimestamp();
         var request = new EchoRequest { Message = m_Options.Message };
-        RequestSendMessage(PacketIds.EchoRequest, request);
+        RequestSendMessage((int)PacketIds.EchoRequest, request);
     }
 
     protected override void OnReceived(BasePacket packet)
@@ -52,9 +51,9 @@ public sealed class SampleClientSession : BaseSessionServer
             return;
         }
 
-        if (packetId != PacketIds.EchoResponse)
+        if (packetId != (int)PacketIds.EchoResponse)
         {
-            m_Logger.LogWarning("Unexpected packet id. Expected={Expected}, Got={Actual}", PacketIds.EchoResponse, packetId);
+            m_Logger.LogWarning("Unexpected packet id. Expected={Expected}, Got={Actual}", (int)PacketIds.EchoResponse, packetId);
             return;
         }
 
