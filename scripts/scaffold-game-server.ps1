@@ -482,6 +482,53 @@ function New-SolutionFile {
     finally {
         Pop-Location
     }
+
+    Add-ProtosSolutionFolder
+}
+
+# Inject a "Protos" solution folder into the generated sln so IDE
+# (Visual Studio / Rider) shows the shared .proto files under Solution Explorer.
+# Solution Items are NOT build targets; tests/scaffold/run.sh's compute_sha256
+# already excludes *.sln, so this edit doesn't affect golden fixtures.
+function Add-ProtosSolutionFolder {
+    $slnPath    = Join-Path $Script:DestPathResolved "$NewProjectName.sln"
+    $protosDir  = Join-Path $Script:DestPathResolved 'Protos'
+    if (-not (Test-Path -LiteralPath $protosDir -PathType Container)) { return }
+
+    # Build the Solution Folder block (sln files use Windows-style \ on all OSes).
+    $blockLines = New-Object System.Collections.Generic.List[string]
+    $blockLines.Add('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{B7C2F1D3-4E5A-4B6C-9F8E-1A2B3C4D5E6F}"')
+    $blockLines.Add("`tProjectSection(SolutionItems) = preProject")
+    Get-ChildItem -LiteralPath $protosDir -File -Filter '*.proto' | Sort-Object -Property Name | ForEach-Object {
+        $blockLines.Add("`t`tProtos\$($_.Name) = Protos\$($_.Name)")
+    }
+    $blockLines.Add("`tEndProjectSection")
+    $blockLines.Add('EndProject')
+
+    # Read the sln, insert the block before the first "^Global" line, write back.
+    # Visual Studio expects CRLF for sln (see .gitattributes); .NET WriteAllLines uses CRLF by default on Windows
+    # but on macOS/Linux we must preserve the line endings. dotnet new sln emits CRLF on all OSes.
+    $existing = [System.IO.File]::ReadAllText($slnPath, $Script:Utf8NoBom)
+    $newline  = if ($existing -match "`r`n") { "`r`n" } else { "`n" }
+    $sourceLines = $existing -split "`r`n|`n"
+
+    $sb = New-Object System.Text.StringBuilder
+    $inserted = $false
+    foreach ($line in $sourceLines) {
+        if (-not $inserted -and $line -match '^Global') {
+            foreach ($bl in $blockLines) {
+                [void]$sb.Append($bl).Append($newline)
+            }
+            $inserted = $true
+        }
+        [void]$sb.Append($line).Append($newline)
+    }
+    # Trim trailing newline that the split-then-join introduced.
+    $text = $sb.ToString()
+    if ($text.EndsWith($newline)) {
+        $text = $text.Substring(0, $text.Length - $newline.Length)
+    }
+    Write-FileUtf8NoBom -Path $slnPath -Content $text
 }
 
 # ---------- step 11: git init -----------------------------------------------

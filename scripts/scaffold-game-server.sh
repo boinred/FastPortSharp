@@ -449,6 +449,51 @@ generate_sln() {
     && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}/${NEW_NAME}.csproj"     >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibCommons/LibCommons.csproj"       >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibNetworks/LibNetworks.csproj"     >/dev/null )
+
+  inject_protos_solution_folder
+}
+
+# Inject a "Protos" solution folder into the generated sln so IDE
+# (Visual Studio / Rider) shows the shared .proto files under Solution Explorer.
+# Mirrors the pattern used by the source repo's FastPortSharp.sln.
+# Solution Items are NOT build targets; tests/scaffold/run.sh's compute_sha256
+# already excludes *.sln, so this edit doesn't affect golden fixtures.
+inject_protos_solution_folder() {
+  local sln="${DEST_PATH}/${NEW_NAME}.sln"
+  local protos_dir="${DEST_PATH}/Protos"
+  [ -d "${protos_dir}" ] || return 0
+
+  # Build the Solution Folder block via a temp file (avoids awk -v backslash
+  # double-escape: passing "Protos\Sample.proto" through awk -v would eat
+  # the backslash because awk processes \X escapes in -v assignments).
+  local block_file="${sln}.block"
+  {
+    printf 'Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{B7C2F1D3-4E5A-4B6C-9F8E-1A2B3C4D5E6F}"\n'
+    printf '\tProjectSection(SolutionItems) = preProject\n'
+    local f
+    for f in "${protos_dir}"/*.proto; do
+      [ -f "${f}" ] || continue
+      local name
+      name="$(basename "${f}")"
+      # Use Windows-style backslash for sln path convention (sln files use \ on all OSes).
+      printf '\t\tProtos\\%s = Protos\\%s\n' "${name}" "${name}"
+    done
+    printf '\tEndProjectSection\n'
+    printf 'EndProject\n'
+  } > "${block_file}"
+
+  # Insert the block before the first "^Global" line.
+  local tmp="${sln}.new"
+  awk -v block_file="${block_file}" '
+    /^Global/ && !inserted {
+      while ((getline line < block_file) > 0) print line
+      close(block_file)
+      inserted = 1
+    }
+    { print }
+  ' "${sln}" > "${tmp}"
+  mv "${tmp}" "${sln}"
+  rm -f "${block_file}"
 }
 
 # ---------- step 11: git init -----------------------------------------------
