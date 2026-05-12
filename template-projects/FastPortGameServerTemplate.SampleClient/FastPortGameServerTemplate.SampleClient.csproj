@@ -19,15 +19,31 @@
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <!-- Design Ref: protos-shared-folder-revert-contracts §10.1 —
+         Per-consumer protobuf code generation from shared Protos/ folder. -->
     <PackageReference Include="Google.Protobuf" Version="3.32.1" />
+    <PackageReference Include="Google.Protobuf.Tools" Version="3.32.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.71.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Design Ref: §2.1 — generate Sample.cs into this assembly from shared proto. -->
+    <Protobuf Include="..\Protos\*.proto"
+              ProtoRoot="..\Protos"
+              GrpcServices="None"
+              Access="Public" />
+    <!-- Design Ref: §10.2 — source-level sharing of PacketIds with Template
+         (no Exe->Exe ProjectReference; PacketIds.cs is compiled into both dlls). -->
+    <Compile Include="..\FastPortGameServerTemplate\Handlers\PacketIds.cs"
+             Link="Handlers\PacketIds.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\LibCommons\LibCommons.csproj" />
     <ProjectReference Include="..\..\LibNetworks\LibNetworks.csproj" />
-    <!-- Design Ref: template-contracts-extraction §2.3 —
-         Contracts lib에서 Sample.proto + PacketIds 직접 획득 (Template Exe 참조 안티패턴 해소). -->
-    <ProjectReference Include="..\FastPortGameServerTemplate.Contracts\FastPortGameServerTemplate.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
