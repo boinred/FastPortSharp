@@ -46,8 +46,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly SCRIPT_DIR
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly TEMPLATE_SRC="${REPO_ROOT}/template-projects/${TEMPLATE_TOKEN}"
-# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
-readonly CONTRACTS_SRC="${REPO_ROOT}/template-projects/${TEMPLATE_TOKEN}.Contracts"
+# Design Ref: protos-shared-folder-revert-contracts §2.1 — shared Protos folder
+# (verbatim copy like LibCommons, but its .proto files DO get token-replaced
+# for csharp_namespace).
+readonly PROTOS_SRC="${REPO_ROOT}/template-projects/Protos"
 readonly LIBCOMMONS_SRC="${REPO_ROOT}/LibCommons"
 readonly LIBNETWORKS_SRC="${REPO_ROOT}/LibNetworks"
 readonly BLOCKED_TOKENS_FILE="${REPO_ROOT}/tests/scaffold/_shared/blocked-tokens.txt"
@@ -240,16 +242,16 @@ dry_run_plan() {
   log "[DRY-RUN]   --skip-smoke  : $([ "${OPT_SKIP_SMOKE}" -eq 1 ] && echo on || echo off)"
   log "[DRY-RUN] would copy:"
   log "[DRY-RUN]   ${TEMPLATE_SRC}    -> ${DEST_PATH}/${NEW_NAME}"
-  log "[DRY-RUN]   ${CONTRACTS_SRC}   -> ${DEST_PATH}/${NEW_NAME}.Contracts"
+  log "[DRY-RUN]   ${PROTOS_SRC}      -> ${DEST_PATH}/Protos"
   log "[DRY-RUN]   ${LIBCOMMONS_SRC}  -> ${DEST_PATH}/LibCommons"
   log "[DRY-RUN]   ${LIBNETWORKS_SRC} -> ${DEST_PATH}/LibNetworks"
   log "[DRY-RUN] would replace token \"${TEMPLATE_TOKEN}\" -> \"${NEW_NAME}\" in:"
-  log "[DRY-RUN]   text files (extensions: ${TEXT_EXTS}) under <dest>/${NEW_NAME} and <dest>/${NEW_NAME}.Contracts"
+  log "[DRY-RUN]   text files (extensions: ${TEXT_EXTS}) under <dest>/${NEW_NAME} and <dest>/Protos"
   log "[DRY-RUN] would generate:"
   log "[DRY-RUN]   ${DEST_PATH}/.gitignore"
   log "[DRY-RUN]   ${DEST_PATH}/.gitattributes"
   log "[DRY-RUN]   ${DEST_PATH}/README.md"
-  log "[DRY-RUN]   ${DEST_PATH}/${NEW_NAME}.sln (4 projects)"
+  log "[DRY-RUN]   ${DEST_PATH}/${NEW_NAME}.sln (3 projects)"
   if [ "${OPT_NO_GIT}" -ne 1 ]; then
     log "[DRY-RUN]   .git + initial commit"
   fi
@@ -263,9 +265,11 @@ dry_run_plan() {
 copy_template() {
   copy_tree "${TEMPLATE_SRC}"   "${DEST_PATH}/${TEMPLATE_TOKEN}"
 }
-# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
-copy_contracts() {
-  copy_tree "${CONTRACTS_SRC}"  "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts"
+# Design Ref: protos-shared-folder-revert-contracts §2.1 — shared Protos folder.
+# Copied to <dest>/Protos verbatim (folder name not token-renamed), but the
+# .proto files inside ARE token-replaced (csharp_namespace).
+copy_protos() {
+  copy_tree "${PROTOS_SRC}"     "${DEST_PATH}/Protos"
 }
 copy_libcommons() {
   copy_tree "${LIBCOMMONS_SRC}"  "${DEST_PATH}/LibCommons"
@@ -295,13 +299,15 @@ build_text_find_args() {
 }
 
 replace_tokens() {
-  # Design Ref: template-contracts-scaffold-fix §2.1 —
-  # Both Template and Contracts subtrees need token replacement.
-  # Each subtree is iterated separately to keep `find` scope clearly bounded
-  # (LibCommons/LibNetworks must NOT be touched).
+  # Design Ref: protos-shared-folder-revert-contracts §2.1, §11.3 —
+  # Template subtree and Protos subtree both need token replacement.
+  # Protos is verbatim-located (folder name unchanged) but its .proto files
+  # contain `option csharp_namespace = "FastPortGameServerTemplate.Protocols"`
+  # which must become "<NEW_NAME>.Protocols" for the scaffolded project.
+  # LibCommons/LibNetworks subtrees must NOT be touched.
   local subtrees=(
     "${DEST_PATH}/${TEMPLATE_TOKEN}"
-    "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts"
+    "${DEST_PATH}/Protos"
   )
   local find_expr
   find_expr="$(build_text_find_args)"
@@ -327,17 +333,11 @@ EOF
   mv "${DEST_PATH}/${NEW_NAME}/${TEMPLATE_TOKEN}.csproj" \
      "${DEST_PATH}/${NEW_NAME}/${NEW_NAME}.csproj"
 
-  # Design Ref: §2.1 — Rename the Contracts subtree directory + csproj.
-  mv "${DEST_PATH}/${TEMPLATE_TOKEN}.Contracts" "${DEST_PATH}/${NEW_NAME}.Contracts"
-  mv "${DEST_PATH}/${NEW_NAME}.Contracts/${TEMPLATE_TOKEN}.Contracts.csproj" \
-     "${DEST_PATH}/${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"
-
-  # Design Ref: template-contracts-scaffold-fix §2.1 —
-  # Source csproj has `..\..\LibCommons` (template-projects/ depth) but scaffold
-  # output is flat, so adjust to `..\LibCommons`. Same for LibNetworks.
+  # Design Ref: template-contracts-scaffold-fix §2.1 (path depth adjustment) —
+  # Source csproj has `..\..\LibCommons` (template-projects/ depth 2) but
+  # scaffold output is flat (depth 1), so adjust to `..\LibCommons`.
   local csproj_files=(
     "${DEST_PATH}/${NEW_NAME}/${NEW_NAME}.csproj"
-    "${DEST_PATH}/${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"
   )
   local cf
   for cf in "${csproj_files[@]}"; do
@@ -447,7 +447,6 @@ generate_sln() {
   ( cd "${DEST_PATH}" \
     && dotnet new sln --format sln -n "${NEW_NAME}"                          >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}/${NEW_NAME}.csproj"     >/dev/null \
-    && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}.Contracts/${NEW_NAME}.Contracts.csproj"  >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibCommons/LibCommons.csproj"       >/dev/null \
     && dotnet sln "${NEW_NAME}.sln" add "LibNetworks/LibNetworks.csproj"     >/dev/null )
 }
@@ -494,9 +493,9 @@ main() {
     exit 0
   fi
 
-  log "[5/12]  Copying ${TEMPLATE_TOKEN} + ${TEMPLATE_TOKEN}.Contracts..."
+  log "[5/12]  Copying ${TEMPLATE_TOKEN} + Protos..."
   copy_template
-  copy_contracts
+  copy_protos
   log "        OK"
 
   log "[6/12]  Copying LibCommons..."

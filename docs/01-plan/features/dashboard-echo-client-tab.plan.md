@@ -138,7 +138,7 @@ Dashboard에 echo client 탭을 추가하여, JSONL 파일 없이도 서버 도�
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| `FastPortGameServerTemplate` Exe 라서 `EchoRequest/PacketIds` 직접 참조 불가 | High | Resolved-by-precursor | **선행 cycle `template-contracts-extraction` 처리 확정 (2026-05-11)**: `FastPortGameServerTemplate.Contracts` (net10.0 Class Library) 신설, proto + PacketIds 이동, Template/SampleClient/Dashboard 모두 동일 lib 참조. 본 cycle Design 시점엔 Contracts lib 이미 존재한다는 전제. |
+| `FastPortGameServerTemplate` Exe 라서 `EchoRequest/PacketIds` 직접 참조 불가 | High | Resolved-by-precursor | **선행 cycle들 처리 확정 (2026-05-12)**: `template-contracts-extraction` (Contracts lib 도입) + `template-contracts-scaffold-fix` + 최종 `protos-shared-folder-revert-contracts`로 단순화 완료. 현재 상태: `template-projects/Protos/Sample.proto` (단순 폴더). Dashboard는 자체 `<Protobuf Include="..\template-projects\Protos\*.proto"/>` 한 줄로 EchoRequest/EchoResponse 자체 어셈블리 생성. PacketIds는 `<Compile Include Link>` 로 Template에서 공유 (Exe 참조 없음). |
 | MAUI Catalyst sandbox가 outbound TCP 차단 | High | Low | macOS sandbox는 GUI 앱 outbound 기본 허용. entitlement 변경 없이 검증. 차단 시 `com.apple.security.network.client` 추가. |
 | UI 스레드에서 socket I/O 시 freeze | Medium | Medium | `BaseSessionServer`는 async 패턴 사용 — UI 스레드 외부에서 작업. KPI/차트 update만 dispatcher로 marshal. |
 | Send Interval 너무 짧을 때 echo response가 누적되어 RTT 측정이 잘못됨 (request/response 매칭 실패) | Medium | Medium | 1 connection × in-flight 1 echo가 기본. 다음 echo는 직전 response 도착 후 + interval. 단순한 ping-pong 패턴. (또는 sequence number로 매칭 — Design 결정) |

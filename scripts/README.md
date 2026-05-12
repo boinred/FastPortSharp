@@ -6,8 +6,8 @@ Cross-platform scaffolding utilities for the FastPortSharp game-server template.
 
 Bootstraps a new self-contained game server project from
 `template-projects/FastPortGameServerTemplate/` +
-`template-projects/FastPortGameServerTemplate.Contracts/` (shared proto +
-PacketIds) + the engine (`LibCommons/` + `LibNetworks/`).
+`template-projects/Protos/` (shared `.proto` files) + the engine
+(`LibCommons/` + `LibNetworks/`).
 
 Two scripts, identical behaviour, byte-identical output:
 
@@ -67,23 +67,25 @@ dotnet run --project MyLobbyServer -c Release
 ```
 
 The new project is self-contained:
-- `<NewName>/` — your game server (start here)
-- `<NewName>.Contracts/` — proto contracts + PacketIds (shared with future
-  consumers, e.g. matching sample client)
+- `<NewName>/` — your game server (start here; owns `Handlers/PacketIds.cs`,
+  generates its own C# from `../Protos/*.proto` via `<Protobuf Include>`)
+- `Protos/` — shared `.proto` files (no csproj; each consumer's `<Protobuf
+  Include>` generates C# into that consumer's own assembly)
 - `LibCommons/` — engine: buffers, packet primitives
 - `LibNetworks/` — engine: TCP listener / session
-- `<NewName>.sln` — solution that ties the four projects together
+- `<NewName>.sln` — solution registering the 3 csproj projects
 - `.gitignore`, `.gitattributes`, `README.md` — repo hygiene
 
 ### What gets renamed
 
 The scripts substitute the literal token `FastPortGameServerTemplate`
 with `<NewProjectName>` in:
-- folder names (`<NewName>/`, `<NewName>.Contracts/`)
-- file names (the `.csproj` pair)
-- file contents (`.cs`, `.csproj`, `.proto`, `.json`, `.md`)
-- the generated `.sln` references (4 projects)
-- the C# namespace
+- folder names (`<NewName>/`)
+- file names (the `.csproj`)
+- file contents (`.cs`, `.csproj`, `.proto`, `.json`, `.md`) under
+  `<NewName>/` and `Protos/` subtrees
+- the generated `.sln` references (3 projects)
+- the C# namespace (proto `csharp_namespace` token)
 
 The scripts also adjust `..\..\LibCommons` / `..\..\LibNetworks` relative
 paths in the copied csproj files to `..\LibCommons` / `..\LibNetworks`,

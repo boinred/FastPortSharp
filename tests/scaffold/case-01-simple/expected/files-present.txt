@@ -13,15 +13,14 @@ MyLobbyServer/Application/PacketDispatcher.cs
 MyLobbyServer/Configuration/GameServerOptions.cs
 MyLobbyServer/Handlers/EchoHandler.cs
 MyLobbyServer/Handlers/IPacketHandler.cs
+MyLobbyServer/Handlers/PacketIds.cs
 MyLobbyServer/Sessions/GameSession.cs
 MyLobbyServer/Sessions/GameSessionFactory.cs
 MyLobbyServer/Telemetry/IGameServerTelemetry.cs
 MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
 
-# Contracts project (proto + PacketIds, token-renamed)
-MyLobbyServer.Contracts/MyLobbyServer.Contracts.csproj
-MyLobbyServer.Contracts/Protocols/Sample.proto
-MyLobbyServer.Contracts/Handlers/PacketIds.cs
+# Shared Protos folder (proto files only — verbatim location, namespace token-replaced)
+Protos/Sample.proto
 
 # Engine projects (verbatim copy)
 LibCommons/LibCommons.csproj

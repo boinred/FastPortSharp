@@ -86,8 +86,9 @@ $Script:NameRegex     = '^[A-Z][A-Za-z0-9]{0,63}$'
 $Script:ScriptDir       = Split-Path -Parent $PSCommandPath
 $Script:RepoRoot        = Resolve-Path (Join-Path $Script:ScriptDir '..') | Select-Object -ExpandProperty Path
 $Script:TemplateSrc     = Join-Path $Script:RepoRoot (Join-Path 'template-projects' $Script:TemplateToken)
-# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
-$Script:ContractsSrc    = Join-Path $Script:RepoRoot (Join-Path 'template-projects' "$Script:TemplateToken.Contracts")
+# Design Ref: protos-shared-folder-revert-contracts §2.1 — shared Protos folder
+# (verbatim location, but .proto files inside get token-replaced for csharp_namespace).
+$Script:ProtosSrc       = Join-Path $Script:RepoRoot (Join-Path 'template-projects' 'Protos')
 $Script:LibCommonsSrc   = Join-Path $Script:RepoRoot 'LibCommons'
 $Script:LibNetworksSrc  = Join-Path $Script:RepoRoot 'LibNetworks'
 $Script:BlockedTokensFile = Join-Path $Script:RepoRoot 'tests/scaffold/_shared/blocked-tokens.txt'
@@ -285,16 +286,16 @@ function Show-DryRunPlan {
     Write-Log "[DRY-RUN]   -SkipSmoke    : $(if ($SkipSmoke) { 'on' } else { 'off' })"
     Write-Log "[DRY-RUN] would copy:"
     Write-Log "[DRY-RUN]   $Script:TemplateSrc -> $(Join-Path $Script:DestPathResolved $NewProjectName)"
-    Write-Log "[DRY-RUN]   $Script:ContractsSrc -> $(Join-Path $Script:DestPathResolved "$NewProjectName.Contracts")"
+    Write-Log "[DRY-RUN]   $Script:ProtosSrc -> $(Join-Path $Script:DestPathResolved 'Protos')"
     Write-Log "[DRY-RUN]   $Script:LibCommonsSrc -> $(Join-Path $Script:DestPathResolved 'LibCommons')"
     Write-Log "[DRY-RUN]   $Script:LibNetworksSrc -> $(Join-Path $Script:DestPathResolved 'LibNetworks')"
     Write-Log "[DRY-RUN] would replace token `"$Script:TemplateToken`" -> `"$NewProjectName`" in:"
-    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) under <Dest>/$NewProjectName and <Dest>/$NewProjectName.Contracts"
+    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) under <Dest>/$NewProjectName and <Dest>/Protos"
     Write-Log "[DRY-RUN] would generate:"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitignore')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitattributes')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved 'README.md')"
-    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") (4 projects)"
+    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") (3 projects)"
     if (-not $NoGit) {
         Write-Log "[DRY-RUN]   .git + initial commit"
     }
@@ -308,9 +309,9 @@ function Show-DryRunPlan {
 function Copy-Template {
     Copy-TreeFiltered -Src $Script:TemplateSrc -Dest (Join-Path $Script:DestPathResolved $Script:TemplateToken)
 }
-# Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
-function Copy-Contracts {
-    Copy-TreeFiltered -Src $Script:ContractsSrc -Dest (Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts")
+# Design Ref: protos-shared-folder-revert-contracts §2.1 — shared Protos folder.
+function Copy-Protos {
+    Copy-TreeFiltered -Src $Script:ProtosSrc -Dest (Join-Path $Script:DestPathResolved 'Protos')
 }
 function Copy-LibCommons {
     Copy-TreeFiltered -Src $Script:LibCommonsSrc -Dest (Join-Path $Script:DestPathResolved 'LibCommons')
@@ -322,11 +323,13 @@ function Copy-LibNetworks {
 # ---------- step 8: token replacement ---------------------------------------
 
 function Update-Tokens {
-    # Design Ref: template-contracts-scaffold-fix §2.1 —
-    # Both Template and Contracts subtrees need token replacement.
+    # Design Ref: protos-shared-folder-revert-contracts §2.1, §11.3 —
+    # Template subtree + Protos subtree both need token replacement.
+    # Protos folder location verbatim; csharp_namespace inside .proto files
+    # gets token-renamed. LibCommons/LibNetworks must NOT be touched.
     $subtrees = @(
         Join-Path $Script:DestPathResolved $Script:TemplateToken
-        Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts"
+        Join-Path $Script:DestPathResolved 'Protos'
     )
     $count = 0
 
@@ -353,20 +356,11 @@ function Update-Tokens {
         -LiteralPath (Join-Path $newSubtree "$Script:TemplateToken.csproj") `
         -NewName "$NewProjectName.csproj"
 
-    # Design Ref: §2.1 — Rename the Contracts subtree directory + csproj.
-    $newContractsSubtree = Join-Path $Script:DestPathResolved "$NewProjectName.Contracts"
-    Rename-Item `
-        -LiteralPath (Join-Path $Script:DestPathResolved "$Script:TemplateToken.Contracts") `
-        -NewName "$NewProjectName.Contracts"
-    Rename-Item `
-        -LiteralPath (Join-Path $newContractsSubtree "$Script:TemplateToken.Contracts.csproj") `
-        -NewName "$NewProjectName.Contracts.csproj"
-
-    # Design Ref: §2.1 — Source csproj has `..\..\LibCommons` (template-projects/
-    # depth) but scaffold output is flat, so adjust to `..\LibCommons`.
+    # Design Ref: template-contracts-scaffold-fix §2.1 (path depth adjustment) —
+    # Source csproj has `..\..\LibCommons` (template-projects/ depth 2) but
+    # scaffold output is flat (depth 1), so adjust to `..\LibCommons`.
     $csprojFiles = @(
         Join-Path $newSubtree "$NewProjectName.csproj"
-        Join-Path $newContractsSubtree "$NewProjectName.Contracts.csproj"
     )
     foreach ($cf in $csprojFiles) {
         if (-not (Test-Path -LiteralPath $cf)) { continue }
@@ -480,9 +474,6 @@ function New-SolutionFile {
         if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path $NewProjectName "$NewProjectName.csproj") | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
-        # Design Ref: template-contracts-scaffold-fix §2.1 — Contracts sub-project.
-        dotnet sln "$NewProjectName.sln" add (Join-Path "$NewProjectName.Contracts" "$NewProjectName.Contracts.csproj") | Out-Null
-        if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path 'LibCommons'  'LibCommons.csproj')  | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
         dotnet sln "$NewProjectName.sln" add (Join-Path 'LibNetworks' 'LibNetworks.csproj') | Out-Null
@@ -543,9 +534,9 @@ function Invoke-Main {
         exit 0
     }
 
-    Write-Log "[5/12]  Copying $Script:TemplateToken + $Script:TemplateToken.Contracts..."
+    Write-Log "[5/12]  Copying $Script:TemplateToken + Protos..."
     Copy-Template
-    Copy-Contracts
+    Copy-Protos
     Write-Log "        OK"
 
     Write-Log "[6/12]  Copying LibCommons..."

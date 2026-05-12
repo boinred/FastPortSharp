@@ -359,7 +359,8 @@ FastPortSharp/
 │   │   │   └── GameSessionFactory.cs
 │   │   ├── Handlers/
 │   │   │   ├── IPacketHandler.cs
-│   │   │   └── EchoHandler.cs                  # 1001 → 1002 round-trip 샘플
+│   │   │   ├── EchoHandler.cs                  # 1001 → 1002 round-trip 샘플
+│   │   │   └── PacketIds.cs                    # 1001/1002 registry (소유)
 │   │   ├── Telemetry/
 │   │   │   ├── IGameServerTelemetry.cs
 │   │   │   └── NullGameServerTelemetry.cs
@@ -367,12 +368,10 @@ FastPortSharp/
 │   │   ├── Program.cs                          # Generic Host + Serilog wiring
 │   │   ├── appsettings.json
 │   │   ├── README.md / QUICKSTART.ko.md
-│   │   └── FastPortGameServerTemplate.csproj
+│   │   └── FastPortGameServerTemplate.csproj   # <Protobuf Include="..\Protos\*.proto"/>
 │   │
-│   ├── 📦 FastPortGameServerTemplate.Contracts/  # 공유 proto + PacketIds (Class Library)
-│   │   ├── Protocols/Sample.proto              # Grpc.Tools, GrpcServices=None
-│   │   ├── Handlers/PacketIds.cs               # 1001/1002 registry
-│   │   └── FastPortGameServerTemplate.Contracts.csproj
+│   ├── 📁 Protos/                              # 공유 .proto 파일 (csproj 없음)
+│   │   └── Sample.proto                        # Grpc.Tools per consumer, GrpcServices=None
 │   │
 │   └── 🧪 FastPortGameServerTemplate.SampleClient/  # Full echo round-trip 검증
 │       ├── Sessions/

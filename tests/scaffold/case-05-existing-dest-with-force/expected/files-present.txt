@@ -1,8 +1,7 @@
 Foo/Foo.csproj
 Foo/Program.cs
-Foo.Contracts/Foo.Contracts.csproj
-Foo.Contracts/Protocols/Sample.proto
-Foo.Contracts/Handlers/PacketIds.cs
+Foo/Handlers/PacketIds.cs
+Protos/Sample.proto
 LibCommons/LibCommons.csproj
 LibNetworks/LibNetworks.csproj
 Foo.sln

@@ -31,9 +31,6 @@
 ./LibNetworks/Sessions/SendCompletionTracker.cs
 ./LibNetworks/Sessions/SessionSendOptions.cs
 ./LibNetworks/SocketEventsPool.cs
-./MyLobbyServer.Contracts/Handlers/PacketIds.cs
-./MyLobbyServer.Contracts/MyLobbyServer.Contracts.csproj
-./MyLobbyServer.Contracts/Protocols/Sample.proto
 ./MyLobbyServer.sln
 ./MyLobbyServer/Application/GameServer.cs
 ./MyLobbyServer/Application/GameServerHostedService.cs
@@ -41,6 +38,7 @@
 ./MyLobbyServer/Configuration/GameServerOptions.cs
 ./MyLobbyServer/Handlers/EchoHandler.cs
 ./MyLobbyServer/Handlers/IPacketHandler.cs
+./MyLobbyServer/Handlers/PacketIds.cs
 ./MyLobbyServer/MyLobbyServer.csproj
 ./MyLobbyServer/Program.cs
 ./MyLobbyServer/QUICKSTART.ko.md
@@ -50,4 +48,5 @@
 ./MyLobbyServer/Telemetry/IGameServerTelemetry.cs
 ./MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
 ./MyLobbyServer/appsettings.json
+./Protos/Sample.proto
 ./README.md
