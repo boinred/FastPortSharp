@@ -1,103 +1,15 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Design Ref: §10 Migration — MainPage는 AppShell의 직접 child가 아니다.
+     2-탭 routing은 AppShell.xaml의 <TabBar>로 이전. 이 페이지는 backward-compat을 위해 남겨둠
+     (현재는 어디서도 사용되지 않음). 콘텐츠는 JsonlPollingPage로 이전됨. -->
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels;assembly=FastPortDashboard.Core"
+             xmlns:views="clr-namespace:FastPortDashboard.Maui.Views"
              x:Class="FastPortDashboard.Maui.MainPage"
-             x:DataType="vm:DashboardViewModel"
              Title="FastPort Dashboard">
-
-    <ScrollView>
-        <VerticalStackLayout Spacing="12" Padding="16">
-
-            <Label Text="FastPort Telemetry Dashboard"
-                   FontSize="24"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Start" />
-            <Label Text="ObservedMetricsSnapshot JSONL을 1초 간격으로 polling합니다."
-                   FontSize="12"
-                   TextColor="Gray" />
-
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
-                <VerticalStackLayout Spacing="8">
-                    <HorizontalStackLayout Spacing="8">
-                        <Label Text="JSONL Path:" VerticalOptions="Center" WidthRequest="100" />
-                        <Entry x:Name="PathEntry"
-                               Text="{Binding FilePath}"
-                               Placeholder="/path/to/server.metrics.jsonl"
-                               HorizontalOptions="FillAndExpand" />
-                        <Button Text="Browse"
-                                Clicked="OnBrowseClicked" />
-                    </HorizontalStackLayout>
-                    <HorizontalStackLayout Spacing="8">
-                        <CheckBox IsChecked="{Binding UseMock}" />
-                        <Label Text="Use Mock data (실 server 없이 UI 테스트)"
-                               VerticalOptions="Center" />
-                    </HorizontalStackLayout>
-                    <HorizontalStackLayout Spacing="8">
-                        <Button Text="⚡ Connect"
-                                Command="{Binding ConnectCommand}"
-                                BackgroundColor="DodgerBlue"
-                                TextColor="White" />
-                        <Button Text="⏹ Disconnect"
-                                Command="{Binding DisconnectCommand}" />
-                        <Label Text="{Binding State, StringFormat='State: {0}'}"
-                               VerticalOptions="Center"
-                               FontAttributes="Bold" />
-                    </HorizontalStackLayout>
-                    <Label Text="{Binding ErrorMessage}"
-                           TextColor="Red" />
-                </VerticalStackLayout>
-            </Frame>
-
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
-                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
-                    <VerticalStackLayout Grid.Column="0" Grid.Row="0">
-                        <Label Text="Current Sessions" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding CurrentSessions}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1" Grid.Row="0">
-                        <Label Text="Total Accepted" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding TotalAcceptedSessions}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="2" Grid.Row="0">
-                        <Label Text="Total Sent Bytes" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding TotalSentBytes, StringFormat='{0:N0}'}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="0" Grid.Row="1">
-                        <Label Text="Pending Send" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding PendingSendRequests}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1" Grid.Row="1">
-                        <Label Text="Send Buffer Bytes" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding SendBufferBytes, StringFormat='{0:N0}'}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="2" Grid.Row="1">
-                        <Label Text="Last Update" FontSize="11" TextColor="Gray" />
-                        <Label Text="{Binding LastUpdate, StringFormat='{0:HH:mm:ss}'}" FontSize="20" FontAttributes="Bold" />
-                    </VerticalStackLayout>
-                </Grid>
-            </Frame>
-
-            <!-- Design Ref: §5.1 (dashboard-chart-graphicsview-migration) — GraphicsView로 교체.
-                 SkiaSharp 기반 ChartView가 macOS 26 SwiftUI Observation crash trigger였음. -->
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
-                <VerticalStackLayout>
-                    <Label Text="Client RTT P95 (ms)" FontAttributes="Bold" />
-                    <Label Text="{Binding ClientRttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <GraphicsView x:Name="RttChartView" HeightRequest="160" />
-                </VerticalStackLayout>
-            </Frame>
-
-            <!-- Design Ref: §5.1 — Throughput line chart, 위와 동일 구조. -->
-            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
-                <VerticalStackLayout>
-                    <Label Text="Server Throughput (B/s)" FontAttributes="Bold" />
-                    <Label Text="{Binding ThroughputSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
-                    <GraphicsView x:Name="ThroughputChartView" HeightRequest="160" />
-                </VerticalStackLayout>
-            </Frame>
-
-        </VerticalStackLayout>
-    </ScrollView>
-
+    <ContentPage.Content>
+        <Label Text="See AppShell tabs (JSONL Polling / Echo Client)"
+               HorizontalOptions="Center"
+               VerticalOptions="Center" />
+    </ContentPage.Content>
 </ContentPage>
