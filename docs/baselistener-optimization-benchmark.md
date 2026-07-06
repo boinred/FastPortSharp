@@ -109,6 +109,32 @@ max pending send 30~31, max send buffer 2,089B, 총 수신 ~209.9K 패킷.
 4. 구조적 개선(동기완료 재귀 제거, accept당 할당 2→1, 로그 비용 제거)은 이 측정에
    나타나는 수치와 무관하게 유효하며, 10K/고속 램프업에서 효과가 더 커질 것으로 예상.
 
+## 시나리오 C — OutstandingAccepts 비교 (2026-07-06 추가)
+
+조건: 시나리오 B와 동일 (1,000 세션 / fixed:2048 / ramp-up 5s / 60s),
+2단계 최적화 + shutdown fix(`f102dc2`) 빌드, `--FastPortTestSmokeServer:OutstandingAccepts` 만 변경.
+
+### 서버 관측 (accept 경로, avg / max ms)
+
+| 지표 | OA=1 | OA=4 | OA=8 |
+|---|---:|---:|---:|
+| accept-first-receive | 1.261 / 128.10 | 0.459 / 23.08 | 0.441 / 22.88 |
+| accept-task-start | 0.138 / 20.44 | 0.105 / 11.77 | 0.107 / 11.51 |
+| onaccepted-start-first-receive | 1.123 / 118.21 | 0.354 / 11.31 | 0.335 / 11.37 |
+| accept-session-create | 0.101 / 8.54 | 0.100 / 10.82 | 0.101 / 10.52 |
+
+공통: 세션 1,000/1,000 유지, 에러/backpressure 0. 클라이언트 정상 상태 RTT는
+OA 값과 무관 (accept는 램프업 구간에만 영향).
+
+### 결론
+
+- **OA=1 → OA=4: accept-first-receive 평균 -64%, max -82%** (128.10ms → 23.08ms).
+  단일 outstanding accept가 초당 200 accept 램프업에서 병목이었음을 확인.
+- OA=8은 OA=4와 사실상 동일 — 이 부하에서는 4로 충분 (수확 체감).
+- 반영: `FastPortTestSmokeServer/appsettings.json` 기본값을 `OutstandingAccepts: 4`로 변경.
+  엔진 기본값(`C_DefaultOutstandingAccepts = 1`)은 호환성 유지를 위해 그대로 두고,
+  10K 검증에서 재확인 후 변경을 검토한다.
+
 ## 한계 및 다음 측정
 
 - 각 조건 1회 측정 — 확정 수치가 필요하면 조건당 3회 이상 반복 후 중앙값 비교.
