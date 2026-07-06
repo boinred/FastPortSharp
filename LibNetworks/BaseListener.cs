@@ -99,7 +99,7 @@ public abstract class BaseListener : BaseSocket
         {
             // Invalid endpoint: accept 실패 관측, telemetry 타입 비의존
             OnAcceptFailed("start-endpoint", null, null);
-            m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
+            m_Logger.LogError("BaseListener, Start, IP is not valid. {Ip}", ip);
             return false;
         }
 
@@ -136,7 +136,7 @@ public abstract class BaseListener : BaseSocket
             // Bind/Listen 예외: accept 실패 및 listener socket error 동시 관측
             OnAcceptFailed("start-bind-listen", null, ex);
             OnListenerSocketError("start-bind-listen", null, ex);
-            m_Logger.LogError($"BaseListener, Start, Exception : {ex}");
+            m_Logger.LogError(ex, "BaseListener, Start, Exception");
         }
 
         return false;
@@ -192,39 +192,48 @@ public abstract class BaseListener : BaseSocket
 
     private bool Accept(System.Net.Sockets.SocketAsyncEventArgs acceptArgs)
     {
-        if (!Volatile.Read(ref m_bIsRunning))
+        // 흐름: 동기 완료를 재귀 대신 루프로 처리해 backlog 연쇄 시 스택 증가 방지
+        while (Volatile.Read(ref m_bIsRunning))
         {
-            // 상태: shutdown 이후에는 새 accept repost 금지
-            return false;
-        }
+            // Reset the acceptArgs for reuse
+            acceptArgs.AcceptSocket = null;
 
-        // Reset the acceptArgs for reuse
-        acceptArgs.AcceptSocket = null;
-
-        try
-        {
-            if (!m_Socket.AcceptAsync(acceptArgs))
+            try
             {
-                // If AcceptAsync returns false, we handle the accept operation immediately
-                OnSocketEventsAcceptCompleted(this, acceptArgs);
+                if (m_Socket.AcceptAsync(acceptArgs))
+                {
+                    // 비동기 대기 상태: completion callback이 이어서 처리
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                // AcceptAsync 시작 실패: subclass hook 기반 외부 관측
+                OnAcceptFailed("accept-start", null, ex);
+                OnListenerSocketError("accept-start", null, ex);
+                m_Logger.LogError(ex, "BaseListener, Accept, Exception");
+                return false;
             }
 
-            return true;
-        }
-        catch (Exception ex)
-        {
-            // AcceptAsync 시작 실패: subclass hook 기반 외부 관측
-            OnAcceptFailed("accept-start", null, ex);
-            OnListenerSocketError("accept-start", null, ex);
-            m_Logger.LogError($"BaseListener, Accept, Exception : {ex}");
+            // 동기 완료: 즉시 처리 후 루프에서 동일 args 재등록
+            ProcessAccept(acceptArgs);
         }
 
+        // 상태: shutdown 이후에는 새 accept repost 금지
         return false;
     }
 
     private void OnSocketEventsAcceptCompleted(object? sender, SocketAsyncEventArgs args)
     {
-        // 계측 기준점: accept completion callback 진입 시각
+        ProcessAccept(args);
+
+        // 흐름: completion된 동일 args를 listener running 상태에서만 재등록
+        Accept(args);
+    }
+
+    private void ProcessAccept(SocketAsyncEventArgs args)
+    {
+        // 계측 기준점: accept completion 처리 진입 시각
         long acceptCompletedTimestamp = Stopwatch.GetTimestamp();
 
         try
@@ -234,7 +243,7 @@ public abstract class BaseListener : BaseSocket
                 // Accept completion socket error: accept 실패 및 socket error
                 OnAcceptFailed("accept-completion", args.SocketError, null);
                 OnListenerSocketError("accept-completion", args.SocketError, null);
-                m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, SocketError : {args.SocketError}");
+                m_Logger.LogError("BaseListener, OnSocketEventsAcceptCompleted, SocketError : {SocketError}", args.SocketError);
                 return;
             }
             Socket? clientSocket = args.AcceptSocket;
@@ -242,13 +251,17 @@ public abstract class BaseListener : BaseSocket
             {
                 // Completion without socket: session 생성 불가, accept 실패
                 OnAcceptFailed("accept-completion-null-socket", null, null);
-                m_Logger.LogError($"BaseListener, OnSocketEventsAcceptCompleted, Socket is not valid.");
+                m_Logger.LogError("BaseListener, OnSocketEventsAcceptCompleted, Socket is not valid.");
                 return;
             }
 
             // Accept 성공 hook: session 생성 전 호출, 기존 telemetry 순서 보존
             OnAcceptSucceeded(clientSocket);
-            m_Logger.LogInformation($"BaseListener, OnSocketEventsAcceptCompleted, End Point : {clientSocket.RemoteEndPoint}");
+            if (m_Logger.IsEnabled(LogLevel.Debug))
+            {
+                // 관측 로그: RemoteEndPoint 조회(syscall + 할당)는 debug 레벨에서만 수행
+                m_Logger.LogDebug("BaseListener, OnSocketEventsAcceptCompleted, End Point : {RemoteEndPoint}", clientSocket.RemoteEndPoint);
+            }
 
             // TODO: 다른 thread 처리 필요
 
@@ -277,10 +290,11 @@ public abstract class BaseListener : BaseSocket
                 clientSession.OnAccepted();
             });
         }
-        finally
+        catch (Exception ex)
         {
-            // 흐름: completion된 동일 args를 listener running 상태에서만 재등록
-            Accept(args);
+            // Accept 처리 예외: pump 유지를 위해 관측 후 계속 진행
+            OnAcceptFailed("accept-process", null, ex);
+            m_Logger.LogError(ex, "BaseListener, ProcessAccept, Exception");
         }
     }
 }
