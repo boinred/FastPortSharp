@@ -298,42 +298,51 @@ public abstract class BaseSession
 
     private void OnSocketEventsReceivedCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        // 계측 기준점: socket receive completion callback 진입 시각
+        if (ProcessReceiveCompleted(e))
+        {
+            RequestReceived();
+        }
+    }
+
+    // 목적: receive completion 1건 처리, 반환값은 수신 계속 여부
+    private bool ProcessReceiveCompleted(SocketAsyncEventArgs e)
+    {
+        // 계측 기준점: socket receive completion 처리 진입 시각
         long receiveCompletedTimestamp = GetNetworkTimestamp();
 
         if (e.SocketError == SocketError.IOPending)
         {
-            m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Socket IOPeding.");
-            return;
+            m_Logger.LogDebug("BaseSession, OnSocketEventsReceivedCompleted, Socket IOPending.");
+            return false;
         }
 
         if (e.BytesTransferred <= 0)
         {
-            m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. BytesTransferred is zero.");
+            m_Logger.LogInformation("BaseSession, OnSocketEventsReceivedCompleted, Disconnected. BytesTransferred is zero.");
             RequestDisconnect(NetworkDisconnectReason.RemoteClosed);
 
-            return;
+            return false;
         }
 
         if (e.SocketError != SocketError.Success)
         {
             // Receive completion socket error: disconnect 전 hook 노출
             OnNetworkSocketError("receive-completion", e.SocketError, null);
-            m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. SocketError : {e.SocketError}");
+            m_Logger.LogInformation("BaseSession, OnSocketEventsReceivedCompleted, Disconnected. SocketError : {SocketError}", e.SocketError);
 
             RequestDisconnect(NetworkDisconnectReason.ReceiveSocketError);
 
-            return;
+            return false;
         }
 
         var buffer = e.Buffer;
         if (null == buffer)
         {
-            m_Logger.LogInformation($"BaseSession, OnSocketEventsReceivedCompleted, Disconnected. Buffer is null.");
+            m_Logger.LogInformation("BaseSession, OnSocketEventsReceivedCompleted, Disconnected. Buffer is null.");
 
             RequestDisconnect(NetworkDisconnectReason.Unknown);
 
-            return;
+            return false;
         }
 
         // 계측: ReceiveAsync 요청부터 socket byte 수신 완료까지의 대기 시간
@@ -355,11 +364,13 @@ public abstract class BaseSession
             SignalReceivedBufferWritten();
         }
 
-        m_Logger.LogDebug($"BaseSession, OnSocketEventsReceivedCompleted, Received {wroteSize} bytes from {GetSessionAddress()}");
+        if (m_Logger.IsEnabled(LogLevel.Debug))
+        {
+            // 관측 로그: per-receive 문자열 포맷 비용은 debug 레벨에서만 발생
+            m_Logger.LogDebug("BaseSession, OnSocketEventsReceivedCompleted, Received {WroteSize} bytes from {SessionAddress}", wroteSize, GetSessionAddress());
+        }
 
-        // 
-
-        RequestReceived();
+        return true;
     }
 
     public bool RequestDisconnect()
@@ -377,7 +388,7 @@ public abstract class BaseSession
             return false;
         }
 
-        m_Logger.LogInformation($"BaseSession, RequestDisconnect.");
+        m_Logger.LogInformation("BaseSession, RequestDisconnect.");
         // Disconnect 처리: engine 담당, 관측 hook 분리
         OnNetworkSessionDisconnected(reason);
         // Disconnect cleanup: 미완료 send request를 완료와 구분해 pending gauge에서 제거
@@ -436,40 +447,51 @@ public abstract class BaseSession
 
     protected void RequestReceived()
     {
-        // 이미 연결 해제 중이면 무시
-        if (IsDisconnected)
+        // 흐름: 동기 완료를 재귀 대신 루프로 처리해 수신 폭주 시 스택 증가 방지
+        while (true)
         {
-            return;
-        }
-
-        var socket = m_Socket;
-        if (socket == null || !socket.Connected)
-        {
-            return;
-        }
-
-        m_Logger.LogDebug($"BaseSession, RequestReceived");
-        try
-        {
-            // 계측 기준점: ReceiveAsync 요청 시작 시각
-            Volatile.Write(ref m_ReceiveRequestedTimestamp, GetNetworkTimestamp());
-            if (!socket.ReceiveAsync(m_SocketEventsReceived))
+            // 이미 연결 해제 중이면 무시
+            if (IsDisconnected)
             {
-                // If ReceiveAsync returns false, we handle the receive operation immediately
-                OnSocketEventsReceivedCompleted(this, m_SocketEventsReceived);
+                return;
             }
-        }
-        catch (ObjectDisposedException)
-        {
-            // 소켓이 이미 Dispose된 경우
-            RequestDisconnect(NetworkDisconnectReason.Unknown);
-        }
-        catch (SocketException ex)
-        {
-            m_Logger.LogDebug($"BaseSession, RequestReceived, SocketException : {ex.Message}");
-            // Receive 요청 실패: socket error hook 기반 외부 관측
-            OnNetworkSocketError("receive-request", ex.SocketErrorCode, ex);
-            RequestDisconnect(NetworkDisconnectReason.ReceiveRequestError);
+
+            var socket = m_Socket;
+            if (socket == null || !socket.Connected)
+            {
+                return;
+            }
+
+            try
+            {
+                // 계측 기준점: ReceiveAsync 요청 시작 시각
+                Volatile.Write(ref m_ReceiveRequestedTimestamp, GetNetworkTimestamp());
+                if (socket.ReceiveAsync(m_SocketEventsReceived))
+                {
+                    // 비동기 대기 상태: completion callback이 이어서 처리
+                    return;
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // 소켓이 이미 Dispose된 경우
+                RequestDisconnect(NetworkDisconnectReason.Unknown);
+                return;
+            }
+            catch (SocketException ex)
+            {
+                m_Logger.LogDebug("BaseSession, RequestReceived, SocketException : {Message}", ex.Message);
+                // Receive 요청 실패: socket error hook 기반 외부 관측
+                OnNetworkSocketError("receive-request", ex.SocketErrorCode, ex);
+                RequestDisconnect(NetworkDisconnectReason.ReceiveRequestError);
+                return;
+            }
+
+            // 동기 완료: 즉시 처리 후 루프에서 다음 수신 요청
+            if (!ProcessReceiveCompleted(m_SocketEventsReceived))
+            {
+                return;
+            }
         }
     }
 
@@ -591,7 +613,7 @@ public abstract class BaseSession
         }
 
 
-        m_Logger.LogDebug($"BaseSession, RequestSendBuffers, Buffer Length : {buffersSize}");
+        m_Logger.LogDebug("BaseSession, RequestSendBuffers, Buffer Length : {BuffersSize}", buffersSize);
 
         var sendItem = new SendQueueItem(sendBuffers, buffersSize);
         if (!m_SendQueue.Writer.TryWrite(sendItem))
@@ -801,7 +823,11 @@ public abstract class BaseSession
 
                 foreach (var basePacket in basePackets)
                 {
-                    m_Logger.LogDebug($"BaseSession, DoWorkReceived, Received Packet Size : {basePacket.PacketSize}, Data Size : {basePacket.DataSize}");
+                    if (m_Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        // 관측 로그: per-packet 문자열 포맷 비용은 debug 레벨에서만 발생
+                        m_Logger.LogDebug("BaseSession, DoWorkReceived, Received Packet Size : {PacketSize}, Data Size : {DataSize}", basePacket.PacketSize, basePacket.DataSize);
+                    }
                     // Packet complete: received packet/bytes hook 호출 기준
                     OnNetworkPacketReceived(basePacket);
 
@@ -888,7 +914,11 @@ public abstract class BaseSession
                         continue;
                     }
 
-                    m_Logger.LogDebug($"BaseSession, DoWorkSendBuffers, Buffer Length : {batchBytes}, Segments : {sendSegments.Count}");
+                    if (m_Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        // 관측 로그: per-batch 문자열 포맷 비용은 debug 레벨에서만 발생
+                        m_Logger.LogDebug("BaseSession, DoWorkSendBuffers, Buffer Length : {BatchBytes}, Segments : {Segments}", batchBytes, sendSegments.Count);
+                    }
 
                     int sentSize;
                     try
