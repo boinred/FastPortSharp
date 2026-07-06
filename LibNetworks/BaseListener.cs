@@ -263,38 +263,62 @@ public abstract class BaseListener : BaseSocket
                 m_Logger.LogDebug("BaseListener, OnSocketEventsAcceptCompleted, End Point : {RemoteEndPoint}", clientSocket.RemoteEndPoint);
             }
 
-            // TODO: 다른 thread 처리 필요
-
-            //new BaseSessionClient(clientSocket);
-            BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
-            // 계측: accept callback 진입부터 session factory 완료까지의 비용
-            OnAcceptSessionCreated(
-                clientSocket,
-                clientSession,
-                Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
-                acceptCompletedTimestamp);
-
-            // Add Session Managers
-            Task.Run(() =>
-            {
-                // 계측 기준점: ThreadPool task가 실제 실행을 시작한 시각
-                long onAcceptedStartedTimestamp = Stopwatch.GetTimestamp();
-
-                // 계측: accept callback 진입부터 OnAccepted task 시작까지의 scheduling 지연
-                OnAcceptSessionTaskStarted(
-                    clientSocket,
-                    clientSession,
-                    Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
-                    onAcceptedStartedTimestamp);
-
-                clientSession.OnAccepted();
-            });
+            // 흐름: session factory 비용을 accept pump 스레드 밖으로 이동해 다음 accept 재등록 지연 최소화
+            // 할당: closure + Task 대신 work item 1개만 할당, ExecutionContext 캡처 생략
+            // 분산: preferLocal=false로 IOCP 스레드 로컬 큐 대신 글로벌 큐에 적재해 공정하게 소비
+            ThreadPool.UnsafeQueueUserWorkItem(
+                new AcceptedSessionWork(this, clientSocket, acceptCompletedTimestamp),
+                preferLocal: false);
         }
         catch (Exception ex)
         {
             // Accept 처리 예외: pump 유지를 위해 관측 후 계속 진행
             OnAcceptFailed("accept-process", null, ex);
             m_Logger.LogError(ex, "BaseListener, ProcessAccept, Exception");
+        }
+    }
+
+    // 목적: accept 이후 세션 생성/시작을 ThreadPool에서 실행하는 무클로저 work item
+    private sealed class AcceptedSessionWork(
+        BaseListener listener,
+        Socket clientSocket,
+        long acceptCompletedTimestamp) : IThreadPoolWorkItem
+    {
+        public void Execute()
+        {
+            listener.RunAcceptedSessionWork(clientSocket, acceptCompletedTimestamp);
+        }
+    }
+
+    private void RunAcceptedSessionWork(Socket clientSocket, long acceptCompletedTimestamp)
+    {
+        try
+        {
+            BaseSessionClient clientSession = m_ClientSessionFactory.Create(clientSocket);
+            // 계측: accept completion 진입부터 session factory 완료까지 (work item queue 지연 포함)
+            OnAcceptSessionCreated(
+                clientSocket,
+                clientSession,
+                Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
+                acceptCompletedTimestamp);
+
+            // 계측 기준점: OnAccepted 실행 직전 시각
+            long onAcceptedStartedTimestamp = Stopwatch.GetTimestamp();
+
+            // 계측: accept completion 진입부터 OnAccepted 시작까지의 지연
+            OnAcceptSessionTaskStarted(
+                clientSocket,
+                clientSession,
+                Stopwatch.GetElapsedTime(acceptCompletedTimestamp),
+                onAcceptedStartedTimestamp);
+
+            clientSession.OnAccepted();
+        }
+        catch (Exception ex)
+        {
+            // 세션 생성/시작 예외: accept pump와 분리된 실패로 관측
+            OnAcceptFailed("accept-session-work", null, ex);
+            m_Logger.LogError(ex, "BaseListener, RunAcceptedSessionWork, Exception");
         }
     }
 }
