@@ -24,9 +24,6 @@ public abstract class BaseListener : BaseSocket
 
     protected bool m_bIsRunning = false;
 
-    // Listener가 정지되었을 경우 처리하는 CancellationToken 
-    private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
-
     // 상태: listener accept pump 전용 SocketAsyncEventArgs 목록
     private SocketAsyncEventArgs[] m_AcceptSocketEvents = Array.Empty<SocketAsyncEventArgs>();
 
@@ -188,7 +185,17 @@ public abstract class BaseListener : BaseSocket
 
         // TODO : Shutdown Session Managers
 
-        RequestDisconnect();
+        // 리스닝 소켓은 Connected가 아니므로 RequestDisconnect가 조기 반환한다.
+        // 소켓을 직접 닫아 대기 중인 AcceptAsync를 취소하고 포트를 해제한다.
+        try
+        {
+            m_Socket?.Close();
+        }
+        catch (Exception ex)
+        {
+            OnListenerSocketError("shutdown-close", null, ex);
+            m_Logger.LogError(ex, "BaseListener, RequestShutdown, Exception");
+        }
     }
 
     private bool Accept(System.Net.Sockets.SocketAsyncEventArgs acceptArgs)
@@ -209,6 +216,13 @@ public abstract class BaseListener : BaseSocket
             }
             catch (Exception ex)
             {
+                // Shutdown 레이스로 닫힌 소켓에 대한 AcceptAsync는 정상 종료 경로
+                if (!Volatile.Read(ref m_bIsRunning))
+                {
+                    acceptArgs.Dispose();
+                    return false;
+                }
+
                 // AcceptAsync 시작 실패: subclass hook 기반 외부 관측
                 OnAcceptFailed("accept-start", null, ex);
                 OnListenerSocketError("accept-start", null, ex);
@@ -220,7 +234,8 @@ public abstract class BaseListener : BaseSocket
             ProcessAccept(acceptArgs);
         }
 
-        // 상태: shutdown 이후에는 새 accept repost 금지
+        // 상태: shutdown 이후에는 새 accept repost 금지, 해당 args의 pump 종료 시점에 자원 해제
+        acceptArgs.Dispose();
         return false;
     }
 
@@ -241,6 +256,12 @@ public abstract class BaseListener : BaseSocket
         {
             if (args.SocketError != SocketError.Success)
             {
+                // Shutdown에 의한 accept 취소는 정상 종료 경로이므로 실패로 기록하지 않음
+                if (args.SocketError == SocketError.OperationAborted && !Volatile.Read(ref m_bIsRunning))
+                {
+                    return;
+                }
+
                 // Accept completion socket error: accept 실패 및 socket error
                 OnAcceptFailed("accept-completion", args.SocketError, null);
                 OnListenerSocketError("accept-completion", args.SocketError, null);
