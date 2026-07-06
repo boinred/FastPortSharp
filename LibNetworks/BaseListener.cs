@@ -99,7 +99,7 @@ public abstract class BaseListener : BaseSocket
         {
             // Invalid endpoint: accept 실패 관측, telemetry 타입 비의존
             OnAcceptFailed("start-endpoint", null, null);
-            m_Logger.LogError($"BaseListener, Start, IP is not valid. ${ip}");
+            m_Logger.LogError($"BaseListener, Start, IP is not valid. {ip}");
             return false;
         }
 
@@ -140,49 +140,52 @@ public abstract class BaseListener : BaseSocket
         }
 
         return false;
-    }
 
-    // 목적: 설정/환경변수에서 들어온 listen backlog 보정
-    private static int NormalizeListenBacklog(int backlog)
-    {
-        // 목적: appsettings/env override가 0 이하일 때 Listen 호출을 안정화
-        return backlog > 0 ? backlog : C_DefaultListenBacklog;
-    }
-
-    // 목적: 설정/환경변수에서 들어온 outstanding accept 수 보정
-    internal static int NormalizeOutstandingAccepts(int outstandingAccepts)
-    {
-        if (outstandingAccepts <= 0)
+        // 목적: 설정/환경변수에서 들어온 listen backlog 보정
+        int NormalizeListenBacklog(int backlog)
         {
-            // 목적: invalid 값은 기존 단일 accept 동작으로 보정
-            return C_DefaultOutstandingAccepts;
+            // 목적: appsettings/env override가 0 이하일 때 Listen 호출을 안정화
+            return backlog > 0 ? backlog : C_DefaultListenBacklog;
         }
 
-        // 목적: 과도한 설정값은 listener callback 폭증 방지 상한으로 제한
-        return Math.Min(outstandingAccepts, C_MaxOutstandingAccepts);
-    }
-
-    // 목적: listener accept pump 전용 SocketAsyncEventArgs 목록 생성
-    private SocketAsyncEventArgs[] CreateAcceptSocketEvents(int outstandingAccepts)
-    {
-        var acceptSocketEvents = new SocketAsyncEventArgs[outstandingAccepts];
-        for (int index = 0; index < acceptSocketEvents.Length; index++)
+        // 목적: 설정/환경변수에서 들어온 outstanding accept 수 보정
+        int NormalizeOutstandingAccepts(int outstandingAccepts)
         {
-            // 상태: 하나의 args는 하나의 outstanding AcceptAsync에만 사용
-            var acceptArgs = new SocketAsyncEventArgs();
-            acceptArgs.Completed += OnSocketEventsAcceptCompleted;
-            acceptSocketEvents[index] = acceptArgs;
+            if (outstandingAccepts <= 0)
+            {
+                // 목적: invalid 값은 기존 단일 accept 동작으로 보정
+                return C_DefaultOutstandingAccepts;
+            }
+
+            // 목적: 과도한 설정값은 listener callback 폭증 방지 상한으로 제한
+            return Math.Min(outstandingAccepts, C_MaxOutstandingAccepts);
         }
 
-        return acceptSocketEvents;
+        // 목적: listener accept pump 전용 SocketAsyncEventArgs 목록 생성
+        SocketAsyncEventArgs[] CreateAcceptSocketEvents(int outstandingAccepts)
+        {
+            var acceptSocketEvents = new SocketAsyncEventArgs[outstandingAccepts];
+            for (int index = 0; index < acceptSocketEvents.Length; index++)
+            {
+                // 상태: 하나의 args는 하나의 outstanding AcceptAsync에만 사용
+                var acceptArgs = new SocketAsyncEventArgs();
+                acceptArgs.Completed += OnSocketEventsAcceptCompleted;
+                acceptSocketEvents[index] = acceptArgs;
+            }
+
+            return acceptSocketEvents;
+        }
     }
+
+
+
 
     public void RequestShutdown()
     {
         var result = Interlocked.CompareExchange(ref m_bIsRunning, false, true);
-        if(true != result)
+        if (true != result)
         {
-            return; 
+            return;
         }
 
         // TODO : Shutdown Session Managers
