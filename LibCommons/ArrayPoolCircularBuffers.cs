@@ -1,40 +1,36 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 
 namespace LibCommons;
 
 /// <summary>
-/// ArrayPool 기반 고성능 순환 버퍼
-/// - ArrayPool을 사용하여 메모리 재사용
-/// - .NET 9+ Lock 클래스 사용
-/// - Span 기반 Zero-copy 최적화
+/// Circular buffer backed by ArrayPool.
+/// - Reuses rented arrays to reduce GC pressure.
+/// - Uses System.Threading.Lock for short critical sections.
+/// - Uses Span-based copy paths to avoid intermediate allocations.
 /// </summary>
 public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
 {
-    private bool m_bDisposed = false;
-
+    private bool m_bDisposed;
     private byte[] m_Buffers;
 
-    // 읽기 시작 위치
-    private int m_Head = 0;
+    // Next read position.
+    private int m_Head;
 
-    // 쓰기 시작 위치
-    private int m_Tail = 0;
+    // Next write position.
+    private int m_Tail;
 
-    // 버퍼의 총 크기 (ArrayPool에서 받은 실제 크기와 다를 수 있음)
+    // Logical capacity requested by the buffer. The rented array may be larger.
     private int m_Capacity;
 
-    // 실제 ArrayPool에서 받은 버퍼 크기
-    private int m_ActualBufferSize;
-
-    // .NET 9+ 경량 Lock 클래스 사용
+    // Lightweight lock available on recent .NET versions.
     private readonly Lock m_Lock = new();
 
+    // Number of bytes currently available to read.
+    public int CanReadSize { get; private set; }
 
-    // 버퍼에 현재 데이터 사이즈
-    public int CanReadSize { get; private set; } = 0;
-
-    // 버퍼의 여유 공간
+    // Number of bytes available before the next expansion.
     public int CanWriteSize => m_Capacity - CanReadSize;
 
     public ArrayPoolCircularBuffers(int capacity)
@@ -43,8 +39,6 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
 
         m_Capacity = capacity;
         m_Buffers = ArrayPool<byte>.Shared.Rent(capacity);
-        m_ActualBufferSize = m_Buffers.Length;
-        CanReadSize = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -55,20 +49,18 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
             return 0;
         }
 
-        lock (m_Lock)
+        ArgumentOutOfRangeException.ThrowIfNegative(offset, nameof(offset));
+        ArgumentOutOfRangeException.ThrowIfNegative(count, nameof(count));
+        if (offset > buffers.Length || count > buffers.Length - offset)
         {
-            if (count > CanWriteSize)
-            {
-                ExpandBuffer(count - CanWriteSize);
-            }
-
-            WriteInternal(buffers.AsSpan(offset, count));
-            return count;
+            throw new ArgumentOutOfRangeException(nameof(count), "The offset and count range must fit within the source buffer.");
         }
+
+        return Write(buffers.AsSpan(offset, count));
     }
 
     /// <summary>
-    /// Span 기반 Write - Zero-copy 최적화
+    /// Writes bytes from a span without creating an intermediate array.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int Write(ReadOnlySpan<byte> source)
@@ -78,101 +70,39 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
             return 0;
         }
 
-        int writeSize = source.Length;
         lock (m_Lock)
         {
-            if (writeSize > CanWriteSize)
-            {
-                // 용량을 증가 시켜 준다.
-                var increaseSize = writeSize - CanWriteSize; // 증가시켜야 하는 크기
-                ExpandBuffer(increaseSize);
-            }
-
+            ThrowIfDisposed();
+            EnsureWritableCapacity(source.Length);
             WriteInternal(source);
-            return writeSize;
+            return source.Length;
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void WriteInternal(ReadOnlySpan<byte> source)
-    {
-        int writeSize = source.Length;
-
-        // 데이터가 버퍼의 끝을 넘어서 순환해야 하는 경우
-        if (m_Tail + writeSize > m_Capacity)
-        {
-            int forwardSize = m_Capacity - m_Tail;
-            source[..forwardSize].CopyTo(m_Buffers.AsSpan(m_Tail));
-            source[forwardSize..].CopyTo(m_Buffers.AsSpan(0));
-        }
-        else
-        {
-            source.CopyTo(m_Buffers.AsSpan(m_Tail));
-        }
-
-        m_Tail = (m_Tail + writeSize) % m_Capacity;
-        CanReadSize += writeSize;
     }
 
     /// <summary>
-    /// 버퍼 확장 - ArrayPool 기반
+    /// Copies readable bytes into the supplied array without removing them.
     /// </summary>
-    private void ExpandBuffer(int additionalSize)
-    {
-        // 최소 2배 또는 필요한 크기만큼 증가
-        int newCapacity = Math.Max(m_Capacity + additionalSize, m_Capacity * 2);
-        byte[] newBuffer = ArrayPool<byte>.Shared.Rent(newCapacity);
-
-        // 기존 데이터 복사 (순환 버퍼 고려)
-        if (CanReadSize > 0)
-        {
-            if (m_Head + CanReadSize > m_Capacity)
-            {
-                // 데이터가 버퍼 끝을 넘어 순환하는 경우
-                int forwardSize = m_Capacity - m_Head;
-                m_Buffers.AsSpan(m_Head, forwardSize).CopyTo(newBuffer);
-                m_Buffers.AsSpan(0, CanReadSize - forwardSize).CopyTo(newBuffer.AsSpan(forwardSize));
-            }
-            else
-            {
-                m_Buffers.AsSpan(m_Head, CanReadSize).CopyTo(newBuffer);
-            }
-        }
-
-        // 기존 버퍼 반환
-        ArrayPool<byte>.Shared.Return(m_Buffers);
-
-        m_Buffers = newBuffer;
-        m_ActualBufferSize = newBuffer.Length;
-        m_Head = 0;
-        m_Tail = CanReadSize;
-        m_Capacity = newCapacity;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int Peek(ref byte[] buffers)
     {
-        lock (m_Lock)
-        {
-            if (CanReadSize <= 0)
-            {
-                return 0;
-            }
-
-            int buffersSize = Math.Min(buffers.Length, CanReadSize);
-            ReadInternal(buffers.AsSpan(0, buffersSize));
-            return buffersSize;
-        }
+        ArgumentNullException.ThrowIfNull(buffers);
+        return Peek(buffers.AsSpan());
     }
 
     /// <summary>
-    /// Span 기반 Peek - Zero-copy 최적화
+    /// Copies readable bytes into the supplied span without removing them.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int Peek(Span<byte> destination)
     {
+        if (destination.IsEmpty)
+        {
+            return 0;
+        }
+
         lock (m_Lock)
         {
+            ThrowIfDisposed();
             if (CanReadSize <= 0)
             {
                 return 0;
@@ -184,23 +114,178 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ReadInternal(Span<byte> destination)
+    public int GetPacketBuffers(out byte[]? buffers, int size)
     {
-        if (m_Head + destination.Length > m_Capacity)
+        if (size <= 0)
         {
-            // 데이터가 버퍼 끝을 넘어 순환하는 경우
-            int forwardSize = m_Capacity - m_Head;
-            m_Buffers.AsSpan(m_Head, forwardSize).CopyTo(destination);
-            m_Buffers.AsSpan(0, destination.Length - forwardSize).CopyTo(destination[forwardSize..]);
+            buffers = null;
+            return 0;
         }
-        else
+
+        lock (m_Lock)
         {
-            m_Buffers.AsSpan(m_Head, destination.Length).CopyTo(destination);
+            ThrowIfDisposed();
+            return GetPacketBuffersCore(out buffers, size);
         }
     }
 
-    public int GetPacketBuffers(out byte[]? buffers, int size)
+    /// <summary>
+    /// Returns a buffer rented by GetPacketBuffers.
+    /// </summary>
+    public static void ReturnBuffer(byte[]? buffer)
+    {
+        if (buffer != null)
+        {
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: false);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int Drain(int size)
+    {
+        if (size <= 0)
+        {
+            return 0;
+        }
+
+        lock (m_Lock)
+        {
+            ThrowIfDisposed();
+            return DrainCore(size);
+        }
+    }
+
+    public bool TryGetBasePackets(out List<BasePacket> basePackets)
+    {
+        basePackets = [];
+
+        lock (m_Lock)
+        {
+            ThrowIfDisposed();
+
+            while (CanReadSize >= BasePacket.HeaderSize)
+            {
+                int basePacketSize = GetPacketSizeInBuffersCore();
+                if (basePacketSize < BasePacket.HeaderSize || CanReadSize < basePacketSize)
+                {
+                    break;
+                }
+
+                int readBufferSize = GetPacketBuffersCore(out var buffers, basePacketSize);
+                if (readBufferSize <= 0 || buffers == null)
+                {
+                    break;
+                }
+
+                try
+                {
+                    basePackets.Add(new BasePacket(basePacketSize, buffers));
+                }
+                finally
+                {
+                    ReturnBuffer(buffers);
+                }
+            }
+        }
+
+        return basePackets.Count > 0;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int GetPacketSizeInBuffers()
+    {
+        lock (m_Lock)
+        {
+            ThrowIfDisposed();
+            return GetPacketSizeInBuffersCore();
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool bDisposing)
+    {
+        if (!bDisposing)
+        {
+            return;
+        }
+
+        byte[]? bufferToReturn = null;
+        lock (m_Lock)
+        {
+            if (m_bDisposed)
+            {
+                return;
+            }
+
+            bufferToReturn = m_Buffers;
+            m_Buffers = [];
+            m_Head = 0;
+            m_Tail = 0;
+            m_Capacity = 0;
+            CanReadSize = 0;
+            m_bDisposed = true;
+        }
+
+        ArrayPool<byte>.Shared.Return(bufferToReturn, clearArray: false);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void EnsureWritableCapacity(int writeSize)
+    {
+        if (writeSize > CanWriteSize)
+        {
+            ExpandBuffer(writeSize - CanWriteSize);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void WriteInternal(ReadOnlySpan<byte> source)
+    {
+        int writeSize = source.Length;
+        int forwardSize = Math.Min(writeSize, m_Capacity - m_Tail);
+
+        source[..forwardSize].CopyTo(m_Buffers.AsSpan(m_Tail, forwardSize));
+        source[forwardSize..].CopyTo(m_Buffers.AsSpan(0, writeSize - forwardSize));
+
+        m_Tail = (m_Tail + writeSize) % m_Capacity;
+        CanReadSize += writeSize;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReadInternal(Span<byte> destination)
+    {
+        int readSize = destination.Length;
+        int forwardSize = Math.Min(readSize, m_Capacity - m_Head);
+
+        m_Buffers.AsSpan(m_Head, forwardSize).CopyTo(destination[..forwardSize]);
+        m_Buffers.AsSpan(0, readSize - forwardSize).CopyTo(destination[forwardSize..]);
+    }
+
+    private void ExpandBuffer(int additionalSize)
+    {
+        int minimumCapacity = checked(m_Capacity + additionalSize);
+        int newCapacity = GrowCapacity(m_Capacity, minimumCapacity);
+        byte[] newBuffer = ArrayPool<byte>.Shared.Rent(newCapacity);
+
+        if (CanReadSize > 0)
+        {
+            ReadInternal(newBuffer.AsSpan(0, CanReadSize));
+        }
+
+        ArrayPool<byte>.Shared.Return(m_Buffers, clearArray: false);
+
+        m_Buffers = newBuffer;
+        m_Head = 0;
+        m_Tail = CanReadSize;
+        m_Capacity = newCapacity;
+    }
+
+    private int GetPacketBuffersCore(out byte[]? buffers, int size)
     {
         if (CanReadSize < size)
         {
@@ -208,27 +293,13 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
             return 0;
         }
 
-        // ArrayPool에서 버퍼 대여
         buffers = ArrayPool<byte>.Shared.Rent(size);
         ReadInternal(buffers.AsSpan(0, size));
-
-        return Drain(size);
-    }
-
-    /// <summary>
-    /// ArrayPool 버퍼를 반환하는 정적 메서드
-    /// GetPacketBuffers로 받은 버퍼는 사용 후 반드시 반환해야 함
-    /// </summary>
-    public static void ReturnBuffer(byte[] buffer)
-    {
-        if (buffer != null)
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        return DrainCore(size);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int Drain(int size)
+    private int DrainCore(int size)
     {
         size = Math.Min(size, CanReadSize);
         if (size <= 0)
@@ -242,79 +313,47 @@ public sealed class ArrayPoolCircularBuffers : IBuffers, IDisposable
         return size;
     }
 
-    public bool TryGetBasePackets(out List<BasePacket> basePackets)
-    {
-        basePackets = [];
-
-        lock (m_Lock)
-        {
-            while (CanReadSize > BasePacket.HeaderSize)
-            {
-                int basePacketSize = GetPacketSizeInBuffers();
-                if (CanReadSize < basePacketSize || basePacketSize <= 0)
-                {
-                    break;
-                }
-
-                int readBufferSize = GetPacketBuffers(out var buffers, basePacketSize);
-                if (readBufferSize <= 0 || buffers == null)
-                {
-                    break;
-                }
-
-                // Drain은 GetPacketBuffers에서 이미 호출됨
-
-                var basePacket = new BasePacket(basePacketSize, buffers);
-                basePackets.Add(basePacket);
-
-                // ArrayPool 버퍼 반환
-                ReturnBuffer(buffers);
-            }
-        }
-
-        return basePackets.Count > 0;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int GetPacketSizeInBuffers()
+    private int GetPacketSizeInBuffersCore()
     {
         if (CanReadSize < BasePacket.HeaderSize)
         {
             return 0;
         }
 
-        // stackalloc으로 헤더 읽기 (힙 할당 없음)
+        if (m_Head + BasePacket.HeaderSize <= m_Capacity)
+        {
+            return BinaryPrimitives.ReadUInt16LittleEndian(m_Buffers.AsSpan(m_Head, BasePacket.HeaderSize));
+        }
+
         Span<byte> headerBytes = stackalloc byte[BasePacket.HeaderSize];
-
-        int index = m_Head;
-        for (int i = 0; i < BasePacket.HeaderSize; i++)
-        {
-            headerBytes[i] = m_Buffers[index];
-            index = (index + 1) % m_Capacity;
-        }
-
-        return BitConverter.ToUInt16(headerBytes);
+        ReadInternal(headerBytes);
+        return BinaryPrimitives.ReadUInt16LittleEndian(headerBytes);
     }
 
-    public void Dispose()
+    private static int GrowCapacity(int currentCapacity, int minimumCapacity)
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
+        int newCapacity = currentCapacity;
+        while (newCapacity < minimumCapacity)
+        {
+            int nextCapacity = newCapacity <= Array.MaxLength / 2
+                ? newCapacity * 2
+                : Array.MaxLength;
+
+            if (nextCapacity == newCapacity)
+            {
+                throw new OutOfMemoryException("The circular buffer cannot grow to the requested size.");
+            }
+
+            newCapacity = nextCapacity;
+        }
+
+        return newCapacity;
     }
 
-    private void Dispose(bool bDisposing)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ThrowIfDisposed()
     {
-        if (m_bDisposed)
-        {
-            return;
-        }
-
-        if (bDisposing)
-        {
-            // ArrayPool에 버퍼 반환
-            ArrayPool<byte>.Shared.Return(m_Buffers);
-        }
-
-        m_bDisposed = true;
+        ObjectDisposedException.ThrowIf(m_bDisposed, this);
     }
 }

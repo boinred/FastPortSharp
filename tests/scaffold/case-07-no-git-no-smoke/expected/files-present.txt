@@ -1,0 +1,9 @@
+Foo/Foo.csproj
+Foo/Program.cs
+Protos/PacketIds.proto
+Protos/Sample.proto
+LibCommons/LibCommons.csproj
+LibNetworks/LibNetworks.csproj
+Foo.sln
+.gitignore
+README.md

@@ -1,0 +1,69 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Foundation cycle: macOS Catalyst + Windows desktop만. iOS/Android는 별도 cycle. -->
+		<TargetFrameworks>net10.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>FastPortDashboard.Maui</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+
+		<!-- Foundation cycle 한정: macOS 26.x + .NET 10 MAUI Catalyst에서 Release AOT가
+		     `mono_jit_init` → `xamarin_bridge_initialize` 단계에서 SIGABRT.
+		     AOT를 끄면 JIT로 동작 (런타임 성능은 약간 ↓이지만 dev/test 충분). -->
+		<RunAOTCompilation Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">false</RunAOTCompilation>
+		<MtouchInterpreter Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">all</MtouchInterpreter>
+
+		<!-- Display name -->
+		<ApplicationTitle>FastPortDashboard.Maui</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.companyname.fastportdashboard.maui</ApplicationId>
+		<ApplicationIdGuid>cb169cd5-e823-4942-93b5-25839e94da4f</ApplicationIdGuid>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\appicon.svg" ForegroundFile="Resources\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\appiconfg.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- MAUI core (.NET 8+ 부터 명시적 PackageReference 필요). -->
+		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
+		<!-- Design Ref: §2 (dashboard-chart-graphicsview-migration) — Microcharts.Maui / SkiaSharp 제거.
+		     SkiaSharp 기반 view가 macOS 26 SwiftUI Observation framework crash trigger임이 확인됨.
+		     라인 차트는 Microsoft.Maui.Graphics + GraphicsView + IDrawable (Views/LineChartDrawable.cs)로 재구현. -->
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Design Ref: §3.3 (extract-LibDashboardCore cycle) —
+		     ViewModel/Adapter + Toolkit.Mvvm + LibTestTelemetry는 LibDashboardCore가 transitive 제공. -->
+		<ProjectReference Include="..\FastPortDashboard.Core\FastPortDashboard.Core.csproj" />
+	</ItemGroup>
+
+</Project>

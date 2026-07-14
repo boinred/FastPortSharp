@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Design Ref: §10 Migration — MainPage는 AppShell의 직접 child가 아니다.
+     2-탭 routing은 AppShell.xaml의 <TabBar>로 이전. 이 페이지는 backward-compat을 위해 남겨둠
+     (현재는 어디서도 사용되지 않음). 콘텐츠는 JsonlPollingPage로 이전됨. -->
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:FastPortDashboard.Maui.Views"
+             x:Class="FastPortDashboard.Maui.MainPage"
+             Title="FastPort Dashboard">
+    <ContentPage.Content>
+        <Label Text="See AppShell tabs (JSONL Polling / Echo Client)"
+               HorizontalOptions="Center"
+               VerticalOptions="Center" />
+    </ContentPage.Content>
+</ContentPage>

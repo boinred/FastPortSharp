@@ -15,6 +15,17 @@ public abstract class BaseSessionClient : BaseSession
         
     }
 
+    // Client session 옵션 overload: telemetry 제외, send policy 조정
+    public BaseSessionClient(
+        ILogger<BaseSessionClient> logger,
+        System.Net.Sockets.Socket socket,
+        LibCommons.IBuffers receivedBuffers,
+        LibCommons.IBuffers sendBuffers,
+        SessionSendOptions? sendOptions)
+        : base(logger, socket, receivedBuffers, sendBuffers, sendOptions)
+    {
+    }
+
     public virtual void OnAccepted()
     {
         m_Logger.LogInformation($"BaseSessionClient, OnAccepted. Id : {Id}, Remote End Point : {GetSessionAddress()}");

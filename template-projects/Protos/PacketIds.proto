@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package fastport.sample;
+option csharp_namespace = "FastPortGameServerTemplate.Protocols";
+
+// Packet ID registry for the template's sample protocol.
+// Reserved range: 1000-1999 for sample / template-built-in packets.
+// User-defined game packets should start at 2000+.
+//
+// C# generator strips the enum-name prefix (PACKET_IDS_) automatically,
+// yielding `PacketIds.Unspecified`, `PacketIds.EchoRequest`, etc.
+enum PacketIds {
+  PACKET_IDS_UNSPECIFIED = 0;
+  PACKET_IDS_ECHO_REQUEST = 1001;
+  PACKET_IDS_ECHO_RESPONSE = 1002;
+}

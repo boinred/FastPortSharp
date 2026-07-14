@@ -1,0 +1,60 @@
+name: build
+
+# Builds and tests FastPortSharp.sln across the 3-OS matrix.
+# Companion to scaffold.yml (which only exercises the scaffold scripts).
+
+on:
+  push:
+    branches:
+      - builds.release
+  pull_request:
+    branches:
+      - builds.release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Force LF line endings on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: dotnet --info
+        shell: bash
+        run: dotnet --info
+
+      - name: Restore
+        shell: bash
+        run: dotnet restore FastPortSharp.sln
+
+      - name: Build (Release)
+        shell: bash
+        run: dotnet build FastPortSharp.sln -c Release --no-restore
+
+      - name: Test (Release)
+        shell: bash
+        run: dotnet test FastPortSharp.sln -c Release --no-build --logger "console;verbosity=normal"

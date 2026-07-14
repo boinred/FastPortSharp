@@ -1,0 +1,3 @@
+Foo
+{DEST}
+--dry-run

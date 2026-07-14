@@ -1,0 +1,4 @@
+MyLobbyServer
+{DEST}
+--no-git
+--skip-smoke

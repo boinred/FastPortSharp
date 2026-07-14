@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FastPortDashboard.Maui.ViewModels;assembly=FastPortDashboard.Core"
+             x:Class="FastPortDashboard.Maui.Views.EchoClientPage"
+             x:DataType="vm:EchoClientViewModel"
+             Title="Echo Client">
+
+    <!-- Design Ref: §5.1 — host/port 입력 + Connect + RTT chart + KPI. -->
+    <ScrollView>
+        <VerticalStackLayout Spacing="12" Padding="16">
+
+            <Label Text="FastPort Echo Client"
+                   FontSize="24"
+                   FontAttributes="Bold" />
+            <Label Text="host:port에 직접 TCP 접속 → EchoRequest 반복 송신, RTT 측정."
+                   FontSize="12"
+                   TextColor="Gray" />
+
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
+                <VerticalStackLayout Spacing="8">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="Host:" VerticalOptions="Center" WidthRequest="80" />
+                        <Entry Text="{Binding Host}" Placeholder="127.0.0.1" WidthRequest="200" />
+                        <Label Text="Port:" VerticalOptions="Center" WidthRequest="60" />
+                        <Entry Text="{Binding Port}" Placeholder="7777" Keyboard="Numeric" WidthRequest="100" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="Message:" VerticalOptions="Center" WidthRequest="80" />
+                        <Entry Text="{Binding Message}" Placeholder="hello" WidthRequest="200" />
+                        <Label Text="Interval:" VerticalOptions="Center" WidthRequest="60" />
+                        <Entry Text="{Binding SendIntervalMs}" Keyboard="Numeric" WidthRequest="80" />
+                        <Label Text="ms" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="⚡ Connect"
+                                Command="{Binding ConnectCommand}"
+                                BackgroundColor="DodgerBlue"
+                                TextColor="White" />
+                        <Button Text="⏹ Disconnect"
+                                Command="{Binding DisconnectCommand}" />
+                        <Label Text="{Binding State, StringFormat='State: {0}'}"
+                               VerticalOptions="Center"
+                               FontAttributes="Bold" />
+                    </HorizontalStackLayout>
+                    <Label Text="{Binding ErrorMessage}" TextColor="Red" />
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- KPI grid: Plan SC FR-05 -->
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray">
+                <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                    <VerticalStackLayout Grid.Column="0" Grid.Row="0">
+                        <Label Text="Send" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.SendCount}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Grid.Row="0">
+                        <Label Text="Recv" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.RecvCount}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2" Grid.Row="0">
+                        <Label Text="Send/s" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.SendRatePerSec, StringFormat='{0:F1}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="3" Grid.Row="0">
+                        <Label Text="Recv/s" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.RecvRatePerSec, StringFormat='{0:F1}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="0" Grid.Row="1">
+                        <Label Text="Tx Bytes" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.TotalBytesSent, StringFormat='{0:N0}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Grid.Row="1">
+                        <Label Text="Rx Bytes" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.TotalBytesRecv, StringFormat='{0:N0}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2" Grid.Row="1">
+                        <Label Text="Last RTT (ms)" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.LastRttMs, StringFormat='{0:F2}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="3" Grid.Row="1">
+                        <Label Text="Avg RTT (ms)" FontSize="11" TextColor="Gray" />
+                        <Label Text="{Binding Snapshot.AvgRttMs, StringFormat='{0:F2}'}" FontSize="18" FontAttributes="Bold" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Frame>
+
+            <!-- RTT 차트 (LineChartDrawable single-series 재사용) -->
+            <Frame Padding="12" CornerRadius="8" BorderColor="Gray" HeightRequest="220">
+                <VerticalStackLayout>
+                    <Label Text="Round-Trip Time (ms)" FontAttributes="Bold" />
+                    <Label Text="{Binding RttSeries.Count, StringFormat='최근 sample 수: {0}'}" FontSize="11" TextColor="Gray" />
+                    <GraphicsView x:Name="RttChartView" HeightRequest="160" />
+                </VerticalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

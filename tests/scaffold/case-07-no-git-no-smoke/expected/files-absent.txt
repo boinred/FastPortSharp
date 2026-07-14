@@ -1,0 +1,5 @@
+# --no-git: no .git folder.
+.git
+# --skip-smoke: no build artifacts.
+Foo/bin
+Foo/obj

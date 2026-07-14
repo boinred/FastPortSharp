@@ -1,0 +1,7 @@
+# Dry-run must not have created anything inside dest.
+Foo
+LibCommons
+LibNetworks
+.gitignore
+README.md
+Foo.sln

@@ -1,0 +1,33 @@
+# Files (relative to <dest>) that MUST exist after scaffold.
+# Lines starting with `#` are comments.
+
+# Server project (token-renamed)
+MyLobbyServer/MyLobbyServer.csproj
+MyLobbyServer/Program.cs
+MyLobbyServer/appsettings.json
+MyLobbyServer/README.md
+MyLobbyServer/QUICKSTART.ko.md
+MyLobbyServer/Application/GameServer.cs
+MyLobbyServer/Application/GameServerHostedService.cs
+MyLobbyServer/Application/PacketDispatcher.cs
+MyLobbyServer/Configuration/GameServerOptions.cs
+MyLobbyServer/Handlers/EchoHandler.cs
+MyLobbyServer/Handlers/IPacketHandler.cs
+MyLobbyServer/Sessions/GameSession.cs
+MyLobbyServer/Sessions/GameSessionFactory.cs
+MyLobbyServer/Telemetry/IGameServerTelemetry.cs
+MyLobbyServer/Telemetry/NullGameServerTelemetry.cs
+
+# Shared Protos folder (proto files only — verbatim location, namespace token-replaced)
+Protos/PacketIds.proto
+Protos/Sample.proto
+
+# Engine projects (verbatim copy)
+LibCommons/LibCommons.csproj
+LibNetworks/LibNetworks.csproj
+
+# Solution + repo aux
+MyLobbyServer.sln
+.gitignore
+.gitattributes
+README.md

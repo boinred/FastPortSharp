@@ -1,0 +1,4 @@
+# Validation failed before any filesystem changes.
+Application
+LibCommons
+LibNetworks

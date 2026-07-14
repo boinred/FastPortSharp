@@ -8,12 +8,17 @@ public class FastPortServerBackgroundService : BackgroundService
 {
     private readonly ILogger<FastPortServerBackgroundService> _logger;
     private readonly FastPortServer m_FastPortServer;
+    private readonly FastPortServerOptions m_Options;
 
     // 생성자를 통해 의존성 주입(DI)으로 Logger를 받습니다.
-    public FastPortServerBackgroundService(ILogger<FastPortServerBackgroundService> logger, FastPortServer fastPortServer)
+    public FastPortServerBackgroundService(
+        ILogger<FastPortServerBackgroundService> logger,
+        FastPortServer fastPortServer,
+        FastPortServerOptions options)
     {
         _logger = logger;
         m_FastPortServer = fastPortServer;
+        m_Options = options;
     }
 
     // 실제 작업이 실행되는 부분입니다.
@@ -21,7 +26,12 @@ public class FastPortServerBackgroundService : BackgroundService
     {
         _logger.LogInformation("🚀 FastPortServerBackgroundService 시작되었습니다. (시작 시간: {time})", DateTimeOffset.Now);
 
-        if (!m_FastPortServer.StartAccept("0.0.0.0", 6628))
+        _logger.LogInformation(
+            "FastPortServerBackgroundService, StartAccept. Host:{Host}, Port:{Port}",
+            m_Options.Host,
+            m_Options.Port);
+
+        if (!m_FastPortServer.StartAccept(m_Options.Host, m_Options.Port))
         {
             _logger.LogError("FastPortServerBackgroundService, StartAccept 실패");
             return;

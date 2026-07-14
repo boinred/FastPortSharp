@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Design Ref: §3.4 (extract-LibDashboardCore cycle) —
+		     LibDashboardCore ProjectReference로 ViewModel/Adapter + Toolkit + LibTestTelemetry 모두 transitive 제공.
+		     이전 cycle의 <Compile Include> 우회 패턴 제거. -->
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+		<PackageReference Include="MSTest" Version="3.9.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- LibDashboardCore가 Toolkit.Mvvm + LibTestTelemetry를 transitive로 가져옴. -->
+		<ProjectReference Include="..\..\FastPortDashboard.Core\FastPortDashboard.Core.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,5 @@
+Foo
+{DEST}
+--force
+--no-git
+--skip-smoke

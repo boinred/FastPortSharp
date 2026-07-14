@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- Design Ref: §3.2 — pure net10.0 Class Library. ViewModel/Adapter는 MAUI 타입 의존 0이므로
+		     Maui app과 Test project 둘 다 ProjectReference로 사용 가능. -->
+		<TargetFramework>net10.0</TargetFramework>
+		<LangVersion>latest</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<!-- Design Ref: §2.2 — namespace 보존 (FastPortDashboard.Maui.*).
+		     프로젝트명 ≠ root namespace는 .NET에서 정상 패턴. -->
+		<RootNamespace>FastPortDashboard.Maui</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- ObservableObject / [ObservableProperty] / [RelayCommand] 소스 제너레이터. -->
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<!-- Design Ref: §2.3 (dashboard-echo-client-tab) — protos-shared-folder-revert-contracts cycle 결정.
+		     Sample.proto + PacketIds.proto에서 EchoRequest/EchoResponse/PacketIds 자체 어셈블리 생성. -->
+		<PackageReference Include="Google.Protobuf" Version="3.32.1" />
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.32.1" />
+		<PackageReference Include="Grpc.Tools" Version="2.71.0">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Design Ref: §2.3 — shared protos: EchoRequest/EchoResponse + PacketIds enum. -->
+		<Protobuf Include="..\template-projects\Protos\*.proto"
+		          ProtoRoot="..\template-projects\Protos"
+		          GrpcServices="None"
+		          Access="Public" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- ObservedMetricsSnapshot 데이터 contract. -->
+		<ProjectReference Include="..\tests-projects\LibTestTelemetry\LibTestTelemetry.csproj" />
+		<!-- Design Ref: §2.3 — BaseSessionServer/BaseMessageConnector/IServerSessionFactory. -->
+		<ProjectReference Include="..\LibCommons\LibCommons.csproj" />
+		<ProjectReference Include="..\LibNetworks\LibNetworks.csproj" />
+	</ItemGroup>
+
+</Project>

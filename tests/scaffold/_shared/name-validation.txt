@@ -1,0 +1,46 @@
+# Self-check fixture for scaffold-game-server name validation.
+# Design Ref: §3.2 — used by both scaffold scripts' test runners (run.sh / run.ps1)
+# to verify the regex + blocked-tokens.txt filter matches expectations.
+#
+# Format (TAB-separated, 3 columns):
+#   STATUS<TAB>NAME<TAB>EXPECTED_REASON
+#
+# STATUS:
+#   OK              — passes both regex and blocked-tokens check
+#   REJECT_REGEX    — fails the regex `^[A-Z][A-Za-z0-9]{0,63}$`
+#   REJECT_BLOCKED  — passes regex but is in blocked-tokens.txt
+#
+# Lines starting with `#` are comments. Empty lines ignored.
+# NAME may be empty (handled as an empty cell between two tabs).
+
+# --- Positive cases ---
+OK	A	1-char minimum, uppercase
+OK	MyLobbyServer	typical PascalCase
+OK	Game1	digits allowed after first char
+OK	A1234567890	long mixed
+OK	ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789012345678901234567890123456789	exactly 64 chars
+
+# --- Regex rejections ---
+REJECT_REGEX		empty string
+REJECT_REGEX	myGame	must start with uppercase
+REJECT_REGEX	1Game	must start with letter
+REJECT_REGEX	My-Game	hyphen not allowed
+REJECT_REGEX	My_Game	underscore not allowed
+REJECT_REGEX	My.Game	dot not allowed
+REJECT_REGEX	My$Game	dollar not allowed
+REJECT_REGEX	My Game	whitespace not allowed
+REJECT_REGEX	한글이름	non-ASCII rejected
+REJECT_REGEX	ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890123456789012345678901234567890	65 chars exceeds max
+
+# --- Blocked-tokens rejections ---
+REJECT_BLOCKED	Application	collides with template sub-folder
+REJECT_BLOCKED	Configuration	collides with template sub-folder
+REJECT_BLOCKED	Handlers	collides with template sub-folder
+REJECT_BLOCKED	Sessions	collides with template sub-folder
+REJECT_BLOCKED	Telemetry	collides with template sub-folder
+REJECT_BLOCKED	Protocols	collides with template sub-folder
+REJECT_BLOCKED	LibCommons	collides with engine project
+REJECT_BLOCKED	LibNetworks	collides with engine project
+REJECT_BLOCKED	FastPortServer	collides with sibling project
+REJECT_BLOCKED	FastPortClient	collides with sibling project
+REJECT_BLOCKED	FastPortGameServerTemplate	rename to itself is a no-op

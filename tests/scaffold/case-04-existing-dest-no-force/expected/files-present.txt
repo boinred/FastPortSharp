@@ -1,0 +1,2 @@
+# Pre-existing file must remain untouched.
+preexisting.txt

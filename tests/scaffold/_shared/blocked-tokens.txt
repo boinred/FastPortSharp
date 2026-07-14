@@ -1,0 +1,33 @@
+# Blocked tokens for scaffold-game-server name validation.
+# Design Ref: §3.2 — single source of truth shared by both bash and PowerShell scaffold scripts.
+#
+# Format:
+#   - Lines starting with `#` are comments and are ignored.
+#   - Empty lines are ignored.
+#   - Each non-empty, non-comment line is a single blocked token (case-sensitive).
+#
+# A name passed to scaffold-game-server.{sh,ps1} matching any of these tokens
+# (after passing the regex `^[A-Z][A-Za-z0-9]{0,63}$`) is rejected with exit code 2.
+#
+# Why these tokens are blocked:
+#   - Folder names already used inside FastPortGameServerTemplate
+#     (Application, Configuration, Handlers, Sessions, Telemetry, Protocols).
+#     Using one of these as the new project name would collide with sub-folders
+#     and break post-rename builds.
+#   - Existing engine / sibling project names (LibCommons, LibNetworks,
+#     FastPortServer, FastPortClient). Using one of these as the new project name
+#     would shadow the engine reference inside the destination solution.
+#   - The template's own name (FastPortGameServerTemplate). Renaming "to itself"
+#     produces a no-op that is almost always a typo.
+
+Application
+Configuration
+Handlers
+Sessions
+Telemetry
+Protocols
+LibCommons
+LibNetworks
+FastPortServer
+FastPortClient
+FastPortGameServerTemplate
