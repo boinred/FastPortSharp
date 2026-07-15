@@ -1,0 +1,5 @@
+MyLobbyServer
+{DEST}
+--protos-path
+{DEST}-protos
+--no-git

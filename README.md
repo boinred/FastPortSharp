@@ -144,13 +144,20 @@ scripts/scaffold-game-server.sh   MyLobbyServer ../my-lobby
 
 # Windows / cross-platform
 pwsh -File scripts/scaffold-game-server.ps1 MyLobbyServer ../my-lobby
+
+# Windows: place shared .proto files outside the scaffold repository
+pwsh -File scripts/scaffold-game-server.ps1 -ProjectName MyLobbyServer -DestinationPath ../my-lobby -ProtosPath ../my-lobby-protos
 ```
 
-This copies `FastPortGameServerTemplate/` + `LibCommons/` + `LibNetworks/`
+The destination folder names the solution (`my-lobby.sln` in the example),
+while `-ProjectName` names only the generated game-server project
+(`MyLobbyServer/MyLobbyServer.csproj`).
+
+This copies `FastPortGameServerTemplate/` + `Protos/` + `LibCommons/` + `LibNetworks/`
 to the destination, renames everything from `FastPortGameServerTemplate`
 to your chosen name, generates `<name>.sln`, runs `git init`, and
 smoke-tests with `dotnet build`. See `scripts/README.md` for options
-(`--force`, `--no-git`, `--dry-run`, `--skip-smoke`) and exit codes.
+(`--protos-path`, `--force`, `--no-git`, `--dry-run`, `--skip-smoke`) and exit codes.
 
 For the full step-by-step walkthrough and Korean version, see
 `FastPortGameServerTemplate/README.md` and

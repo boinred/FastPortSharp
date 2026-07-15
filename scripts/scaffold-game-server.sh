@@ -18,7 +18,7 @@
 #   7.  copy LibNetworks -> <dest>/LibNetworks
 #   8.  token replacement (FastPortGameServerTemplate -> <NewName>)
 #   9.  generate <dest>/.gitignore + .gitattributes + README.md
-#   10. generate <dest>/<NewName>.sln (dotnet new sln + sln add x3)
+#   10. generate <dest>/<DestinationFolderName>.sln (dotnet new sln + sln add x3)
 #   11. (--no-git false) git init + initial commit
 #   12. (--skip-smoke false) dotnet build smoke
 #
@@ -74,6 +74,7 @@ Positional:
                      Refused (exit 3) if exists and non-empty without --force.
 
 Options:
+  --protos-path PATH Copy shared .proto files to PATH instead of <DestinationPath>/Protos.
   --force            Overwrite existing destination (irreversibly removes contents).
   --no-git           Skip 'git init' + initial commit.
   --skip-smoke       Skip 'dotnet build' verification.
@@ -141,10 +142,36 @@ copy_tree() {
       -cf - . ) | ( cd "${dest}" && tar -xf - )
 }
 
+# Return target relative to base. Both paths must be absolute directories/files.
+relative_path() {
+  local base="${1%/}"
+  local target="${2%/}"
+  local common="${base}"
+
+  while [ "${target}" != "${common}" ] && [ "${target#"${common}/"}" = "${target}" ]; do
+    common="$(dirname "${common}")"
+  done
+
+  local result=""
+  local cursor="${base}"
+  while [ "${cursor}" != "${common}" ]; do
+    result="../${result}"
+    cursor="$(dirname "${cursor}")"
+  done
+
+  local suffix="${target#"${common}"}"
+  suffix="${suffix#/}"
+  result="${result}${suffix}"
+  [ -n "${result}" ] || result="."
+  printf '%s' "${result}"
+}
+
 # ---------- step 1: parse arguments -----------------------------------------
 
 NEW_NAME=""
 DEST_PATH=""
+PROTOS_PATH=""
+SOLUTION_NAME=""
 OPT_FORCE=0
 OPT_NO_GIT=0
 OPT_SKIP_SMOKE=0
@@ -158,6 +185,11 @@ parse_args() {
       --no-git)        OPT_NO_GIT=1; shift ;;
       --skip-smoke)    OPT_SKIP_SMOKE=1; shift ;;
       --dry-run)       OPT_DRY_RUN=1; shift ;;
+      --protos-path)
+        [ $# -ge 2 ] || { err "--protos-path requires a path."; exit 2; }
+        PROTOS_PATH="$2"
+        shift 2
+        ;;
       --)              shift; break ;;
       -*)
         err "unknown option: $1"
@@ -229,6 +261,21 @@ validate_dest() {
   if [ "${OPT_DRY_RUN}" -ne 1 ]; then
     DEST_PATH="$(cd "${DEST_PATH}" && pwd)"
   fi
+
+  if [ -z "${PROTOS_PATH}" ]; then
+    PROTOS_PATH="${DEST_PATH}/Protos"
+  elif [ "${OPT_DRY_RUN}" -ne 1 ]; then
+    mkdir -p "${PROTOS_PATH}"
+    PROTOS_PATH="$(cd "${PROTOS_PATH}" && pwd)"
+  fi
+
+  if [ "${PROTOS_PATH}" = "${DEST_PATH}" ]; then
+    err "ProtosPath must not be the same as DestinationPath."
+    exit 2
+  fi
+
+  # Solution name follows the scaffold destination folder, not the project name.
+  SOLUTION_NAME="$(basename "${DEST_PATH%/}")"
 }
 
 # ---------- step 4: dry-run -------------------------------------------------
@@ -236,13 +283,15 @@ validate_dest() {
 dry_run_plan() {
   log "[DRY-RUN] would scaffold:"
   log "[DRY-RUN]   NewName       : ${NEW_NAME}"
+  log "[DRY-RUN]   SolutionName  : ${SOLUTION_NAME}"
   log "[DRY-RUN]   Destination   : ${DEST_PATH}"
+  log "[DRY-RUN]   ProtosPath    : ${PROTOS_PATH}"
   log "[DRY-RUN]   --force       : $([ "${OPT_FORCE}"      -eq 1 ] && echo on || echo off)"
   log "[DRY-RUN]   --no-git      : $([ "${OPT_NO_GIT}"     -eq 1 ] && echo on || echo off)"
   log "[DRY-RUN]   --skip-smoke  : $([ "${OPT_SKIP_SMOKE}" -eq 1 ] && echo on || echo off)"
   log "[DRY-RUN] would copy:"
   log "[DRY-RUN]   ${TEMPLATE_SRC}    -> ${DEST_PATH}/${NEW_NAME}"
-  log "[DRY-RUN]   ${PROTOS_SRC}      -> ${DEST_PATH}/Protos"
+  log "[DRY-RUN]   ${PROTOS_SRC}      -> ${PROTOS_PATH}"
   log "[DRY-RUN]   ${LIBCOMMONS_SRC}  -> ${DEST_PATH}/LibCommons"
   log "[DRY-RUN]   ${LIBNETWORKS_SRC} -> ${DEST_PATH}/LibNetworks"
   log "[DRY-RUN] would replace token \"${TEMPLATE_TOKEN}\" -> \"${NEW_NAME}\" in:"
@@ -251,12 +300,12 @@ dry_run_plan() {
   log "[DRY-RUN]   ${DEST_PATH}/.gitignore"
   log "[DRY-RUN]   ${DEST_PATH}/.gitattributes"
   log "[DRY-RUN]   ${DEST_PATH}/README.md"
-  log "[DRY-RUN]   ${DEST_PATH}/${NEW_NAME}.sln (3 projects)"
+  log "[DRY-RUN]   ${DEST_PATH}/${SOLUTION_NAME}.sln (3 projects)"
   if [ "${OPT_NO_GIT}" -ne 1 ]; then
     log "[DRY-RUN]   .git + initial commit"
   fi
   if [ "${OPT_SKIP_SMOKE}" -ne 1 ]; then
-    log "[DRY-RUN] would run: dotnet build ${DEST_PATH}/${NEW_NAME}.sln -c Release"
+    log "[DRY-RUN] would run: dotnet build ${DEST_PATH}/${SOLUTION_NAME}.sln -c Release"
   fi
 }
 
@@ -269,7 +318,7 @@ copy_template() {
 # Copied to <dest>/Protos verbatim (folder name not token-renamed), but the
 # .proto files inside ARE token-replaced (csharp_namespace).
 copy_protos() {
-  copy_tree "${PROTOS_SRC}"     "${DEST_PATH}/Protos"
+  copy_tree "${PROTOS_SRC}"     "${PROTOS_PATH}"
 }
 copy_libcommons() {
   copy_tree "${LIBCOMMONS_SRC}"  "${DEST_PATH}/LibCommons"
@@ -307,7 +356,6 @@ replace_tokens() {
   # LibCommons/LibNetworks subtrees must NOT be touched.
   local subtrees=(
     "${DEST_PATH}/${TEMPLATE_TOKEN}"
-    "${DEST_PATH}/Protos"
   )
   local find_expr
   find_expr="$(build_text_find_args)"
@@ -328,6 +376,21 @@ $(eval "find \"${subtree}\" -type f ${find_expr}")
 EOF
   done
 
+
+  # Only replace tokens in files copied from the template; preserve unrelated
+  # files when --protos-path points at an existing shared directory.
+  while IFS= read -r source_file; do
+    [ -f "${source_file}" ] || continue
+    local relative_file="${source_file#"${PROTOS_SRC}/"}"
+    local proto_file="${PROTOS_PATH}/${relative_file}"
+    if grep -F -q -- "${TEMPLATE_TOKEN}" "${proto_file}" 2>/dev/null; then
+      replace_in_file "${proto_file}" "${TEMPLATE_TOKEN}" "${NEW_NAME}"
+      count=$((count + 1))
+    fi
+  done <<EOF
+$(find "${PROTOS_SRC}" -type f)
+EOF
+
   # Rename the Template subtree directory + csproj.
   mv "${DEST_PATH}/${TEMPLATE_TOKEN}" "${DEST_PATH}/${NEW_NAME}"
   mv "${DEST_PATH}/${NEW_NAME}/${TEMPLATE_TOKEN}.csproj" \
@@ -346,6 +409,13 @@ EOF
       -e 's|\.\.\\\.\.\\LibCommons|..\\LibCommons|g' \
       -e 's|\.\.\\\.\.\\LibNetworks|..\\LibNetworks|g' \
       "${cf}"
+    rm -f "${cf}.bak"
+
+    local relative_protos
+    relative_protos="$(relative_path "${DEST_PATH}/${NEW_NAME}" "${PROTOS_PATH}")"
+    local escaped_protos
+    escaped_protos="$(printf '%s' "${relative_protos}" | sed 's/[&|]/\\&/g')"
+    sed -i.bak -e "s|..\\\\Protos|${escaped_protos}|g" "${cf}"
     rm -f "${cf}.bak"
   done
 
@@ -414,7 +484,7 @@ A game server scaffolded from the FastPortSharp template
 ## Build & Run
 
 \`\`\`bash
-dotnet build ${NEW_NAME}.sln -c Release
+dotnet build ${SOLUTION_NAME}.sln -c Release
 dotnet run --project ${NEW_NAME} -c Release
 \`\`\`
 
@@ -445,10 +515,10 @@ generate_sln() {
   # Force the classic .sln format so existing IDE tooling and CI scripts
   # that match `*.sln` continue to work.
   ( cd "${DEST_PATH}" \
-    && dotnet new sln --format sln -n "${NEW_NAME}"                          >/dev/null \
-    && dotnet sln "${NEW_NAME}.sln" add "${NEW_NAME}/${NEW_NAME}.csproj"     >/dev/null \
-    && dotnet sln "${NEW_NAME}.sln" add "LibCommons/LibCommons.csproj"       >/dev/null \
-    && dotnet sln "${NEW_NAME}.sln" add "LibNetworks/LibNetworks.csproj"     >/dev/null )
+    && dotnet new sln --format sln -n "${SOLUTION_NAME}"                          >/dev/null \
+    && dotnet sln "${SOLUTION_NAME}.sln" add "${NEW_NAME}/${NEW_NAME}.csproj"     >/dev/null \
+    && dotnet sln "${SOLUTION_NAME}.sln" add "LibCommons/LibCommons.csproj"       >/dev/null \
+    && dotnet sln "${SOLUTION_NAME}.sln" add "LibNetworks/LibNetworks.csproj"     >/dev/null )
 
   inject_protos_solution_folder
 }
@@ -459,8 +529,8 @@ generate_sln() {
 # Solution Items are NOT build targets; tests/scaffold/run.sh's compute_sha256
 # already excludes *.sln, so this edit doesn't affect golden fixtures.
 inject_protos_solution_folder() {
-  local sln="${DEST_PATH}/${NEW_NAME}.sln"
-  local protos_dir="${DEST_PATH}/Protos"
+  local sln="${DEST_PATH}/${SOLUTION_NAME}.sln"
+  local protos_dir="${PROTOS_PATH}"
   [ -d "${protos_dir}" ] || return 0
 
   # Build the Solution Folder block via a temp file (avoids awk -v backslash
@@ -473,10 +543,11 @@ inject_protos_solution_folder() {
     local f
     for f in "${protos_dir}"/*.proto; do
       [ -f "${f}" ] || continue
-      local name
-      name="$(basename "${f}")"
+      local item_path
+      item_path="$(relative_path "${DEST_PATH}" "${f}")"
+      item_path="$(printf '%s' "${item_path}" | tr '/' '\\')"
       # Use Windows-style backslash for sln path convention (sln files use \ on all OSes).
-      printf '\t\tProtos\\%s = Protos\\%s\n' "${name}" "${name}"
+      printf '\t\t%s = %s\n' "${item_path}" "${item_path}"
     done
     printf '\tEndProjectSection\n'
     printf 'EndProject\n'
@@ -510,8 +581,8 @@ git_init_and_commit() {
 # ---------- step 12: smoke build --------------------------------------------
 
 smoke_build() {
-  if ! dotnet build "${DEST_PATH}/${NEW_NAME}.sln" -c Release --nologo; then
-    err "'dotnet build ${DEST_PATH}/${NEW_NAME}.sln -c Release' failed."
+  if ! dotnet build "${DEST_PATH}/${SOLUTION_NAME}.sln" -c Release --nologo; then
+    err "'dotnet build ${DEST_PATH}/${SOLUTION_NAME}.sln -c Release' failed."
     hint "this usually means a token was missed during replacement."
     hint "run with --dry-run to inspect, or file an issue."
     exit 4
@@ -561,7 +632,7 @@ main() {
   generate_readme
   log "        OK"
 
-  log "[10/12] Creating ${NEW_NAME}.sln..."
+  log "[10/12] Creating ${SOLUTION_NAME}.sln..."
   generate_sln
   log "        OK"
 

@@ -148,6 +148,7 @@ function Invoke-Scaffold {
                 '--no-git'     { $translated += '-NoGit';     break }
                 '--skip-smoke' { $translated += '-SkipSmoke'; break }
                 '--dry-run'    { $translated += '-DryRun';    break }
+                '--protos-path' { $translated += '-ProtosPath'; break }
                 '--help'       { $translated += '-Help';      break }
                 '-h'           { $translated += '-Help';      break }
                 default        { $translated += $a }

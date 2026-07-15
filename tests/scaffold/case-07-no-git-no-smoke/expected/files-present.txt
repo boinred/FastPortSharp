@@ -4,6 +4,6 @@ Protos/PacketIds.proto
 Protos/Sample.proto
 LibCommons/LibCommons.csproj
 LibNetworks/LibNetworks.csproj
-Foo.sln
+out.sln
 .gitignore
 README.md

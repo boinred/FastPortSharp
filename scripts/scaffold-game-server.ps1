@@ -22,17 +22,22 @@
     7.  copy LibNetworks -> <Dest>/LibNetworks
     8.  token replacement (FastPortGameServerTemplate -> <NewName>)
     9.  generate <Dest>/.gitignore + .gitattributes + README.md
-    10. generate <Dest>/<NewName>.sln (dotnet new sln + sln add x3)
+    10. generate <Dest>/<DestinationFolderName>.sln (dotnet new sln + sln add x3)
     11. (-NoGit false) git init + initial commit
     12. (-SkipSmoke false) dotnet build smoke
 
 .PARAMETER NewProjectName
   PascalCase ASCII identifier, ^[A-Z][A-Za-z0-9]{0,63}$.
   Must not appear in tests/scaffold/_shared/blocked-tokens.txt.
+  Can also be supplied with the explicit -ProjectName alias.
 
 .PARAMETER DestinationPath
   Absolute or relative target directory. Created if missing.
   Refused (exit 3) if exists and non-empty without -Force.
+
+.PARAMETER ProtosPath
+  Optional destination for shared .proto files. Defaults to <DestinationPath>/Protos.
+  Relative paths are resolved from the current working directory.
 
 .PARAMETER Force
   Overwrite existing destination (irreversibly removes contents).
@@ -61,10 +66,13 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
+    [Alias('ProjectName')]
     [string]$NewProjectName,
 
     [Parameter(Position = 1)]
     [string]$DestinationPath,
+
+    [string]$ProtosPath,
 
     [switch]$Force,
     [switch]$NoGit,
@@ -115,6 +123,7 @@ function Write-Hint { [Console]::Error.WriteLine("hint:  $($args[0])") }
 function Show-Usage {
 @'
 Usage: scaffold-game-server.ps1 <NewProjectName> <DestinationPath> [OPTIONS]
+       scaffold-game-server.ps1 -ProjectName <NewProjectName> -DestinationPath <Path> [OPTIONS]
 
 Positional:
   NewProjectName     PascalCase ASCII identifier, ^[A-Z][A-Za-z0-9]{0,63}$
@@ -123,6 +132,7 @@ Positional:
                      Refused (exit 3) if exists and non-empty without -Force.
 
 Options:
+  -ProtosPath PATH   Copy shared .proto files to PATH instead of <DestinationPath>/Protos.
   -Force             Overwrite existing destination (irreversibly removes contents).
   -NoGit             Skip 'git init' + initial commit.
   -SkipSmoke         Skip 'dotnet build' verification.
@@ -242,6 +252,20 @@ function Test-NewName {
 # ---------- step 3: validate destination ------------------------------------
 
 function Resolve-Destination {
+    $invocationDirectory = (Get-Location).Path
+    $destinationFullPath = [System.IO.Path]::GetFullPath($DestinationPath, $invocationDirectory)
+    $protosFullPath = if ($ProtosPath) {
+        [System.IO.Path]::GetFullPath($ProtosPath, $invocationDirectory)
+    }
+    else {
+        Join-Path $destinationFullPath 'Protos'
+    }
+
+    if ($protosFullPath -eq $destinationFullPath) {
+        Write-Err "ProtosPath must not be the same as DestinationPath."
+        exit 2
+    }
+
     if (Test-Path -LiteralPath $DestinationPath) {
         if (-not (Test-Path -LiteralPath $DestinationPath -PathType Container)) {
             Write-Err "destination `"$DestinationPath`" exists and is not a directory."
@@ -269,10 +293,19 @@ function Resolve-Destination {
     }
     if (-not $DryRun) {
         $Script:DestPathResolved = (Resolve-Path -LiteralPath $DestinationPath).Path
+        if (Test-Path -LiteralPath $protosFullPath -PathType Leaf) {
+            Write-Err "ProtosPath `"$ProtosPath`" exists and is not a directory."
+            exit 3
+        }
+        New-Item -ItemType Directory -Path $protosFullPath -Force | Out-Null
+        $Script:ProtosPathResolved = (Resolve-Path -LiteralPath $protosFullPath).Path
     }
     else {
-        $Script:DestPathResolved = $DestinationPath
+        $Script:DestPathResolved = $destinationFullPath
+        $Script:ProtosPathResolved = $protosFullPath
     }
+    # 목적: 솔루션 이름과 스캐폴드 대상 폴더 이름 일치
+    $Script:SolutionName = [System.IO.DirectoryInfo]::new($Script:DestPathResolved).Name
 }
 
 # ---------- step 4: dry-run -------------------------------------------------
@@ -280,27 +313,29 @@ function Resolve-Destination {
 function Show-DryRunPlan {
     Write-Log "[DRY-RUN] would scaffold:"
     Write-Log "[DRY-RUN]   NewName       : $NewProjectName"
+    Write-Log "[DRY-RUN]   SolutionName  : $Script:SolutionName"
     Write-Log "[DRY-RUN]   Destination   : $Script:DestPathResolved"
+    Write-Log "[DRY-RUN]   ProtosPath    : $Script:ProtosPathResolved"
     Write-Log "[DRY-RUN]   -Force        : $(if ($Force)     { 'on' } else { 'off' })"
     Write-Log "[DRY-RUN]   -NoGit        : $(if ($NoGit)     { 'on' } else { 'off' })"
     Write-Log "[DRY-RUN]   -SkipSmoke    : $(if ($SkipSmoke) { 'on' } else { 'off' })"
     Write-Log "[DRY-RUN] would copy:"
     Write-Log "[DRY-RUN]   $Script:TemplateSrc -> $(Join-Path $Script:DestPathResolved $NewProjectName)"
-    Write-Log "[DRY-RUN]   $Script:ProtosSrc -> $(Join-Path $Script:DestPathResolved 'Protos')"
+    Write-Log "[DRY-RUN]   $Script:ProtosSrc -> $Script:ProtosPathResolved"
     Write-Log "[DRY-RUN]   $Script:LibCommonsSrc -> $(Join-Path $Script:DestPathResolved 'LibCommons')"
     Write-Log "[DRY-RUN]   $Script:LibNetworksSrc -> $(Join-Path $Script:DestPathResolved 'LibNetworks')"
     Write-Log "[DRY-RUN] would replace token `"$Script:TemplateToken`" -> `"$NewProjectName`" in:"
-    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) under <Dest>/$NewProjectName and <Dest>/Protos"
+    Write-Log "[DRY-RUN]   text files (extensions: $($Script:TextExtensions -join ' ')) copied to the project and Protos destinations"
     Write-Log "[DRY-RUN] would generate:"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitignore')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved '.gitattributes')"
     Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved 'README.md')"
-    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") (3 projects)"
+    Write-Log "[DRY-RUN]   $(Join-Path $Script:DestPathResolved "$Script:SolutionName.sln") (3 projects)"
     if (-not $NoGit) {
         Write-Log "[DRY-RUN]   .git + initial commit"
     }
     if (-not $SkipSmoke) {
-        Write-Log "[DRY-RUN] would run: dotnet build $(Join-Path $Script:DestPathResolved "$NewProjectName.sln") -c Release"
+        Write-Log "[DRY-RUN] would run: dotnet build $(Join-Path $Script:DestPathResolved "$Script:SolutionName.sln") -c Release"
     }
 }
 
@@ -311,7 +346,7 @@ function Copy-Template {
 }
 # Design Ref: protos-shared-folder-revert-contracts §2.1 — shared Protos folder.
 function Copy-Protos {
-    Copy-TreeFiltered -Src $Script:ProtosSrc -Dest (Join-Path $Script:DestPathResolved 'Protos')
+    Copy-TreeFiltered -Src $Script:ProtosSrc -Dest $Script:ProtosPathResolved
 }
 function Copy-LibCommons {
     Copy-TreeFiltered -Src $Script:LibCommonsSrc -Dest (Join-Path $Script:DestPathResolved 'LibCommons')
@@ -327,10 +362,7 @@ function Update-Tokens {
     # Template subtree + Protos subtree both need token replacement.
     # Protos folder location verbatim; csharp_namespace inside .proto files
     # gets token-renamed. LibCommons/LibNetworks must NOT be touched.
-    $subtrees = @(
-        Join-Path $Script:DestPathResolved $Script:TemplateToken
-        Join-Path $Script:DestPathResolved 'Protos'
-    )
+    $subtrees = @(Join-Path $Script:DestPathResolved $Script:TemplateToken)
     $count = 0
 
     foreach ($subtree in $subtrees) {
@@ -347,6 +379,17 @@ function Update-Tokens {
             Write-FileUtf8NoBom -Path $file.FullName -Content $newContent
             $count++
         }
+    }
+
+    # 목적: 외부 Protos 폴더의 기존 파일은 건드리지 않고 이번에 복사한 파일만 치환
+    Get-ChildItem -LiteralPath $Script:ProtosSrc -Recurse -File -Force | ForEach-Object {
+        $relative = $_.FullName.Substring($Script:ProtosSrc.Length).TrimStart([char]'/', [char]'\')
+        $file = Get-Item -LiteralPath (Join-Path $Script:ProtosPathResolved $relative)
+        if ($Script:TextExtensions -notcontains $file.Extension) { return }
+        $content = [System.IO.File]::ReadAllText($file.FullName, $Script:Utf8NoBom)
+        if (-not $content.Contains($Script:TemplateToken)) { return }
+        Write-FileUtf8NoBom -Path $file.FullName -Content $content.Replace($Script:TemplateToken, $NewProjectName)
+        $count++
     }
 
     # Rename the Template subtree directory + csproj.
@@ -367,6 +410,10 @@ function Update-Tokens {
         $c = [System.IO.File]::ReadAllText($cf, $Script:Utf8NoBom)
         $c = $c.Replace('..\..\LibCommons', '..\LibCommons')
         $c = $c.Replace('..\..\LibNetworks', '..\LibNetworks')
+        # 목적: 프로젝트 위치를 기준으로 기본 또는 외부 Protos 폴더 참조 생성
+        $protosRelativePath = [System.IO.Path]::GetRelativePath($newSubtree, $Script:ProtosPathResolved).Replace('/', '\')
+        $protosRelativePath = [System.Security.SecurityElement]::Escape($protosRelativePath)
+        $c = $c.Replace('..\Protos', $protosRelativePath)
         Write-FileUtf8NoBom -Path $cf -Content $c
     }
 
@@ -437,7 +484,7 @@ A game server scaffolded from the FastPortSharp template
 ## Build & Run
 
 ``````bash
-dotnet build $NewProjectName.sln -c Release
+dotnet build $Script:SolutionName.sln -c Release
 dotnet run --project $NewProjectName -c Release
 ``````
 
@@ -470,13 +517,13 @@ function New-SolutionFile {
         # .NET 10's `dotnet new sln` defaults to the newer .slnx (XML) format.
         # Force the classic .sln format so existing IDE tooling and CI scripts
         # that match `*.sln` continue to work.
-        dotnet new sln --format sln -n $NewProjectName | Out-Null
+        dotnet new sln --format sln -n $Script:SolutionName | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
-        dotnet sln "$NewProjectName.sln" add (Join-Path $NewProjectName "$NewProjectName.csproj") | Out-Null
+        dotnet sln "$Script:SolutionName.sln" add (Join-Path $NewProjectName "$NewProjectName.csproj") | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
-        dotnet sln "$NewProjectName.sln" add (Join-Path 'LibCommons'  'LibCommons.csproj')  | Out-Null
+        dotnet sln "$Script:SolutionName.sln" add (Join-Path 'LibCommons'  'LibCommons.csproj')  | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
-        dotnet sln "$NewProjectName.sln" add (Join-Path 'LibNetworks' 'LibNetworks.csproj') | Out-Null
+        dotnet sln "$Script:SolutionName.sln" add (Join-Path 'LibNetworks' 'LibNetworks.csproj') | Out-Null
         if ($LASTEXITCODE -ne 0) { exit 5 }
     }
     finally {
@@ -491,8 +538,8 @@ function New-SolutionFile {
 # Solution Items are NOT build targets; tests/scaffold/run.sh's compute_sha256
 # already excludes *.sln, so this edit doesn't affect golden fixtures.
 function Add-ProtosSolutionFolder {
-    $slnPath    = Join-Path $Script:DestPathResolved "$NewProjectName.sln"
-    $protosDir  = Join-Path $Script:DestPathResolved 'Protos'
+    $slnPath    = Join-Path $Script:DestPathResolved "$Script:SolutionName.sln"
+    $protosDir  = $Script:ProtosPathResolved
     if (-not (Test-Path -LiteralPath $protosDir -PathType Container)) { return }
 
     # Build the Solution Folder block (sln files use Windows-style \ on all OSes).
@@ -500,7 +547,8 @@ function Add-ProtosSolutionFolder {
     $blockLines.Add('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Protos", "Protos", "{B7C2F1D3-4E5A-4B6C-9F8E-1A2B3C4D5E6F}"')
     $blockLines.Add("`tProjectSection(SolutionItems) = preProject")
     Get-ChildItem -LiteralPath $protosDir -File -Filter '*.proto' | Sort-Object -Property Name | ForEach-Object {
-        $blockLines.Add("`t`tProtos\$($_.Name) = Protos\$($_.Name)")
+        $solutionItemPath = [System.IO.Path]::GetRelativePath($Script:DestPathResolved, $_.FullName).Replace('/', '\')
+        $blockLines.Add("`t`t$solutionItemPath = $solutionItemPath")
     }
     $blockLines.Add("`tEndProjectSection")
     $blockLines.Add('EndProject')
@@ -552,7 +600,7 @@ function Invoke-GitInit {
 # ---------- step 12: smoke build --------------------------------------------
 
 function Invoke-SmokeBuild {
-    $sln = Join-Path $Script:DestPathResolved "$NewProjectName.sln"
+    $sln = Join-Path $Script:DestPathResolved "$Script:SolutionName.sln"
     dotnet build $sln -c Release --nologo
     if ($LASTEXITCODE -ne 0) {
         Write-Err  "'dotnet build $sln -c Release' failed."
@@ -604,7 +652,7 @@ function Invoke-Main {
     New-Readme
     Write-Log "        OK"
 
-    Write-Log "[10/12] Creating $NewProjectName.sln..."
+    Write-Log "[10/12] Creating $Script:SolutionName.sln..."
     New-SolutionFile
     Write-Log "        OK"
 
