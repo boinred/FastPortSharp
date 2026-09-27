@@ -413,8 +413,11 @@ EOF
 
     local relative_protos
     relative_protos="$(relative_path "${DEST_PATH}/${NEW_NAME}" "${PROTOS_PATH}")"
+    # 목적: ps1 scaffold와 동일하게 csproj 경로 구분자를 '\'로 통일 (golden hash 일치)
+    relative_protos="${relative_protos//\//\\}"
     local escaped_protos
-    escaped_protos="$(printf '%s' "${relative_protos}" | sed 's/[&|]/\\&/g')"
+    # 목적: sed replacement 특수문자(\, &, |) escape
+    escaped_protos="$(printf '%s' "${relative_protos}" | sed 's/[\\&|]/\\&/g')"
     sed -i.bak -e "s|..\\\\Protos|${escaped_protos}|g" "${cf}"
     rm -f "${cf}.bak"
   done
