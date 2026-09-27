@@ -84,6 +84,43 @@ public sealed class BaseSessionReceivePolicyTests
     }
 
     [TestMethod]
+    public async Task BaseSession_OneByteFragmentedStream_DeliversAllPacketsWithoutDisconnect()
+    {
+        using SocketPair pair = await SocketPair.CreateAsync();
+        // 설정: Nagle 비활성화로 1 byte write가 개별 TCP segment로 전송되도록 유도
+        pair.Client.NoDelay = true;
+        var session = new ReceiveTestSession(pair.ServerSocket);
+        session.StartReceive();
+
+        try
+        {
+            // 입력: header 2 byte까지 포함해 연속 packet 2개를 1 byte 단위로 쪼개 전송
+            byte[] firstPayload = Enumerable.Range(0, 300).Select(i => (byte)i).ToArray();
+            byte[] secondPayload = [0x10, 0x20, 0x30];
+            byte[] wire = [.. BuildPacket(firstPayload), .. BuildPacket(secondPayload)];
+            NetworkStream stream = pair.Client.GetStream();
+            foreach (byte value in wire)
+            {
+                await stream.WriteAsync(new[] { value });
+                // 흐름: 짧은 간격으로 server receive completion이 1 byte 단위로도 발생하게 함
+                await Task.Delay(1);
+            }
+
+            await WaitUntilAsync(() => session.ReceivedPayloads.Count == 2, s_Timeout);
+
+            Assert.IsFalse(session.IsDisconnected);
+            byte[][] payloads = session.ReceivedPayloads.ToArray();
+            CollectionAssert.AreEqual(firstPayload, payloads[0]);
+            CollectionAssert.AreEqual(secondPayload, payloads[1]);
+        }
+        finally
+        {
+            session.RequestDisconnect();
+            await session.WaitSession();
+        }
+    }
+
+    [TestMethod]
     public async Task BaseSession_ReceiveBufferOverLimit_DisconnectsWithOverflowReason()
     {
         using SocketPair pair = await SocketPair.CreateAsync();
