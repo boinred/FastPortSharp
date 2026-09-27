@@ -16,6 +16,8 @@ public abstract class BaseSession
 {
     private const int SendBufferBackpressureThresholdBytes = 1024 * 1024;
     private const int MaxSendBatchSegments = 16;
+    // 기본값: 파싱 대기 수신 byte 상한, send queue 기본 한도(1MB)와 대칭
+    private const int DefaultMaxReceiveBufferedBytes = 1024 * 1024;
 
     protected ILogger m_Logger;
     private System.Net.Sockets.Socket? m_Socket;
@@ -30,6 +32,8 @@ public abstract class BaseSession
     private CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
 
     private readonly LibCommons.IBuffers m_ReceivedBuffers;
+    // 용도: malformed header 판정 시 packet size field만 읽는 peek 전용 버퍼 (parser task 단독 사용)
+    private readonly byte[] m_ReceivedHeaderPeekBuffers = new byte[BasePacket.HeaderSize];
     // Signal: recv callback이 buffer write 이후 parser task를 즉시 깨우는 용도
     private readonly SemaphoreSlim m_ReceivedBufferSignal = new(0);
     // Version: stale signal 소비 중 새 receive 여부를 구분하는 변경 카운터
@@ -190,6 +194,10 @@ public abstract class BaseSession
 
     public string GetSessionAddress() => m_RemoteEndPoint?.ToString() ?? " Unknown";
 
+    // 설정: 파싱 대기 수신 byte 상한, 초과 시 버퍼 확장 대신 ReceiveBufferOverflow로 disconnect
+    // 주의: 최대 packet 크기(ushort.MaxValue) 미만으로 낮추면 정상 대형 packet도 끊김
+    protected virtual int MaxReceiveBufferedBytes => DefaultMaxReceiveBufferedBytes;
+
 
     protected virtual void OnReceived(BasePacket basePacket) { }
 
@@ -347,6 +355,21 @@ public abstract class BaseSession
 
         // 계측: ReceiveAsync 요청부터 socket byte 수신 완료까지의 대기 시간
         RecordReceiveCompletedDuration(e.BytesTransferred, receiveCompletedTimestamp);
+
+        // 방어: parser 정체(slow handler, malformed stream) 시 수신 버퍼 무한 확장 차단
+        long bufferedAfterWrite = (long)m_ReceivedBuffers.CanReadSize + e.BytesTransferred;
+        if (bufferedAfterWrite > MaxReceiveBufferedBytes)
+        {
+            m_Logger.LogWarning(
+                "BaseSession, OnSocketEventsReceivedCompleted, Receive buffer overflow. Buffered:{BufferedBytes}, Limit:{LimitBytes}, Remote:{SessionAddress}",
+                bufferedAfterWrite,
+                MaxReceiveBufferedBytes,
+                GetSessionAddress());
+
+            RequestDisconnect(NetworkDisconnectReason.ReceiveBufferOverflow);
+
+            return false;
+        }
 
         // Process the received data
         long bufferWriteStartedTimestamp = GetNetworkTimestamp();
@@ -770,7 +793,22 @@ public abstract class BaseSession
 
                 // 계측 기준점: protocol parse 및 echo response enqueue 비용
                 long handlerStartedTimestamp = GetNetworkTimestamp();
-                OnReceived(packetItem.Packet);
+                try
+                {
+                    OnReceived(packetItem.Packet);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                {
+                    // 격리: handler 예외로 worker task가 조용히 종료되어 세션이 정체되는 대신 세션 단위 종료
+                    m_Logger.LogError(
+                        ex,
+                        "BaseSession, DoWorkReceivedPackets, Packet handler threw. Remote:{SessionAddress}",
+                        GetSessionAddress());
+
+                    RequestDisconnect(NetworkDisconnectReason.PacketHandlerError);
+
+                    return;
+                }
                 // 계측: application-level packet handler 처리 시간
                 OnNetworkOperationDuration(
                     "receive-packet-handler",
@@ -812,6 +850,18 @@ public abstract class BaseSession
                 long packetExtractStartedTimestamp = GetNetworkTimestamp();
                 if (!m_ReceivedBuffers.TryGetBasePackets(out List<LibCommons.BasePacket> basePackets))
                 {
+                    // 방어: header 길이 필드가 header 크기 미만이면 영원히 완성되지 않으므로 즉시 disconnect
+                    if (HasInvalidPacketHeader())
+                    {
+                        m_Logger.LogWarning(
+                            "BaseSession, DoWorkReceivedBuffers, Invalid packet header. Remote:{SessionAddress}",
+                            GetSessionAddress());
+
+                        RequestDisconnect(NetworkDisconnectReason.InvalidPacketHeader);
+
+                        return;
+                    }
+
                     // 흐름: partial packet이면 추가 receive write까지 대기
                     await WaitForReceivedBufferChangeAsync(observedVersion, cancellationToken);
                     continue;
@@ -851,6 +901,24 @@ public abstract class BaseSession
         {
             // Channel이 닫힌 경우
         }
+    }
+
+    // 목적: 수신 버퍼 선두 packet size field가 header 크기 미만인지 판정 (packet 추출 실패 경로에서만 호출)
+    private bool HasInvalidPacketHeader()
+    {
+        // 주의: IBuffers 구현에 따라 Peek가 ref 배열을 교체할 수 있으므로 local 변수로 전달
+        byte[] headerBuffers = m_ReceivedHeaderPeekBuffers;
+        int peekedSize = m_ReceivedBuffers.Peek(ref headerBuffers);
+        if (peekedSize < BasePacket.HeaderSize)
+        {
+            // 상태: header 미완성은 malformed가 아닌 partial 수신
+            return false;
+        }
+
+        // 형식: 송신 측 RequestSendBuffers와 동일한 UInt16 little-endian packet size
+        int packetSize = BinaryPrimitives.ReadUInt16LittleEndian(headerBuffers.AsSpan(0, BasePacket.HeaderSize));
+
+        return packetSize < BasePacket.HeaderSize;
     }
 
     /// <summary>
