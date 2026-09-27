@@ -25,5 +25,14 @@ public enum NetworkDisconnectReason
     IdleTimeout = 6,
 
     // 상태: local shutdown 또는 명시적 종료 정책
-    LocalShutdown = 7
+    LocalShutdown = 7,
+
+    // 상태: packet size header가 header 크기 미만인 malformed stream 수신
+    InvalidPacketHeader = 8,
+
+    // 상태: 파싱 대기 중인 수신 byte가 session 수신 버퍼 상한 초과
+    ReceiveBufferOverflow = 9,
+
+    // 상태: OnReceived packet handler에서 처리되지 않은 예외 발생
+    PacketHandlerError = 10
 }
