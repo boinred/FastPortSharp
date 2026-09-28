@@ -584,7 +584,10 @@ git_init_and_commit() {
 # ---------- step 12: smoke build --------------------------------------------
 
 smoke_build() {
-  if ! dotnet build "${DEST_PATH}/${SOLUTION_NAME}.sln" -c Release --nologo; then
+  # 목적: sln 절대 경로에 symlink(macOS /var -> /private/var 등)가 섞이면 MSBuild가
+  #       ProjectReference를 실제 경로로도 해석해 같은 프로젝트를 중복 restore(obj 충돌)하므로,
+  #       dest로 이동 후 상대 경로로 빌드해 모든 경로를 physical cwd 기준 하나로 통일
+  if ! ( cd "${DEST_PATH}" && dotnet build "${SOLUTION_NAME}.sln" -c Release --nologo ); then
     err "'dotnet build ${DEST_PATH}/${SOLUTION_NAME}.sln -c Release' failed."
     hint "this usually means a token was missed during replacement."
     hint "run with --dry-run to inspect, or file an issue."
