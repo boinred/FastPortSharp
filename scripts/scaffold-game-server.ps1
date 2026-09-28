@@ -601,7 +601,16 @@ function Invoke-GitInit {
 
 function Invoke-SmokeBuild {
     $sln = Join-Path $Script:DestPathResolved "$Script:SolutionName.sln"
-    dotnet build $sln -c Release --nologo
+    # 목적: sln 절대 경로에 symlink(macOS /var -> /private/var 등)가 섞이면 MSBuild가
+    #       ProjectReference를 실제 경로로도 해석해 같은 프로젝트를 중복 restore(obj 충돌)하므로,
+    #       dest로 이동 후 상대 경로로 빌드해 모든 경로를 physical cwd 기준 하나로 통일
+    Push-Location -LiteralPath $Script:DestPathResolved
+    try {
+        dotnet build "$Script:SolutionName.sln" -c Release --nologo
+    }
+    finally {
+        Pop-Location
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Err  "'dotnet build $sln -c Release' failed."
         Write-Hint "this usually means a token was missed during replacement."
