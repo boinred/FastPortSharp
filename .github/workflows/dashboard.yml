@@ -3,14 +3,14 @@ name: dashboard
 # Builds and tests FastPortSharp.Dashboard.sln across macOS + Windows.
 # Companion to build.yml (which builds FastPortSharp.sln). Triggered only
 # when Dashboard-related or referenced engine (LibCommons/LibNetworks) files
-# change, on main and builds.release.
+# change, on main and builds/release.
 # Design Ref: dashboard-ci-add cycle §3.1.
 
 on:
   push:
     branches:
       - main
-      - builds.release
+      - builds/release
     paths:
       - 'FastPortDashboard.Maui/**'
       - 'FastPortDashboard.Core/**'
@@ -23,7 +23,7 @@ on:
   pull_request:
     branches:
       - main
-      - builds.release
+      - builds/release
     paths:
       - 'FastPortDashboard.Maui/**'
       - 'FastPortDashboard.Core/**'
