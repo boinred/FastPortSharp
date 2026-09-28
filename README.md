@@ -96,16 +96,18 @@ Listen address / port / max sessions are configured in
 
 ### Customising the server
 
-1. **Add a new packet** — drop a `.proto` into `FastPortGameServerTemplate/Protocols/`.
+1. **Add a new packet** — drop a `.proto` into `template-projects/Protos/`.
    Grpc.Tools regenerates C# classes on `dotnet build`. Add the new packet id
-   to `Handlers/PacketIds.cs` (use `≥ 2000` for user-defined ids).
+   to the `PacketIds` enum in `template-projects/Protos/PacketIds.proto`
+   (use `≥ 2000` for user-defined ids; the generated enum drops the
+   `PACKET_IDS_` prefix, e.g. `PacketIds.MyRequest`).
 
 2. **Implement a handler**:
 
    ```csharp
    public sealed class MyHandler : IPacketHandler
    {
-       public int PacketId => PacketIds.MyRequest;
+       public int PacketId => (int)PacketIds.MyRequest;
        public void Handle(GameSession session, BasePacket packet) { /* ... */ }
    }
    ```
@@ -211,9 +213,9 @@ For the full step-by-step walkthrough and Korean version, see
 
 ### 📈 Detailed Benchmark Results
 
-👉 **[View Full Benchmark Results](docs/baseline-benchmark-results.md)**
+👉 **[View Full Benchmark Results](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/baseline-benchmark-results.md)**
 
-👉 **[View 10K Load Validation Results](docs/load-validation-benchmark-results.md)**
+👉 **[View 10K Load Validation Results](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/load-validation-benchmark-results.md)**
 
 ### Running Load Tests
 
@@ -227,13 +229,17 @@ dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- --sessi
 
 ### Performance Test Reports
 
+> The historical reports below were removed from the working tree in
+> `e4b4c8e`; their links point to the last commit that contained them.
+
 | Report | Description | Link |
 |--------|-------------|------|
-| **Pre-optimization Performance Report** | Latency performance test results before optimization | [📄 View](docs/latency-performance-report.md) |
-| **Lock-optimized Performance Report** | Performance test after applying ArrayPool + .NET 10 Lock | [📄 View](docs/latency-performance-report-after-lock.md) |
-| **Channel-optimized Performance Report** | Performance test after applying full optimizations | [📄 View](docs/latency-performance-report-after-channel.md) |
-| **Historical Benchmark Results** | Component-specific micro benchmark results captured before the load runner migration | [📄 View](docs/baseline-benchmark-results.md) |
-| **10K Load Validation Results** | Same-machine 10K load validation comparison for server send backpressure optimization | [📄 View](docs/load-validation-benchmark-results.md) |
+| **BaseListener Accept-path Benchmark** | Accept pump / session-creation offload optimization and scenario D closed-loop max throughput | [📄 View](docs/baselistener-optimization-benchmark.md) |
+| **Pre-optimization Performance Report** | Latency performance test results before optimization | [📄 View](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report.md) |
+| **Lock-optimized Performance Report** | Performance test after applying ArrayPool + .NET 10 Lock | [📄 View](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report-after-lock.md) |
+| **Channel-optimized Performance Report** | Performance test after applying full optimizations | [📄 View](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report-after-channel.md) |
+| **Historical Benchmark Results** | Component-specific micro benchmark results captured before the load runner migration | [📄 View](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/baseline-benchmark-results.md) |
+| **10K Load Validation Results** | Same-machine 10K load validation comparison for server send backpressure optimization | [📄 View](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/load-validation-benchmark-results.md) |
 
 ### Optimization Summary
 

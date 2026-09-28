@@ -71,8 +71,8 @@ dotnet run --project MyLobbyServer -c Release
 ```
 
 The new project is self-contained:
-- `<NewName>/` — your game server (start here; owns `Handlers/PacketIds.cs`,
-  generates its own C# from `../Protos/*.proto` via `<Protobuf Include>`)
+- `<NewName>/` — your game server (start here; generates its own C# —
+  including the `PacketIds` enum — from `../Protos/*.proto` via `<Protobuf Include>`)
 - `Protos/` — shared `.proto` files (no csproj; each consumer's `<Protobuf
   Include>` generates C# into that consumer's own assembly)
 - `LibCommons/` — engine: buffers, packet primitives
