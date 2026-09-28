@@ -279,8 +279,22 @@ run_case() {
     echo "    tmpdir: ${tmp}"
     echo "    stdout: ${stdout_file}"
     echo "    stderr: ${stderr_file}"
+    # 목적: CI runner 종료 후 tmpdir이 사라져도 원인(smoke build 오류 등)을 로그에서 확인
+    print_log_tail "stdout" "${stdout_file}"
+    print_log_tail "stderr" "${stderr_file}"
     return 1
   fi
+}
+
+# 용도: 실패 case의 scaffold 출력 마지막 LOG_TAIL_LINES줄을 들여쓰기해 출력
+readonly LOG_TAIL_LINES=60
+print_log_tail() {
+  local label="$1"
+  local file="$2"
+  # 상태: 비어 있거나 없는 로그는 생략
+  [ -s "${file}" ] || return 0
+  echo "    ── ${label} (last ${LOG_TAIL_LINES} lines) ──"
+  tail -n "${LOG_TAIL_LINES}" "${file}" | sed 's/^/    | /'
 }
 
 # sha256 list, sorted, with paths relative to <root>.
