@@ -76,9 +76,11 @@ jobs:
         shell: bash
         run: dotnet workload install maui
 
+      # 목적: MAUI는 Release에서만 maccatalyst RuntimeIdentifiers(x64/arm64)를 추가하므로,
+      #       --no-restore Release build와 같은 Configuration으로 restore해야 NETSDK1047 방지
       - name: Restore
         shell: bash
-        run: dotnet restore FastPortSharp.Dashboard.sln
+        run: dotnet restore FastPortSharp.Dashboard.sln -p:Configuration=Release
 
       - name: Build (Release)
         shell: bash
