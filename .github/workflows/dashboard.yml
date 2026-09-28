@@ -40,7 +40,8 @@ permissions:
 
 jobs:
   build-test:
-    name: ${{ matrix.os }}
+    # 목적: branch ruleset 필수 체크에서 build/dashboard job을 구분할 수 있도록 워크플로 접두어 부여
+    name: dashboard (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
