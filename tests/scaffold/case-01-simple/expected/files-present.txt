@@ -27,7 +27,7 @@ LibCommons/LibCommons.csproj
 LibNetworks/LibNetworks.csproj
 
 # Solution + repo aux
-MyLobbyServer.sln
+out.sln
 .gitignore
 .gitattributes
 README.md

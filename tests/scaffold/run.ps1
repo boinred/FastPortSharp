@@ -132,6 +132,16 @@ function Compute-Sha256 {
     }
 }
 
+# 용도: 실패 case의 scaffold 출력 마지막 60줄을 들여쓰기해 출력
+function Write-LogTail {
+    param([string]$Label, [string]$Path)
+    $tailLines = 60
+    # 상태: 비어 있거나 없는 로그는 생략
+    if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -eq 0) { return }
+    Write-Host "    ── $Label (last $tailLines lines) ──"
+    Get-Content -LiteralPath $Path -Tail $tailLines | ForEach-Object { Write-Host "    | $_" }
+}
+
 function Invoke-Scaffold {
     param(
         [string]$Flavor,
@@ -148,6 +158,7 @@ function Invoke-Scaffold {
                 '--no-git'     { $translated += '-NoGit';     break }
                 '--skip-smoke' { $translated += '-SkipSmoke'; break }
                 '--dry-run'    { $translated += '-DryRun';    break }
+                '--protos-path' { $translated += '-ProtosPath'; break }
                 '--help'       { $translated += '-Help';      break }
                 '-h'           { $translated += '-Help';      break }
                 default        { $translated += $a }
@@ -285,6 +296,9 @@ function Run-Case {
         Write-Host "    tmpdir: $tmp"
         Write-Host "    stdout: $stdoutFile"
         Write-Host "    stderr: $stderrFile"
+        # 목적: CI runner 종료 후 tmpdir이 사라져도 원인(smoke build 오류 등)을 로그에서 확인
+        Write-LogTail -Label 'stdout' -Path $stdoutFile
+        Write-LogTail -Label 'stderr' -Path $stderrFile
         return @{ Pass = $false; Tmp = $tmp }
     }
 }

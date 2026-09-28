@@ -2,28 +2,35 @@ name: dashboard
 
 # Builds and tests FastPortSharp.Dashboard.sln across macOS + Windows.
 # Companion to build.yml (which builds FastPortSharp.sln). Triggered only
-# when Dashboard-related files change to keep main CI unaffected.
+# when Dashboard-related or referenced engine (LibCommons/LibNetworks) files
+# change, on main and builds/release.
 # Design Ref: dashboard-ci-add cycle §3.1.
 
 on:
   push:
     branches:
-      - builds.release
+      - main
+      - builds/release
     paths:
       - 'FastPortDashboard.Maui/**'
       - 'FastPortDashboard.Core/**'
       - 'tests-projects/FastPortDashboardTests/**'
       - 'tests-projects/LibTestTelemetry/**'
+      - 'LibCommons/**'
+      - 'LibNetworks/**'
       - 'FastPortSharp.Dashboard.sln'
       - '.github/workflows/dashboard.yml'
   pull_request:
     branches:
-      - builds.release
+      - main
+      - builds/release
     paths:
       - 'FastPortDashboard.Maui/**'
       - 'FastPortDashboard.Core/**'
       - 'tests-projects/FastPortDashboardTests/**'
       - 'tests-projects/LibTestTelemetry/**'
+      - 'LibCommons/**'
+      - 'LibNetworks/**'
       - 'FastPortSharp.Dashboard.sln'
       - '.github/workflows/dashboard.yml'
   workflow_dispatch:
@@ -69,9 +76,11 @@ jobs:
         shell: bash
         run: dotnet workload install maui
 
+      # 목적: MAUI는 Release에서만 maccatalyst RuntimeIdentifiers(x64/arm64)를 추가하므로,
+      #       --no-restore Release build와 같은 Configuration으로 restore해야 NETSDK1047 방지
       - name: Restore
         shell: bash
-        run: dotnet restore FastPortSharp.Dashboard.sln
+        run: dotnet restore FastPortSharp.Dashboard.sln -p:Configuration=Release
 
       - name: Build (Release)
         shell: bash

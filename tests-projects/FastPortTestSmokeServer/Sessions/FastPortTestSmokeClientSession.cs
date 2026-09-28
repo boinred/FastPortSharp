@@ -286,6 +286,9 @@ public class FastPortTestSmokeClientSession : BaseSessionClient, IIdleTrackedSes
             NetworkDisconnectReason.SendZeroBytes => "send-zero-bytes",
             NetworkDisconnectReason.IdleTimeout => "idle-timeout",
             NetworkDisconnectReason.LocalShutdown => "local-shutdown",
+            NetworkDisconnectReason.InvalidPacketHeader => "invalid-packet-header",
+            NetworkDisconnectReason.ReceiveBufferOverflow => "receive-buffer-overflow",
+            NetworkDisconnectReason.PacketHandlerError => "packet-handler-error",
             _ => "unknown"
         };
     }

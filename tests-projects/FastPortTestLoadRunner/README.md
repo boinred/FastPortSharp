@@ -57,4 +57,4 @@ dotnet run -c Release --project FastPortTestLoadRunner -- \
 
 ## 운영 참고
 
-- [FastPortTestLoadRunner OS Limits](../docs/loadrunner-os-limits.md)
+- [FastPortTestLoadRunner OS Limits](../../docs/loadrunner-os-limits.md)

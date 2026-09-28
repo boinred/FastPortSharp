@@ -27,19 +27,23 @@ scripts/scaffold-game-server.sh   <NewProjectName> <DestinationPath> [OPTIONS]
 
 # PowerShell 7+
 pwsh -File scripts/scaffold-game-server.ps1 <NewProjectName> <DestinationPath> [OPTIONS]
+
+# Named PowerShell parameters
+pwsh -File scripts/scaffold-game-server.ps1 -ProjectName <NewProjectName> -DestinationPath <DestinationPath> [OPTIONS]
 ```
 
 ### Arguments
 
 | Positional | Description |
 |------------|-------------|
-| `NewProjectName` | Must match `^[A-Z][A-Za-z0-9]{0,63}$` (PascalCase ASCII) and not be in `tests/scaffold/_shared/blocked-tokens.txt`. |
-| `DestinationPath` | Absolute or relative target directory. Refused if it already exists and is not empty (use `--force` to overwrite). |
+| `NewProjectName` | Must match `^[A-Z][A-Za-z0-9]{0,63}$` (PascalCase ASCII) and not be in `tests/scaffold/_shared/blocked-tokens.txt`. PowerShell also accepts `-ProjectName`. |
+| `DestinationPath` | Absolute or relative target directory. Its final folder name becomes the solution name. Refused if it already exists and is not empty (use `--force` to overwrite). |
 
 ### Options
 
 | Bash (POSIX) | PowerShell | Description |
 |------|------------|-------------|
+| `--protos-path PATH` | `-ProtosPath PATH` | Copy shared `.proto` files to a custom folder and update the generated `.csproj` reference. Relative paths resolve from the current working directory. |
 | `--force` | `-Force` | Overwrite destination (irreversibly removes its contents). |
 | `--no-git` | `-NoGit` | Skip `git init` + initial commit. |
 | `--dry-run` | `-DryRun` | Print planned actions; no filesystem changes. |
@@ -67,13 +71,13 @@ dotnet run --project MyLobbyServer -c Release
 ```
 
 The new project is self-contained:
-- `<NewName>/` — your game server (start here; owns `Handlers/PacketIds.cs`,
-  generates its own C# from `../Protos/*.proto` via `<Protobuf Include>`)
+- `<NewName>/` — your game server (start here; generates its own C# —
+  including the `PacketIds` enum — from `../Protos/*.proto` via `<Protobuf Include>`)
 - `Protos/` — shared `.proto` files (no csproj; each consumer's `<Protobuf
   Include>` generates C# into that consumer's own assembly)
 - `LibCommons/` — engine: buffers, packet primitives
 - `LibNetworks/` — engine: TCP listener / session
-- `<NewName>.sln` — solution registering the 3 csproj projects
+- `<DestinationFolderName>.sln` — solution registering the 3 csproj projects
 - `.gitignore`, `.gitattributes`, `README.md` — repo hygiene
 
 ### What gets renamed

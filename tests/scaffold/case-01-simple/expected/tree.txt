@@ -31,7 +31,6 @@
 ./LibNetworks/Sessions/SendCompletionTracker.cs
 ./LibNetworks/Sessions/SessionSendOptions.cs
 ./LibNetworks/SocketEventsPool.cs
-./MyLobbyServer.sln
 ./MyLobbyServer/Application/GameServer.cs
 ./MyLobbyServer/Application/GameServerHostedService.cs
 ./MyLobbyServer/Application/PacketDispatcher.cs
@@ -50,3 +49,4 @@
 ./Protos/PacketIds.proto
 ./Protos/Sample.proto
 ./README.md
+./out.sln

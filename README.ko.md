@@ -95,16 +95,18 @@ Listen 주소 / 포트 / 최대 세션 수는
 
 ### 서버 커스터마이징
 
-1. **새 패킷 추가** — `FastPortGameServerTemplate/Protocols/`에 `.proto`를
+1. **새 패킷 추가** — `template-projects/Protos/`에 `.proto`를
    추가합니다. `dotnet build` 시 Grpc.Tools가 C# 클래스를 자동 생성합니다.
-   새 packet id를 `Handlers/PacketIds.cs`에 추가 (사용자 정의는 `≥ 2000` 권장).
+   새 packet id는 `template-projects/Protos/PacketIds.proto`의 `PacketIds`
+   enum에 추가 (사용자 정의는 `≥ 2000` 권장, 생성된 enum은 `PACKET_IDS_`
+   접두어가 제거되어 `PacketIds.MyRequest` 형태).
 
 2. **핸들러 구현**:
 
    ```csharp
    public sealed class MyHandler : IPacketHandler
    {
-       public int PacketId => PacketIds.MyRequest;
+       public int PacketId => (int)PacketIds.MyRequest;
        public void Handle(GameSession session, BasePacket packet) { /* ... */ }
    }
    ```
@@ -202,9 +204,9 @@ pwsh -File scripts/scaffold-game-server.ps1 MyLobbyServer ../my-lobby
 
 ### 📈 상세 벤치마크 결과
 
-👉 **[전체 벤치마크 결과 보기](docs/baseline-benchmark-results.md)**
+👉 **[전체 벤치마크 결과 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/baseline-benchmark-results.md)**
 
-👉 **[10K 부하 검증 결과 보기](docs/load-validation-benchmark-results.md)**
+👉 **[10K 부하 검증 결과 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/load-validation-benchmark-results.md)**
 
 ### 부하 테스트 실행
 
@@ -218,13 +220,17 @@ dotnet run -c Release --project tests-projects/FastPortTestLoadRunner -- --sessi
 
 ### 성능 테스트 리포트
 
+> 아래 과거 리포트는 `e4b4c8e`에서 작업 트리에서 제거되었으며, 링크는 해당
+> 파일이 마지막으로 포함된 커밋을 가리킵니다.
+
 | 리포트 | 설명 | 링크 |
 |--------|------|------|
-| **개선 전 퍼포먼스 리포트** | 최적화 전 Latency 성능 테스트 결과 | [📄 보기](docs/latency-performance-report.md) |
-| **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-lock.md) |
-| **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](docs/latency-performance-report-after-channel.md) |
-| **기존 벤치마크 결과** | LoadRunner 전환 전에 측정한 컴포넌트별 micro benchmark 결과 | [📄 보기](docs/baseline-benchmark-results.md) |
-| **10K 부하 검증 결과** | server send backpressure 최적화 전후 same-machine 10K 비교 | [📄 보기](docs/load-validation-benchmark-results.md) |
+| **BaseListener accept 경로 벤치마크** | accept pump / 세션 생성 offload 최적화 및 시나리오 D closed-loop 최대 처리량 | [📄 보기](docs/baselistener-optimization-benchmark.md) |
+| **개선 전 퍼포먼스 리포트** | 최적화 전 Latency 성능 테스트 결과 | [📄 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report.md) |
+| **Lock 개선 후 퍼포먼스 리포트** | ArrayPool + .NET 10 Lock 적용 후 성능 테스트 | [📄 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report-after-lock.md) |
+| **Channel 적용 후 퍼포먼스 리포트** | 전체 최적화 적용 후 성능 테스트 | [📄 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/latency-performance-report-after-channel.md) |
+| **기존 벤치마크 결과** | LoadRunner 전환 전에 측정한 컴포넌트별 micro benchmark 결과 | [📄 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/baseline-benchmark-results.md) |
+| **10K 부하 검증 결과** | server send backpressure 최적화 전후 same-machine 10K 비교 | [📄 보기](https://github.com/boinred/FastPortSharp/blob/4c24bb36994dc008641a34e285d84a066b7751d7/docs/load-validation-benchmark-results.md) |
 
 ### 최적화 효과 요약
 

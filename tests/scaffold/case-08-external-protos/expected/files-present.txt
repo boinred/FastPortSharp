@@ -1,0 +1,3 @@
+MyLobbyServer/MyLobbyServer.csproj
+../out-protos/PacketIds.proto
+../out-protos/Sample.proto
