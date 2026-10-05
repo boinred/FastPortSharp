@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using LibTestTelemetry;
 
@@ -10,6 +11,9 @@ namespace FastPortDashboard.Maui.Adapters;
 //   FileShare.Read default 사용하면 windows에서 IOException 무한 retry 발생.
 public sealed class JsonlPollingAdapter : IPollingAdapter
 {
+    // 용도: polling 한 번에 파일을 나눠 읽는 chunk 크기
+    private const int ReadChunkBytes = 64 * 1024;
+
     private readonly string _path;
     private readonly TimeSpan _interval;
 
@@ -76,26 +80,58 @@ public sealed class JsonlPollingAdapter : IPollingAdapter
             // 이후 producer append는 다음 iteration에서 처리 (race window 좁힘).
             long fileLength = fs.Length;
 
-            if (startOffset > 0 && startOffset <= fileLength)
-            {
-                fs.Seek(startOffset, SeekOrigin.Begin);
-            }
+            fs.Seek(startOffset, SeekOrigin.Begin);
+            newOffset = startOffset;
 
-            using var sr = new StreamReader(fs);
-            string? line;
-            while ((line = await sr.ReadLineAsync(ct)) is not null)
+            // 범위: [startOffset, fileLength)만 읽음 — capture 이후 append된 바이트를 이번에 읽으면
+            //       offset(fileLength)과 어긋나 다음 polling에서 같은 줄을 다시 yield함.
+            // 규칙: '\n'으로 끝난 완성된 줄만 처리하고 offset을 그 줄 끝으로 이동.
+            //       producer가 쓰는 중인 마지막 줄(줄바꿈 전)은 남겨 두고 다음 polling에서 다시 읽음.
+            var buffer = new byte[ReadChunkBytes];
+            var pendingLine = new MemoryStream();
+            long position = startOffset;
+            while (position < fileLength)
             {
-                if (string.IsNullOrWhiteSpace(line)) { continue; }
-                ObservedMetricsSnapshot? snap = TryDeserialize(line);
-                if (snap is not null) { results.Add(snap); }
-            }
+                int toRead = (int)Math.Min(buffer.Length, fileLength - position);
+                int read = await fs.ReadAsync(buffer.AsMemory(0, toRead), ct);
+                // 상태: 파일이 capture 이후 줄어든 경우 — 다음 polling의 truncation 감지에 맡김
+                if (read == 0) { break; }
 
-            newOffset = fileLength;
+                int segmentStart = 0;
+                for (int i = 0; i < read; i++)
+                {
+                    if (buffer[i] != (byte)'\n') { continue; }
+
+                    // 흐름: 줄 하나 완성 → 앞서 쌓인 조각과 합쳐 역직렬화
+                    pendingLine.Write(buffer, segmentStart, i - segmentStart);
+                    AddSnapshot(results, pendingLine);
+                    pendingLine.SetLength(0);
+                    segmentStart = i + 1;
+                    newOffset = position + i + 1;
+                }
+
+                // 상태: 줄바꿈 없는 나머지는 다음 chunk 또는 다음 polling까지 보류
+                pendingLine.Write(buffer, segmentStart, read - segmentStart);
+                position += read;
+            }
         }
         catch (IOException) { /* 다음 polling에서 재시도 */ }
         catch (OperationCanceledException) { /* normal stop */ }
 
         return (results.ToArray(), newOffset);
+    }
+
+    // 용도: 완성된 줄 바이트(줄바꿈 제외)를 UTF-8로 풀어 snapshot 목록에 추가
+    private static void AddSnapshot(List<ObservedMetricsSnapshot> results, MemoryStream lineBytes)
+    {
+        // 정리: StreamWriter가 파일 맨 앞에 쓰는 UTF-8 BOM, Windows 줄 끝 '\r' 제거
+        string line = Encoding.UTF8.GetString(lineBytes.GetBuffer(), 0, (int)lineBytes.Length)
+            .TrimStart('﻿')
+            .TrimEnd('\r');
+        if (string.IsNullOrWhiteSpace(line)) { return; }
+
+        ObservedMetricsSnapshot? snap = TryDeserialize(line);
+        if (snap is not null) { results.Add(snap); }
     }
 
     private static ObservedMetricsSnapshot? TryDeserialize(string line)

@@ -1,6 +1,8 @@
+using System.Runtime.CompilerServices;
 using CommunityToolkit.Mvvm.Input;
 using FastPortDashboard.Maui.Adapters;
 using FastPortDashboard.Maui.ViewModels;
+using LibTestTelemetry;
 
 namespace FastPortDashboardTests.E2E;
 
@@ -11,19 +13,50 @@ namespace FastPortDashboardTests.E2E;
 public class MockE2ETests
 {
     private const int MockIntervalMs = 30;
-    private const int PumpDurationMs = 250;
 
-    private static async Task PumpMockForAsync(DashboardViewModel vm, int durationMs, int intervalMs)
+    // 용도: pump가 끝나지 않을 때의 안전 상한. 정상 경로는 샘플 수로 끝나므로 이 시간에 의존하지 않음.
+    private static readonly TimeSpan SafetyTimeout = TimeSpan.FromSeconds(10);
+
+    // 용도: 정해진 개수의 snapshot을 받은 뒤 pump 종료.
+    // 목적: 고정 시간 창(예: 250ms) 대신 샘플 수로 끝내 CI runner 부하에 흔들리지 않게 함.
+    private static async Task PumpMockSamplesAsync(DashboardViewModel vm, int sampleCount, int intervalMs)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(durationMs));
-        var adapter = new MockPollingAdapter(interval: TimeSpan.FromMilliseconds(intervalMs));
-        try
+        using var cts = new CancellationTokenSource(SafetyTimeout);
+        var adapter = new TakeAdapter(
+            new MockPollingAdapter(interval: TimeSpan.FromMilliseconds(intervalMs)), sampleCount);
+        await vm.PumpAsync(adapter, cts.Token);
+    }
+
+    // 용도: 내부 adapter에서 count개만 yield하고 끝내는 테스트용 래퍼
+    private sealed class TakeAdapter(IPollingAdapter inner, int count) : IPollingAdapter
+    {
+        public async IAsyncEnumerable<ObservedMetricsSnapshot> StreamAsync(
+            [EnumeratorCancellation] CancellationToken ct)
         {
-            await vm.PumpAsync(adapter, cts.Token);
+            int yielded = 0;
+            await foreach (var snap in inner.StreamAsync(ct))
+            {
+                yield return snap;
+                // 종료 조건: 요청한 샘플 수 도달
+                if (++yielded >= count) { yield break; }
+            }
         }
-        catch (OperationCanceledException)
+    }
+
+    // 용도: count개를 yield한 직후 외부 CTS를 취소하는 테스트용 래퍼 (취소 경로 검증)
+    private sealed class CancelAfterAdapter(IPollingAdapter inner, int count, CancellationTokenSource cts)
+        : IPollingAdapter
+    {
+        public async IAsyncEnumerable<ObservedMetricsSnapshot> StreamAsync(
+            [EnumeratorCancellation] CancellationToken ct)
         {
-            // PumpAsync may exit via yield break or propagate cancellation — both OK.
+            int yielded = 0;
+            await foreach (var snap in inner.StreamAsync(ct))
+            {
+                yield return snap;
+                // 흐름: count 도달 시 취소 → 내부 adapter가 delay 중 취소를 보고 종료
+                if (++yielded == count) { cts.Cancel(); }
+            }
         }
     }
 
@@ -32,7 +65,7 @@ public class MockE2ETests
     public async Task Mock_FullPipeline_PopulatesAllSeries()
     {
         var vm = new DashboardViewModel();
-        await PumpMockForAsync(vm, PumpDurationMs, MockIntervalMs);
+        await PumpMockSamplesAsync(vm, 3, MockIntervalMs);
 
         Assert.IsTrue(vm.ClientRttSeries.Count >= 3,
             $"ClientRttSeries count={vm.ClientRttSeries.Count}, expected >= 3");
@@ -47,7 +80,7 @@ public class MockE2ETests
     public async Task Mock_AllRttPercentiles_Populated()
     {
         var vm = new DashboardViewModel();
-        await PumpMockForAsync(vm, PumpDurationMs, MockIntervalMs);
+        await PumpMockSamplesAsync(vm, 5, MockIntervalMs);
 
         Assert.IsTrue(vm.ClientRttSeries.Count > 0, "ClientRttSeries 비어있지 않음");
         foreach (var p in vm.ClientRttSeries)
@@ -62,16 +95,23 @@ public class MockE2ETests
         }
     }
 
-    // E2E-3: Cancellation 시 graceful — ViewModel state 유효 + 최소 1 sample 수신.
+    // E2E-3: Cancellation 시 graceful — ViewModel state 유효 + 취소 전 받은 sample 유지.
     [TestMethod]
     public async Task Mock_Cancellation_GracefullyTerminates()
     {
         var vm = new DashboardViewModel();
-        await PumpMockForAsync(vm, 100, MockIntervalMs);
+        using var cts = new CancellationTokenSource();
+        var adapter = new CancelAfterAdapter(
+            new MockPollingAdapter(interval: TimeSpan.FromMilliseconds(MockIntervalMs)), 2, cts);
 
-        // 100ms 내 최소 1-2 snapshot 수신 후 cancel. 예외 없이 종료되어야.
-        Assert.IsTrue(vm.ClientRttSeries.Count >= 1,
-            $"최소 1 sample 수신 후 cancel (count={vm.ClientRttSeries.Count})");
+        // 흐름: 2번째 sample 직후 취소 → pump가 예외 없이 끝나야 함
+        Task pump = vm.PumpAsync(adapter, cts.Token);
+        Task finished = await Task.WhenAny(pump, Task.Delay(SafetyTimeout));
+        Assert.AreSame(pump, finished, "취소 후 pump 종료");
+        await pump;
+
+        Assert.AreEqual(2, vm.ClientRttSeries.Count,
+            $"취소 전까지 받은 2 sample 유지 (count={vm.ClientRttSeries.Count})");
     }
 
     // E2E-4: KPI 단조 증가 — Mock random walk은 totalAccepted/totalSentBytes를 증가만.
@@ -82,7 +122,7 @@ public class MockE2ETests
         long initialAccepted = vm.TotalAcceptedSessions;
         long initialSentBytes = vm.TotalSentBytes;
 
-        await PumpMockForAsync(vm, PumpDurationMs, MockIntervalMs);
+        await PumpMockSamplesAsync(vm, 5, MockIntervalMs);
 
         Assert.IsTrue(vm.TotalAcceptedSessions >= initialAccepted,
             $"TotalAcceptedSessions monotonic: initial={initialAccepted}, final={vm.TotalAcceptedSessions}");

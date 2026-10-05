@@ -91,51 +91,53 @@ public class JsonlPollingAdapterTests
             got.Select(s => s.ServerObserved!.CurrentSessions).ToArray());
     }
 
+    // 용도: enumerator에서 snapshot 하나를 받아 CurrentSessions 반환 (안전 상한은 호출자 CTS)
+    private static async Task<long> NextSessionsAsync(IAsyncEnumerator<ObservedMetricsSnapshot> enumerator)
+    {
+        Assert.IsTrue(await enumerator.MoveNextAsync(), "snapshot 수신");
+        return enumerator.Current.ServerObserved!.CurrentSessions;
+    }
+
     // T-JA-2: offset이 polling 사이클 간 유지되어 새 line만 yield.
-    // (백그라운드 writer를 사용해 consumer-generator 사이의 race를 회피.)
+    // 흐름: 기존 2줄을 받은 뒤에 append → 고정 delay 없이 소비 순서로 동기화.
     [TestMethod]
     public async Task Stream_OffsetPersistsBetweenIntervals()
     {
         AppendJsonl(_path, 10, 20);
         var adapter = new JsonlPollingAdapter(_path, interval: TimeSpan.FromMilliseconds(50));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = adapter.StreamAsync(cts.Token).GetAsyncEnumerator(cts.Token);
 
-        // 200ms 뒤에 새 line 2개 append. 그 동안 adapter는 첫 2개를 yield하고
-        // offset을 갱신한 채 delay 상태로 들어감.
-        var writeTask = Task.Run(async () =>
-        {
-            await Task.Delay(250);
-            AppendJsonl(_path, 30, 40);
-        });
+        var got = new List<long> { await NextSessionsAsync(enumerator), await NextSessionsAsync(enumerator) };
 
-        var got = await CollectAsync(adapter, 4, TimeSpan.FromSeconds(4));
-        await writeTask;
+        // 상태: generator가 첫 2줄을 내보내고 멈춘 사이 새 2줄 기록
+        AppendJsonl(_path, 30, 40);
+        got.Add(await NextSessionsAsync(enumerator));
+        got.Add(await NextSessionsAsync(enumerator));
 
-        Assert.AreEqual(4, got.Count, "기존 2 + 신규 2 = 4");
-        CollectionAssert.AreEqual(
-            new long[] { 10, 20, 30, 40 },
-            got.Select(s => s.ServerObserved!.CurrentSessions).ToArray());
+        CollectionAssert.AreEqual(new long[] { 10, 20, 30, 40 }, got, "기존 2 + 신규 2, 중복·누락 없음");
     }
 
     // T-JA-3: truncate 후 offset 리셋, 처음부터 다시 읽기.
+    // 흐름: 기존 3줄을 모두 받은 뒤에 truncate → 첫 polling보다 truncate가 먼저 일어나는 경합 제거.
     [TestMethod]
     public async Task Stream_FileTruncated_RestartsFromBeginning()
     {
         AppendJsonl(_path, 1, 2, 3);
         var adapter = new JsonlPollingAdapter(_path, interval: TimeSpan.FromMilliseconds(50));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var enumerator = adapter.StreamAsync(cts.Token).GetAsyncEnumerator(cts.Token);
 
-        // 250ms 뒤 truncate + 새로운 line 1개. adapter가 delay 중이므로 race 없음.
-        var truncateTask = Task.Run(async () =>
+        for (long expected = 1; expected <= 3; expected++)
         {
-            await Task.Delay(250);
-            File.WriteAllText(_path, string.Empty);
-            AppendJsonl(_path, 99);
-        });
+            Assert.AreEqual(expected, await NextSessionsAsync(enumerator));
+        }
 
-        var got = await CollectAsync(adapter, 4, TimeSpan.FromSeconds(4));
-        await truncateTask;
+        // 상태: truncate + 새 1줄 (새 파일이 기존 offset보다 짧아야 truncation으로 감지됨)
+        File.WriteAllText(_path, string.Empty);
+        AppendJsonl(_path, 99);
 
-        Assert.AreEqual(4, got.Count);
-        Assert.AreEqual(99, got[3].ServerObserved!.CurrentSessions, "Truncate 이후 처음부터 읽어 99 수신");
+        Assert.AreEqual(99, await NextSessionsAsync(enumerator), "Truncate 이후 처음부터 읽어 99 수신");
     }
 
     // T-JA-4
