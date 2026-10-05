@@ -6,9 +6,7 @@ produced by `ServerTelemetryExportBackgroundService` and visualises throughput
 + session KPIs in 1-second intervals.
 
 > **Foundation cycle scope** — single view, single chart (server throughput),
-> 6 KPIs. See `docs/archive/2026-05/maui-telemetry-dashboard-foundation/` for
-> the full PDCA record. Multi-run / RTT charts / report export will come in
-> follow-up cycles.
+> 6 KPIs. Multi-run / RTT charts / report export will come in follow-up cycles.
 
 ## Prerequisites
 

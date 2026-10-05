@@ -1,4 +1,4 @@
-# Global Codex Instructions
+# Agent Instructions (Codex / Claude Code 공통)
 
 ## Language
 
@@ -12,13 +12,10 @@
 - Apply the skill with emphasis on explicit assumptions, simplicity first, surgical changes, verifiable success criteria, and verification.
 - If the skill is not available in the current session, read `/Users/boinred/.codex/skills/karpathy-guidelines/SKILL.md` and follow those instructions as the fallback.
 
-## PDCA Automation Rule
+## Code Map Rule
 
-- `$pdca do {feature}`로 개발을 진행한 경우, 구현 완료 후 가능한 한 자동으로 `$pdca analyze {feature}`를 실행하여 design/code gap을 확인한다.
-- 분석 결과 iterate가 필요한 경우, 사용자 추가 지시를 기다리지 말고 가능한 범위에서 `$pdca iterate {feature}` 흐름까지 자동 진행한다.
-- iterate 이후에는 다시 analyze를 수행하고, match rate가 완료 기준에 도달하거나 더 이상 안전하게 자동 수정할 수 없을 때까지 반복한다.
-- 완료 기준에 도달한 경우, 가능한 한 `$pdca report {feature}`까지 자동으로 작성하여 PDCA 흐름을 마무리한다.
-- 자동 진행 중 테스트 실패, 설계 충돌, 위험한 변경, 사용자 결정이 필요한 범위가 발견되면 즉시 중단하고 현재 상태와 필요한 결정을 보고한다.
+- 코드 탐색 전에 `docs/CODEMAP.md`를 먼저 읽고, 작업에 필요한 파일만 열어 토큰을 절약한다.
+- 프로젝트·디렉터리 추가/삭제, 공개 타입 이동, 빌드·테스트 명령 변경처럼 코드맵 내용이 달라지는 변경을 하면 같은 커밋에서 `docs/CODEMAP.md`도 갱신한다.
 
 ## Commenting Rule
 
