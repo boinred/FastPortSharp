@@ -69,7 +69,7 @@ FastPortDashboard.Maui ──▶ FastPortDashboard.Core
 - **세션당 백그라운드 Task 3개**(`DoWorkReceivedBuffers`, `DoWorkReceivedPackets`, `DoWorkSendBuffers`)가 돈다. 종료는 `RequestDisconnect(reason)` 한 곳으로 모이고 한 번만 실행된다.
 - **버퍼는 `ArrayPool<byte>.Shared`에서 빌린다.** 누가 반환하는지 한 곳으로 정해져 있다. 수정 시 반환 경로를 함께 확인한다.
 - **설정은 `appsettings.json` + Generic Host**다. 앱마다 섹션 이름이 다르다(각 도메인 문서 참고).
-- **proto는 두 벌이다.** 엔진 샘플·도구용 `Protocols/Protos/`와 템플릿용 `template-projects/Protos/`. 서로 섞지 않는다.
+- **proto는 두 벌이다.** `Protocols/Protos/`(packetId `ProtocolId.Tests`=1)는 `FastPortClient`, SmokeServer, LoadRunner가 쓴다. `template-projects/Protos/`(`PacketIds` 1001/1002…)는 템플릿, SampleClient, `FastPortDashboard.Core`가 각자 `<Protobuf Include>`로 생성한다. 두 계열은 서로 통신하지 않으므로 섞지 않는다(대시보드 Echo 클라이언트는 템플릿 서버용이다).
 
 ## 큰 파일
 
