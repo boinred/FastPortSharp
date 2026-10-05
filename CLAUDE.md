@@ -1,10 +1,9 @@
 # CLAUDE.md
 
 공통 에이전트 규칙(언어, 코드 탐색, 문서 유지, C# 스타일, 주석, 테스트, 커밋)은 `AGENTS.md`에 있고, 코드 지도는 `docs/llm/`에 있다.
-Claude Code는 아래 import로 두 파일을 자동으로 읽는다. 규칙은 `AGENTS.md` 한 곳에서만 수정한다.
+Claude Code는 아래 import로 `AGENTS.md`만 자동으로 읽는다. 코드 지도(`docs/llm/README.md`)는 매 세션 컨텍스트를 아끼려고 import하지 않고, `AGENTS.md`의 "코드 탐색 규칙"에 따라 코드 탐색 전에 직접 읽는다. 규칙은 `AGENTS.md` 한 곳에서만 수정한다.
 
 @AGENTS.md
-@docs/llm/README.md
 
 ## Claude Code 전용 메모
 
