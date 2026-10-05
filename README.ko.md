@@ -402,7 +402,7 @@ FastPortSharp/
 ├── 📂 FastPortDashboard.Maui/                # MAUI desktop dashboard (macOS / Windows)
 │                                              # FastPortSharp.Dashboard.sln 로 빌드
 │
-├── 📂 docs/                                  # 벤치마크 리포트, runbook, CODEMAP.md
+├── 📂 docs/                                  # 벤치마크 리포트, runbook, llm/ (에이전트용 코드 지도)
 └── FastPortSharp.sln
 ```
 
