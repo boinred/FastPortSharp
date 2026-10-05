@@ -55,6 +55,7 @@ FastPortDashboard.Maui ──▶ FastPortDashboard.Core
 | `tests/scaffold/` | scaffold golden 테스트 (`run.sh` / `run.ps1`, case-01~08) |
 | `docs/` | 벤치마크 리포트, 부하 검증 runbook/가이드, 이 코드맵 |
 | `.github/workflows/` | `build.yml`, `dashboard.yml`, `scaffold.yml` |
+| `.claude/settings.json` | Claude Code 프로젝트 설정. `superpowers@claude-plugins-official` 플러그인 활성화 (공식 마켓플레이스 등록 포함) |
 
 ## 4. 엔진 핵심
 
