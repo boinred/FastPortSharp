@@ -40,7 +40,8 @@ permissions:
 
 jobs:
   build-test:
-    name: ${{ matrix.os }}
+    # 목적: branch ruleset 필수 체크에서 build/dashboard job을 구분할 수 있도록 워크플로 접두어 부여
+    name: dashboard (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -72,9 +73,12 @@ jobs:
         shell: bash
         run: dotnet --info
 
+      # 목적: workload set 버전 고정. 미지정 시 최신 set(예: 10.0.401.1 → MacCatalyst SDK 27.0)이
+      #       설치되어 runner의 Xcode(26.x)와 맞지 않아 빌드 실패. 10.0.401 = MacCatalyst 26.5 + MAUI 10.0.20
+      #       (FastPortDashboard.Maui의 Microsoft.Maui.Controls 10.0.20과 일치). 올릴 때는 runner Xcode 버전과 함께 확인.
       - name: Install MAUI workload
         shell: bash
-        run: dotnet workload install maui
+        run: dotnet workload install maui --version 10.0.401
 
       # 목적: MAUI는 Release에서만 maccatalyst RuntimeIdentifiers(x64/arm64)를 추가하므로,
       #       --no-restore Release build와 같은 Configuration으로 restore해야 NETSDK1047 방지
