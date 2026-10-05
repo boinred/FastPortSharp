@@ -34,6 +34,7 @@ LLM 에이전트(Codex, Claude Code 등)가 이 저장소에서 서버 코드를
 대상: .NET 10 / C# 14 (`<Nullable>enable</Nullable>`, `<ImplicitUsings>enable</ImplicitUsings>`). 포맷터·분석기 설정 파일(`.editorconfig`)은 아직 없으므로 아래 규칙은 리뷰로 지킨다.
 
 - 네임스페이스는 file-scoped(`namespace LibNetworks.Sessions;`)로 쓴다.
+- 새 파일은 UTF-8, LF로 저장한다. 기존 파일의 인코딩은 요청 없이 바꾸지 않는다. 일부 파일(`LibCommons/LatencyStats.cs` 등)은 CP949라서, 다시 저장하면 diff가 커지고 scaffold golden hash가 바뀐다.
 - 필드 이름은 **고치는 파일의 기존 규칙을 따른다.** 새 파일은 소속 프로젝트의 규칙을 따른다.
   - 엔진·템플릿·샘플(`LibCommons`, `LibNetworks`, `template-projects`, `FastPortServer`, `FastPortClient`): 인스턴스 필드 `m_PascalCase`, static 필드 `s_PascalCase`, 상수 `C_PascalCase` 또는 `PascalCase`.
   - 도구·대시보드(`tests-projects/*`, `FastPortDashboard.*`): `_camelCase`.
