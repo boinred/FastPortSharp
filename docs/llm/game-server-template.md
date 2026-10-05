@@ -114,7 +114,6 @@ scripts/scaffold-game-server.sh MyLobbyServer ../my-lobby --dry-run
 ## 주의
 
 - `IPacketHandler.cs` 주석의 "registering them in PacketDispatcher"는 실제와 다르다. 등록은 `Program.cs` DI에서 한다.
-- `QUICKSTART.ko.md` 5절 예시의 `PacketId => PacketIds.MyRequest`, `session.Send(PacketIds.MyResponse, ...)`는 `(int)` 캐스트가 빠져 그대로는 컴파일되지 않는다. 위 절차를 따른다.
 - `template-projects/Protos`는 템플릿·SampleClient 외에 `FastPortDashboard.Core`도 `<Protobuf Include>`로 쓴다. 기존 메시지·ID를 바꾸면 대시보드 Echo 클라이언트도 깨질 수 있다(→ [dashboard.md](dashboard.md)).
 - 엔진 `Protocols/Protos/`(`commons.proto`, `tests.proto`)와 템플릿 `template-projects/Protos/`는 별개다. 템플릿에서 `Protocols` 프로젝트를 참조하지 않는다.
 - `run.sh --script ps1`의 인자 변환에는 `--protos-path` → `-ProtosPath`가 없다(`run.ps1`에는 있다). ps1 flavor로 case-08을 돌릴 때는 `run.ps1`을 쓴다. CI도 ps1 flavor는 `run.ps1`로 돈다.

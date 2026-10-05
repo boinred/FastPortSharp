@@ -8,11 +8,28 @@ LLM 에이전트(Codex, Claude Code 등)가 이 저장소에서 서버 코드를
 - 사용자가 다른 언어를 명시적으로 요청한 경우에만 해당 언어로 답한다.
 - 코드, 명령어, 파일 경로, API 이름, 에러 메시지는 원문을 유지하고, 설명은 한국어로 작성한다.
 
-## Coding Skill Rule
+## 개발 워크플로 (superpowers)
 
-- For code writing, editing, refactoring, debugging, test work, and code review, use the `karpathy-guidelines` skill before starting implementation.
-- Apply the skill with emphasis on explicit assumptions, simplicity first, surgical changes, verifiable success criteria, and verification.
-- If the skill is not available in the current session, read `/Users/boinred/.codex/skills/karpathy-guidelines/SKILL.md` and follow those instructions as the fallback.
+- Claude Code는 프로젝트 설정 `.claude/settings.json`으로 `superpowers@claude-plugins-official` 플러그인을 켠다. 작업을 시작하기 전에 상황에 맞는 superpowers 스킬을 먼저 호출하고 그 절차를 따른다.
+- 상황별 스킬:
+
+| 상황 | 스킬 |
+|---|---|
+| 새 기능, 동작 변경, 요구가 모호한 요청의 설계 | `brainstorming` |
+| 여러 단계에 걸친 구현 | `writing-plans` → `executing-plans` 또는 `subagent-driven-development` |
+| 코드 작성, 버그 수정 | `test-driven-development` (MSTest로 실패하는 테스트를 먼저 만든다) |
+| 버그, 테스트 실패, CI 실패의 원인 찾기 | `systematic-debugging` |
+| 서로 독립인 작업 여러 개 | `dispatching-parallel-agents` |
+| "완료", 커밋, PR 직전 | `verification-before-completion` (빌드·테스트 출력을 직접 확인) |
+| 리뷰 요청과 리뷰 반영 | `requesting-code-review`, `receiving-code-review` |
+| 작업 브랜치 마무리 | `finishing-a-development-branch` |
+
+- 오타, 문서 한 줄, 설정값 하나처럼 작은 변경은 `brainstorming`·`writing-plans`를 건너뛴다. `verification-before-completion`은 건너뛰지 않는다.
+- 산출물 위치: 설계는 `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, 계획은 `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`에 두고 구현과 같은 PR로 커밋한다. 이 문서들은 결정 기록이고 코드 지도가 아니다. 구현이 끝나면 `docs/llm/` 도메인 문서를 고친다.
+- 계획(`writing-plans`)에는 이 파일의 "문서 유지 규칙"과 "변경 시 함께 해야 하는 일"(golden hash 갱신 등)을 단계로 넣는다. 테스트 명령은 `docs/llm/platform.md`의 것을 쓴다.
+- `finishing-a-development-branch`에서는 항상 "push 후 PR"을 고른다. `main`은 보호 브랜치라 로컬 머지나 직접 push를 하지 않는다.
+- 우선순위: 이 파일(`AGENTS.md`)과 사용자 지시 > superpowers 스킬 > 기본 동작. 예를 들어 스킬 예시의 커밋 메시지(`feat: ...`)보다 아래 "Git / 커밋 메시지" 형식을 따른다.
+- 플러그인을 쓸 수 없는 에이전트(Codex 등)는 같은 순서(설계 → 계획 → 테스트 먼저 구현 → 검증 → 리뷰 → PR)를 직접 따른다. 스킬 원문: <https://github.com/obra/superpowers/tree/main/skills>.
 
 ## 코드 탐색 규칙
 

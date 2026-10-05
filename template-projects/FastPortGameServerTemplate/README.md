@@ -133,7 +133,6 @@ publish workflow.
 ## See also
 
 - Repo `README.md` — performance benchmarks, full architecture overview.
-- Repo `HANDOFF.md` — important architecture decisions and roadmap context.
-- `docs/00-pm/game-server-template-from-network-engine.prd.md` — PM analysis.
-- `docs/02-design/features/game-server-template-from-network-engine.design.md`
-  — design rationale (Option C — Pragmatic Balance).
+- Repo `docs/llm/game-server-template.md` — template structure, packet-add
+  steps, scaffold and golden-test rules.
+- Repo `docs/llm/session.md` — engine session receive/send/disconnect behavior.

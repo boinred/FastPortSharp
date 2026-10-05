@@ -52,7 +52,7 @@
 | 대시보드 차트 추가 | `DashboardViewModel`에 `ObservableCollection` 시리즈 + 600점 trim → `JsonlPollingPage.xaml`에 `GraphicsView` → `.xaml.cs`에서 drawable 연결·`CollectionChanged` 구독 | 여러 선이면 `MultiLineChartDrawable`/`LineChartSeries`, 범위 수학은 `LineChartMath` + `LineChartMathTests` |
 | JSONL 읽기 문제(누락·중복·IOException) | `JsonlPollingAdapter.ReadNewSnapshotsAsync` | 생산자의 `FileShare`·flush(`ServerTelemetryExportBackgroundService`), `JsonlPollingAdapterTests` |
 | 새 데이터 소스 | `IPollingAdapter` 구현 → `DashboardViewModel.StartAsync`의 선택 분기 | `UseMock`/`FilePath` 입력 UI |
-| Echo 클라이언트 프로토콜 변경 | `EchoClientSession`(송신·`OnReceived`), `template-projects/Protos/` | 템플릿·SampleClient 영향([game-server-template.md](game-server-template.md)), `dashboard.yml` paths에 Protos가 없음 |
+| Echo 클라이언트 프로토콜 변경 | `EchoClientSession`(송신·`OnReceived`), `template-projects/Protos/` | 템플릿·SampleClient 영향([game-server-template.md](game-server-template.md)), scaffold golden 갱신 |
 | Echo 연결 상태·오류 표시 | `EchoClientConnector`, `EchoClientViewModel.OnConnectorStateChanged` | `EchoClientConnectorTests` |
 | Echo KPI 계산 | `EchoClientStats.Snapshot` | `EchoClientStatsTests` |
 | MAUI CI 실패 | `.github/workflows/dashboard.yml` | workload 버전·Xcode, restore의 `-p:Configuration=Release` |
@@ -75,7 +75,7 @@ dotnet build FastPortDashboard.Maui/FastPortDashboard.Maui.csproj -c Release -f 
 
 - 실데이터 확인: SmokeServer를 `--Telemetry:Output=<경로>`로 띄운 뒤([load-testing.md](load-testing.md)) JSONL Polling 탭에서 Mock을 끄고 그 파일을 고른다. Echo 탭은 게임 서버 템플릿을 띄우고 7777에 붙는다.
 - 테스트(`tests-projects/FastPortDashboardTests/`): `Adapters/JsonlPollingAdapterTests.cs`(offset 유지, truncate, 깨진 줄, 동시 쓰기), `Adapters/MockPollingAdapterTests.cs`, `Charts/LineChartMathTests.cs`, `EchoClient/EchoClientConnectorTests.cs`, `EchoClient/EchoClientStatsTests.cs`, `ViewModels/DashboardViewModelTests.cs`, `E2E/MockE2ETests.cs`(Mock → ViewModel 전체 흐름). `EchoClientViewModel` 전용 테스트는 없다.
-- CI `dashboard.yml`: `main`·`builds/release`의 push/PR 중 `FastPortDashboard.Maui/**`, `FastPortDashboard.Core/**`, `tests-projects/FastPortDashboardTests/**`, `tests-projects/LibTestTelemetry/**`, `LibCommons/**`, `LibNetworks/**`, `FastPortSharp.Dashboard.sln`, 워크플로 자신이 바뀔 때와 `workflow_dispatch`로 돈다. job 이름은 `dashboard (macos-latest)`, `dashboard (windows-latest)`이다. Linux는 MAUI TFM을 빌드할 수 없어 matrix에서 뺐다.
+- CI `dashboard.yml`: `main`·`builds/release`의 push/PR 중 `FastPortDashboard.Maui/**`, `FastPortDashboard.Core/**`, `tests-projects/FastPortDashboardTests/**`, `tests-projects/LibTestTelemetry/**`, `LibCommons/**`, `LibNetworks/**`, `template-projects/Protos/**`, `FastPortSharp.Dashboard.sln`, 워크플로 자신이 바뀔 때와 `workflow_dispatch`로 돈다. job 이름은 `dashboard (macos-latest)`, `dashboard (windows-latest)`이다. Linux는 MAUI TFM을 빌드할 수 없어 matrix에서 뺐다.
 
 ## 주의
 
@@ -85,6 +85,5 @@ dotnet build FastPortDashboard.Maui/FastPortDashboard.Maui.csproj -c Release -f 
 - MAUI workload는 `--version 10.0.401`로 고정한다. 최신 workload set은 runner의 Xcode보다 높은 MacCatalyst SDK를 요구해 빌드가 깨질 수 있다. 올릴 때는 `Microsoft.Maui.Controls` 버전과 runner Xcode를 함께 확인한다.
 - macOS Catalyst Release는 AOT에서 시작 시 SIGABRT가 나서 `RunAOTCompilation=false`, `MtouchInterpreter=all`로 둔다.
 - `Platforms/` 아래 Android·iOS·Tizen 폴더가 남아 있지만 TFM에 없어 빌드되지 않는다.
-- `dashboard.yml` paths에는 `template-projects/Protos/**`가 없다. Core가 그 proto를 생성하므로 Protos만 바꾼 PR에서는 대시보드 CI가 돌지 않는다.
 - `FastPortDashboard.Maui/README.md`는 일부 오래됐다(ViewModel 위치를 Maui로 적음, RTT 차트 미포함이라고 적음, SmokeServer가 기본으로 JSONL을 쓴다고 적음). 코드가 기준이다. SmokeServer는 `Telemetry:Output`을 줘야 JSONL을 쓴다.
 - 코드 주석의 `Design Ref: §...`는 저장소에 없는 과거 설계 문서 참조다. 용어는 [glossary.md](glossary.md), 전체 지도는 [README.md](README.md), 샘플 서버·클라이언트는 [sample-apps.md](sample-apps.md).

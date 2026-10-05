@@ -44,7 +44,7 @@
 | 워크플로 | 트리거 | job 이름 | 내용 |
 |---|---|---|---|
 | `.github/workflows/build.yml` | `main`, `builds/release` push·PR, 수동 | `build (ubuntu-latest)`, `build (macos-latest)`, `build (windows-latest)` | `FastPortSharp.sln` restore → Release build → test. **main 필수 체크** |
-| `.github/workflows/dashboard.yml` | 위 두 브랜치 + 대시보드·`LibTestTelemetry`·엔진·`FastPortSharp.Dashboard.sln` 경로 변경 | `dashboard (macos-latest)`, `dashboard (windows-latest)` | MAUI workload 설치(`--version 10.0.401` 고정) → restore(`-p:Configuration=Release`) → build → test |
+| `.github/workflows/dashboard.yml` | 위 두 브랜치 + 대시보드·`LibTestTelemetry`·엔진·`template-projects/Protos`·`FastPortSharp.Dashboard.sln` 경로 변경 | `dashboard (macos-latest)`, `dashboard (windows-latest)` | MAUI workload 설치(`--version 10.0.401` 고정) → restore(`-p:Configuration=Release`) → build → test |
 | `.github/workflows/scaffold.yml` | `main` push·모든 PR 중 scaffold 스크립트·`tests/scaffold`·템플릿·`template-projects/Protos`·엔진·`.gitattributes` 경로 변경, 수동 | `<os> / <sh\|ps1>`, `cross-OS byte-identical compare` | 3개 OS × sh/ps1로 scaffold 케이스 실행 후 결과 sha256을 OS 사이에 비교 |
 
 - CI 실패를 볼 때는 먼저 base 브랜치(`main`)에서도 같은 job이 실패하는지 확인한다.

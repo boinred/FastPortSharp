@@ -91,6 +91,7 @@ FastPortDashboard.Maui ──▶ FastPortDashboard.Core
 - `bin/`, `obj/`, `TestResults/`: 빌드 산출물.
 - `docs/*.md`(이 폴더 제외): 벤치마크 리포트와 runbook. 성능 수치나 클라우드 절차가 필요할 때만 [load-testing.md](load-testing.md)에서 골라 읽는다.
 - 코드 주석의 `Design Ref: §...`: 저장소에 없는 과거 설계 문서 참조다.
+- `docs/superpowers/specs/`, `docs/superpowers/plans/`: superpowers 워크플로가 남긴 설계·계획 기록이다. 현재 코드 구조는 이 폴더(`docs/llm/`)가 기준이다. 결정 배경이 필요할 때만 읽는다.
 
 ## 문서 유지 규칙
 
