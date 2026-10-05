@@ -157,7 +157,7 @@ tests/scaffold/run.sh [--script ps1] [--update-golden case-01-simple] [case...]
 - **Client/Server 명명**: `BaseSessionClient` = 서버가 accept한 세션, `BaseSessionServer` = 클라이언트가 연결한 세션.
 - **미사용 코드**: `BaseSession` 생성자의 `sendbuffers`(IBuffers), `BaseListener.C_MaxConnections`(저장만 함), `SocketEventsPool`, `FastPortClientSessionManager`(빈 stub).
 - **Dashboard.sln**에는 `LibCommons`/`LibNetworks`가 포함되지 않아 Release 빌드에서도 ProjectReference가 Debug 구성으로 빌드됨.
-- **MAUI CI**: `--no-restore` Release 빌드 전 restore에도 `-p:Configuration=Release` 필요 (NETSDK1047/1112).
+- **MAUI CI**: `--no-restore` Release 빌드 전 restore에도 `-p:Configuration=Release` 필요 (NETSDK1047/1112). workload는 `dotnet workload install maui --version 10.0.401`로 고정 — 최신 set은 runner Xcode보다 높은 MacCatalyst SDK를 요구할 수 있음.
 - **macOS symlink**: `/var` → `/private/var`. 절대 경로 sln 빌드 시 ProjectReference 중복 restore 경합 → scaffold smoke build는 dest로 이동 후 상대 경로로 빌드.
 - **릴리스 브랜치 이름**: `builds/release` (`builds.release` 아님).
 - **코드 주석의 `Design Ref: §...`**: 과거 설계 문서 참조이며 해당 문서는 저장소에 없음.
