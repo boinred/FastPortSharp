@@ -411,7 +411,7 @@ FastPortSharp/
 ├── 📂 FastPortDashboard.Maui/                # MAUI desktop dashboard (macOS / Windows)
 │                                              # Built via FastPortSharp.Dashboard.sln
 │
-├── 📂 docs/                                  # Performance reports, PDCA archive
+├── 📂 docs/                                  # Benchmark reports, runbooks, CODEMAP.md
 └── FastPortSharp.sln
 ```
 
