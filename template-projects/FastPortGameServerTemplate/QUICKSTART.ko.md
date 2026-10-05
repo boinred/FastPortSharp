@@ -69,12 +69,12 @@ nc -zv 127.0.0.1 7777
    ```csharp
    public sealed class MyHandler : IPacketHandler
    {
-       public int PacketId => PacketIds.MyRequest;
+       public int PacketId => (int)PacketIds.MyRequest;
        public void Handle(GameSession session, BasePacket packet)
        {
            // 1) ParseMessageFromPacket<MyRequest> 로 디코딩
            // 2) 게임 로직
-           // 3) session.Send(PacketIds.MyResponse, response)
+           // 3) session.Send((int)PacketIds.MyResponse, response)
        }
    }
    ```
@@ -123,8 +123,6 @@ runner의 출발점으로도 사용할 수 있습니다.
 
 ## 다음 단계
 
-- 본 cycle 자체에 대한 배경: `docs/00-pm/...prd.md`,
-  `docs/01-plan/features/...plan.md`,
-  `docs/02-design/features/...design.md`.
-- 엔진 패키지 NuGet publish 정책: `HANDOFF.md` "Important Architecture
-  Decisions" 섹션의 game server template 항목 + 차기 cycle.
+- 템플릿 구조, 패킷 추가 절차, scaffold 규칙: FastPortSharp 저장소의
+  `docs/llm/game-server-template.md`.
+- 엔진 세션 동작(수신·송신·종료): FastPortSharp 저장소의 `docs/llm/session.md`.
